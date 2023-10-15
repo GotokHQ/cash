@@ -1,0 +1,30 @@
+name: SDK PassBook
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  build-lint-and-test-pass-book:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions/cache@v2
+        with:
+          path: '**/node_modules'
+          key: sdk-pass-book-js-${{ runner.os }}-modules-${{ hashFiles('**/yarn.lock') }}
+
+      - name: Install modules
+        run: yarn install
+        shell: bash
+
+      - name: Build TypeScript 
+        run: yarn build
+        shell: bash
+        
+      - name: Lint TypeScript 
+        run: yarn lint
+        shell: bash
