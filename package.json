@@ -2,8 +2,8 @@
     "name": "@gotok/cash",
     "version": "0.0.1",
     "description": "Cash Link JavaScript API.",
-    "main": "dist/src/card.js",
-    "types": "dist/src/card.d.ts",
+    "main": "dist/src/cash.js",
+    "types": "dist/src/cash.d.ts",
     "scripts": {
         "build:docs": "typedoc",
         "build": "rimraf dist && tsc -p tsconfig.json",
@@ -22,8 +22,6 @@
         "dist"
     ],
     "keywords": [
-        "nft",
-        "pass",
         "solana",
         "blockchain"
     ],

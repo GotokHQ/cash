@@ -3,9 +3,7 @@ use crate::instruction::CashInstruction;
 
 use solana_program::{account_info::AccountInfo, entrypoint::ProgramResult, msg, pubkey::Pubkey};
 
-pub mod deposit;
-pub mod withdraw;
-pub mod escrow;
+pub mod cashlink;
 
 
 pub struct Processor;
@@ -20,29 +18,21 @@ impl Processor {
         msg!("Successfully deserialized cash instruction");
 
         match instruction {
-            CashInstruction::InitDeposit(args) => {
-                msg!("Instruction: Init deposit");
-                deposit::init(program_id, accounts, args)
-            }
-            CashInstruction::InitWithdrawal(args) => {
-                msg!("Instruction: Init withdraw");
-                withdraw::init(program_id, accounts, args)
-            }
-            CashInstruction::InitEscrow(args) => {
-                msg!("Instruction: InitEscrow");
-                escrow::process_init_escrow(accounts, args, program_id)
+            CashInstruction::InitCashLink(args) => {
+                msg!("Instruction: InitCashLink");
+                cashlink::process_init_cash_link(accounts, args, program_id)
             }
             CashInstruction::Settle => {
-                msg!("Instruction: Settle Escrow");
-                escrow::process_settlement(accounts, program_id)
+                msg!("Instruction: Settle CashLink");
+                cashlink::process_settlement(accounts, program_id)
             }
             CashInstruction::Cancel => {
-                msg!("Instruction: Cancel Escrow");
-                escrow::process_cancel(accounts, program_id)
+                msg!("Instruction: Cancel CashLink");
+                cashlink::process_cancel(accounts, program_id)
             }
             CashInstruction::Close => {
                 msg!("Instruction: Close");
-                escrow::process_close(accounts, program_id)
+                cashlink::process_close(accounts, program_id)
             }
         }
     }

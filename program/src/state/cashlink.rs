@@ -6,11 +6,11 @@ use solana_program::{
     program_pack::{IsInitialized, Pack, Sealed}, pubkey::Pubkey,
 };
 
-pub const ESCROW_DATA_SIZE: usize = 164;
+pub const CASH_LINK_DATA_SIZE: usize = 164;
 
 #[repr(C)]
 #[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq, Clone, Default)]
-pub enum EscrowState {
+pub enum CashLinkState {
     #[default]
     Uninitialized = 0,
     Initialized,
@@ -20,8 +20,8 @@ pub enum EscrowState {
 }
 #[repr(C)]
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Default)]
-pub struct Escrow {
-    pub state: EscrowState,
+pub struct CashLink {
+    pub state: CashLinkState,
     pub amount: u64,
     pub fee: u64,
     pub payer: Pubkey,
@@ -33,30 +33,30 @@ pub struct Escrow {
     pub authority: Pubkey,
 }
 
-impl Escrow {
-    pub const PREFIX: &'static str = "escrow";
+impl CashLink {
+    pub const PREFIX: &'static str = "cash";
     pub const VAULT_PREFIX: &'static str = "vault";
     pub fn is_closed(&self) -> bool {
-        self.state == EscrowState::Closed
+        self.state == CashLinkState::Closed
     }
     pub fn is_settled(&self) -> bool {
-        self.state == EscrowState::Settled
+        self.state == CashLinkState::Settled
     }
     pub fn is_canceled(&self) -> bool {
-        self.state == EscrowState::Canceled
+        self.state == CashLinkState::Canceled
     }
 }
 
-impl IsInitialized for Escrow {
+impl IsInitialized for CashLink {
     fn is_initialized(&self) -> bool {
-        self.state == EscrowState::Initialized
+        self.state == CashLinkState::Initialized
     }
 }
 
-impl Sealed for Escrow {}
+impl Sealed for CashLink {}
 
-impl Pack for Escrow {
-    const LEN: usize = ESCROW_DATA_SIZE;
+impl Pack for CashLink {
+    const LEN: usize = CASH_LINK_DATA_SIZE;
 
     fn pack_into_slice(&self, dst: &mut [u8]) {
         let mut slice = dst;

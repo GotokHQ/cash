@@ -15,14 +15,14 @@ import * as spl from '@solana/spl-token';
 import BN from 'bn.js';
 import { InitializePaymentInput, EscrowInput } from './types';
 import { CashProgram } from '../cashProgram';
-import { Escrow, EscrowState } from '../accounts/escrow';
-import { InitEscrowArgs, InitEscrowParams } from '../transactions/InitEscrow';
-import { CloseEscrowArgs, CloseEscrowParams } from '../transactions/CloseEscrow';
-import { SettleEscrowArgs, SettleEscrowParams } from '../transactions/SettleEscrow';
+import { CashLink, CashLinkState } from '../accounts/cash_link';
+import { InitCashLinkArgs, InitCashLinkParams } from '../transactions/InitCashLink';
+import { CloseCashLinkArgs, CloseCashLinkParams } from '../transactions/CloseCashLink';
+import { SettleCashLinkArgs, SettleCashLinkParams } from '../transactions/SettleCashLink';
 import { InitDepositArgs, InitDepositParams } from '../transactions/InitDeposit';
 import {
-  CancelEscrowArgs,
-  CancelEscrowParams,
+  CancelCashLinkArgs,
+  CancelCashLinkParams,
   InitWithdrawArgs,
   InitWithdrawParams,
 } from '../transactions';
@@ -69,10 +69,10 @@ export class EscrowClient {
 
   cancel = async (input: EscrowInput): Promise<string> => {
     const escrow = await _getEscrowAccount(this.connection, new PublicKey(input.escrowAddress));
-    if (escrow.data?.state === EscrowState.Closed) {
+    if (escrow.data?.state === CashLinkState.Closed) {
       throw new Error(ACCOUNT_ALREADY_CANCELED);
     }
-    if (escrow.data?.state === EscrowState.Settled) {
+    if (escrow.data?.state === CashLinkState.Settled) {
       throw new Error(ACCOUNT_ALREADY_SETTLED);
     }
     const payer = new PublicKey(escrow.data.payer);
@@ -115,10 +115,10 @@ export class EscrowClient {
 
   cancelAndClose = async (input: EscrowInput): Promise<string> => {
     const escrow = await _getEscrowAccount(this.connection, new PublicKey(input.escrowAddress));
-    if (escrow.data?.state === EscrowState.Closed) {
+    if (escrow.data?.state === CashLinkState.Closed) {
       throw new Error(ACCOUNT_ALREADY_CANCELED);
     }
-    if (escrow.data?.state === EscrowState.Settled) {
+    if (escrow.data?.state === CashLinkState.Settled) {
       throw new Error(ACCOUNT_ALREADY_SETTLED);
     }
     const payer = new PublicKey(escrow.data.payer);
@@ -164,10 +164,10 @@ export class EscrowClient {
     }
   };
 
-  cancelInstruction = async (params: CancelEscrowParams): Promise<TransactionInstruction> => {
+  cancelInstruction = async (params: CancelCashLinkParams): Promise<TransactionInstruction> => {
     return new TransactionInstruction({
       programId: CashProgram.PUBKEY,
-      data: CancelEscrowArgs.serialize(),
+      data: CancelCashLinkArgs.serialize(),
       keys: [
         { pubkey: params.authority, isSigner: true, isWritable: false },
         { pubkey: params.escrow, isSigner: false, isWritable: true },
@@ -198,7 +198,7 @@ export class EscrowClient {
     const escrow = await _getEscrowAccount(this.connection, new PublicKey(input.escrowAddress));
     if (
       !(
-        escrow.data?.state === EscrowState.Initialized || escrow.data?.state === EscrowState.Settled
+        escrow.data?.state === CashLinkState.Initialized || escrow.data?.state === CashLinkState.Settled
       )
     ) {
       throw new Error(ACCOUNT_NOT_INITIALIZED_OR_SETTLED);
@@ -222,10 +222,10 @@ export class EscrowClient {
     });
   };
 
-  closeInstruction = (params: CloseEscrowParams): TransactionInstruction => {
+  closeInstruction = (params: CloseCashLinkParams): TransactionInstruction => {
     return new TransactionInstruction({
       programId: CashProgram.PUBKEY,
-      data: CloseEscrowArgs.serialize(),
+      data: CloseCashLinkArgs.serialize(),
       keys: [
         { pubkey: params.authority, isSigner: true, isWritable: false },
         {
@@ -246,11 +246,11 @@ export class EscrowClient {
   initializeEscrow = async (input: InitializePaymentInput): Promise<string> => {
     const payer = new PublicKey(input.wallet);
     const mint = new PublicKey(input.mint);
-    const [escrow, escrowBump] = await CashProgram.findEscrowAccount(input.reference);
+    const [escrow, escrowBump] = await CashProgram.findCashLinkAccount(input.reference);
     const [vaultTokenAccount, vaultBump] = await CashProgram.findVaultAccount(escrow);
     const amount = new BN(input.amount);
     const fee = new BN(input.fee ?? 0);
-    const escrowParams: InitEscrowParams = {
+    const escrowParams: InitCashLinkParams = {
       mint,
       payer,
       escrowBump,
@@ -283,12 +283,12 @@ export class EscrowClient {
   initializeEscrowAndPay = async (input: InitializePaymentInput): Promise<string> => {
     const payer = new PublicKey(input.wallet);
     const mint = new PublicKey(input.mint);
-    const [escrow, escrowBump] = await CashProgram.findEscrowAccount(input.reference);
+    const [escrow, escrowBump] = await CashProgram.findCashLinkAccount(input.reference);
     const [vaultTokenAccount, vaultBump] = await CashProgram.findVaultAccount(escrow);
     const amount = new BN(input.amount);
     const fee = new BN(input.fee ?? 0);
     const total = amount.add(fee);
-    const escrowParams: InitEscrowParams = {
+    const escrowParams: InitCashLinkParams = {
       mint,
       payer,
       escrowBump,
@@ -336,7 +336,7 @@ export class EscrowClient {
     const escrowAddress = new PublicKey(input.escrowAddress);
     const walletAddress = new PublicKey(input.memo);
     const escrow = await _getEscrowAccount(this.connection, escrowAddress);
-    if (escrow.data.state !== EscrowState.Initialized) {
+    if (escrow.data.state !== CashLinkState.Initialized) {
       throw Error(INVALID_STATE);
     }
     const [vaultTokenAccount] = await CashProgram.findVaultAccount(escrowAddress);
@@ -378,7 +378,7 @@ export class EscrowClient {
       .toString('base64');
   };
 
-  initInstruction = (params: InitEscrowParams): TransactionInstruction => {
+  initInstruction = (params: InitCashLinkParams): TransactionInstruction => {
     const {
       amount,
       fee,
@@ -391,12 +391,12 @@ export class EscrowClient {
       vaultToken,
       mint,
     } = params;
-    const data = InitEscrowArgs.serialize({
+    const data = InitCashLinkArgs.serialize({
       amount,
       fee,
       reference,
       vault_bump: vaultBump,
-      escrow_bump: escrowBump,
+      cash_link_bump: escrowBump,
     });
     const keys = [
       {
@@ -854,10 +854,10 @@ export class EscrowClient {
     }
   };
 
-  settleInstruction = async (params: SettleEscrowParams): Promise<TransactionInstruction> => {
+  settleInstruction = async (params: SettleCashLinkParams): Promise<TransactionInstruction> => {
     return new TransactionInstruction({
       programId: CashProgram.PUBKEY,
-      data: SettleEscrowArgs.serialize(),
+      data: SettleCashLinkArgs.serialize(),
       keys: [
         { pubkey: params.authority, isSigner: true, isWritable: false },
         { pubkey: params.destinationToken, isSigner: false, isWritable: true },
@@ -942,7 +942,7 @@ export class EscrowClient {
     }
   };
 
-  getEscrow = async (address: PublicKey, commitment?: Commitment): Promise<Escrow | null> => {
+  getEscrow = async (address: PublicKey, commitment?: Commitment): Promise<CashLink | null> => {
     try {
       return await _getEscrowAccount(this.connection, address, commitment);
     } catch (error) {
@@ -992,13 +992,13 @@ const _getEscrowAccount = async (
   connection: Connection,
   escrowAddress: PublicKey,
   commitment?: Commitment,
-): Promise<Escrow | null> => {
+): Promise<CashLink | null> => {
   try {
     const accountInfo = await connection.getAccountInfo(escrowAddress, commitment);
     if (accountInfo == null) {
       throw new Error(FAILED_TO_FIND_ACCOUNT);
     }
-    const escrow = Escrow.from(new Account(escrowAddress, accountInfo));
+    const escrow = CashLink.from(new Account(escrowAddress, accountInfo));
     return escrow;
   } catch (error) {
     return null;

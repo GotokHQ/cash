@@ -11,7 +11,7 @@ import { CashProgram } from '../cashProgram';
 
 export const MAX_ESCROW_DATA_LEN = 164;
 
-export enum EscrowState {
+export enum CashLinkState {
   Uninitialized = 0,
   Initialized = 1,
   Settled = 2,
@@ -19,8 +19,8 @@ export enum EscrowState {
   Closed = 4,
 }
 
-export type EscrowDataArgs = {
-  state: EscrowState;
+export type CashLinkDataArgs = {
+  state: CashLinkState;
   amount: BN;
   fee: BN;
   vaultToken: StringPublicKey;
@@ -32,8 +32,8 @@ export type EscrowDataArgs = {
   canceled_at?: BN;
 };
 
-export class EscrowData extends Borsh.Data<EscrowDataArgs> {
-  static readonly SCHEMA = EscrowData.struct([
+export class CashLinkData extends Borsh.Data<CashLinkDataArgs> {
+  static readonly SCHEMA = CashLinkData.struct([
     ['state', 'u8'],
     ['amount', 'u64'],
     ['fee', 'u64'],
@@ -45,7 +45,7 @@ export class EscrowData extends Borsh.Data<EscrowDataArgs> {
     ['settled_at', { kind: 'option', type: 'u64' }],
     ['canceled_at', { kind: 'option', type: 'u64' }],
   ]);
-  state: EscrowState;
+  state: CashLinkState;
   amount: BN;
   fee: BN;
   payer: StringPublicKey;
@@ -56,24 +56,24 @@ export class EscrowData extends Borsh.Data<EscrowDataArgs> {
   settled_at: BN | null;
   canceled_at: BN | null;
 
-  constructor(args: EscrowDataArgs) {
+  constructor(args: CashLinkDataArgs) {
     super(args);
   }
 }
 
-export class Escrow extends Account<EscrowData> {
-  static readonly PREFIX = 'escrow';
+export class CashLink extends Account<CashLinkData> {
+  static readonly PREFIX = 'cash';
   static readonly VAULT_PREFIX = 'vault';
   constructor(pubkey: AnyPublicKey, info: AccountInfo<Buffer>) {
     super(pubkey, info);
-    this.data = EscrowData.deserialize(this.info.data);
+    this.data = CashLinkData.deserialize(this.info.data);
     if (!this.assertOwner(CashProgram.PUBKEY)) {
       throw ERROR_INVALID_OWNER();
     }
   }
 
   static async getPDA(reference: string) {
-    const [pubKey] = await CashProgram.findEscrowAccount(reference);
+    const [pubKey] = await CashProgram.findCashLinkAccount(reference);
     return pubKey;
   }
 }
