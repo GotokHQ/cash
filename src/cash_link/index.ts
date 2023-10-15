@@ -13,20 +13,19 @@ import {
 } from '@solana/web3.js';
 import * as spl from '@solana/spl-token';
 import BN from 'bn.js';
-import { InitializePaymentInput, EscrowInput } from './types';
-import { CashProgram } from '../cashProgram';
+import { InitializeCashLinkInput, CashLinkInput } from './types';
+import { CashProgram } from '../cash_program';
 import { CashLink, CashLinkState } from '../accounts/cash_link';
-import { InitCashLinkArgs, InitCashLinkParams } from '../transactions/InitCashLink';
-import { CloseCashLinkArgs, CloseCashLinkParams } from '../transactions/CloseCashLink';
-import { SettleCashLinkArgs, SettleCashLinkParams } from '../transactions/SettleCashLink';
-import { InitDepositArgs, InitDepositParams } from '../transactions/InitDeposit';
 import {
   CancelCashLinkArgs,
   CancelCashLinkParams,
-  InitWithdrawArgs,
-  InitWithdrawParams,
+  InitCashLinkArgs,
+  InitCashLinkParams,
+  CloseCashLinkArgs,
+  CloseCashLinkParams,
+  SettleCashLinkArgs,
+  SettleCashLinkParams,
 } from '../transactions';
-import { Deposit, Withdraw } from '../accounts';
 import { Account } from '@metaplex-foundation/mpl-core';
 
 export const FAILED_TO_FIND_ACCOUNT = 'Failed to find account';
@@ -67,33 +66,33 @@ export class EscrowClient {
     this.connection = connection;
   }
 
-  cancel = async (input: EscrowInput): Promise<string> => {
-    const escrow = await _getEscrowAccount(this.connection, new PublicKey(input.escrowAddress));
-    if (escrow.data?.state === CashLinkState.Closed) {
+  cancel = async (input: CashLinkInput): Promise<string> => {
+    const cashLink = await _getCasLinkAccount(this.connection, new PublicKey(input.escrowAddress));
+    if (cashLink.data?.state === CashLinkState.Closed) {
       throw new Error(ACCOUNT_ALREADY_CANCELED);
     }
-    if (escrow.data?.state === CashLinkState.Settled) {
+    if (cashLink.data?.state === CashLinkState.Settled) {
       throw new Error(ACCOUNT_ALREADY_SETTLED);
     }
-    const payer = new PublicKey(escrow.data.payer);
-    const mint = new PublicKey(escrow.data.mint);
+    const payer = new PublicKey(cashLink.data.payer);
+    const mint = new PublicKey(cashLink.data.mint);
     const isNative = mint.equals(spl.NATIVE_MINT);
     const cancelInstruction = await this.cancelInstruction({
       mint,
       authority: this.authority.publicKey,
-      escrow: escrow.pubkey,
+      cashLink: cashLink.pubkey,
       payerToken: isNative
         ? payer
         : (
             await spl.getOrCreateAssociatedTokenAccount(
               this.connection,
               this.feePayer,
-              new PublicKey(escrow.data.mint),
+              new PublicKey(cashLink.data.mint),
               payer,
               true,
             )
           ).address,
-      vaultToken: new PublicKey(escrow.data.vaultToken),
+      vaultToken: new PublicKey(cashLink.data.vaultToken),
       feePayer: this.feePayer.publicKey,
     });
     const transaction = new Transaction().add(cancelInstruction);
@@ -113,37 +112,37 @@ export class EscrowClient {
     }
   };
 
-  cancelAndClose = async (input: EscrowInput): Promise<string> => {
-    const escrow = await _getEscrowAccount(this.connection, new PublicKey(input.escrowAddress));
-    if (escrow.data?.state === CashLinkState.Closed) {
+  cancelAndClose = async (input: CashLinkInput): Promise<string> => {
+    const cashLink = await _getCasLinkAccount(this.connection, new PublicKey(input.escrowAddress));
+    if (cashLink.data?.state === CashLinkState.Closed) {
       throw new Error(ACCOUNT_ALREADY_CANCELED);
     }
-    if (escrow.data?.state === CashLinkState.Settled) {
+    if (cashLink.data?.state === CashLinkState.Settled) {
       throw new Error(ACCOUNT_ALREADY_SETTLED);
     }
-    const payer = new PublicKey(escrow.data.payer);
-    const mint = new PublicKey(escrow.data.mint);
+    const payer = new PublicKey(cashLink.data.payer);
+    const mint = new PublicKey(cashLink.data.mint);
     const isNative = mint.equals(spl.NATIVE_MINT);
     const cancelInstruction = await this.cancelInstruction({
       mint,
       authority: this.authority.publicKey,
-      escrow: escrow.pubkey,
+      cashLink: cashLink.pubkey,
       payerToken: isNative
         ? payer
         : (
             await spl.getOrCreateAssociatedTokenAccount(
               this.connection,
               this.feePayer,
-              new PublicKey(escrow.data.mint),
+              new PublicKey(cashLink.data.mint),
               payer,
               true,
             )
           ).address,
-      vaultToken: new PublicKey(escrow.data.vaultToken),
+      vaultToken: new PublicKey(cashLink.data.vaultToken),
       feePayer: this.feePayer.publicKey,
     });
     const closeInstruction = this.closeInstruction({
-      escrow: new PublicKey(input.escrowAddress),
+      cashLink: new PublicKey(input.escrowAddress),
       authority: this.authority.publicKey,
       feePayer: this.feePayer.publicKey,
     });
@@ -170,7 +169,7 @@ export class EscrowClient {
       data: CancelCashLinkArgs.serialize(),
       keys: [
         { pubkey: params.authority, isSigner: true, isWritable: false },
-        { pubkey: params.escrow, isSigner: false, isWritable: true },
+        { pubkey: params.cashLink, isSigner: false, isWritable: true },
         { pubkey: params.payerToken, isSigner: false, isWritable: true },
         { pubkey: params.vaultToken, isSigner: false, isWritable: true },
         { pubkey: params.feePayer, isSigner: true, isWritable: true },
@@ -194,17 +193,18 @@ export class EscrowClient {
     });
   };
 
-  close = async (input: EscrowInput): Promise<string> => {
-    const escrow = await _getEscrowAccount(this.connection, new PublicKey(input.escrowAddress));
+  close = async (input: CashLinkInput): Promise<string> => {
+    const cashLink = await _getCasLinkAccount(this.connection, new PublicKey(input.escrowAddress));
     if (
       !(
-        escrow.data?.state === CashLinkState.Initialized || escrow.data?.state === CashLinkState.Settled
+        cashLink.data?.state === CashLinkState.Initialized ||
+        cashLink.data?.state === CashLinkState.Settled
       )
     ) {
       throw new Error(ACCOUNT_NOT_INITIALIZED_OR_SETTLED);
     }
     const closeInstruction = this.closeInstruction({
-      escrow: new PublicKey(input.escrowAddress),
+      cashLink: new PublicKey(input.escrowAddress),
       authority: this.authority.publicKey,
       feePayer: this.feePayer.publicKey,
     });
@@ -229,7 +229,7 @@ export class EscrowClient {
       keys: [
         { pubkey: params.authority, isSigner: true, isWritable: false },
         {
-          pubkey: params.escrow,
+          pubkey: params.cashLink,
           isSigner: false,
           isWritable: true,
         },
@@ -243,19 +243,19 @@ export class EscrowClient {
     });
   };
 
-  initializeEscrow = async (input: InitializePaymentInput): Promise<string> => {
+  initializeEscrow = async (input: InitializeCashLinkInput): Promise<string> => {
     const payer = new PublicKey(input.wallet);
     const mint = new PublicKey(input.mint);
-    const [escrow, escrowBump] = await CashProgram.findCashLinkAccount(input.reference);
-    const [vaultTokenAccount, vaultBump] = await CashProgram.findVaultAccount(escrow);
+    const [cashLink, cashLinkBump] = await CashProgram.findCashLinkAccount(input.reference);
+    const [vaultTokenAccount, vaultBump] = await CashProgram.findVaultAccount(cashLink);
     const amount = new BN(input.amount);
     const fee = new BN(input.fee ?? 0);
     const escrowParams: InitCashLinkParams = {
       mint,
       payer,
-      escrowBump,
+      cashLinkBump,
       vaultBump,
-      escrow,
+      cashLink,
       vaultToken: vaultTokenAccount,
       amount: amount,
       fee,
@@ -280,20 +280,20 @@ export class EscrowClient {
       .toString('base64');
   };
 
-  initializeEscrowAndPay = async (input: InitializePaymentInput): Promise<string> => {
+  initializeEscrowAndPay = async (input: InitializeCashLinkInput): Promise<string> => {
     const payer = new PublicKey(input.wallet);
     const mint = new PublicKey(input.mint);
-    const [escrow, escrowBump] = await CashProgram.findCashLinkAccount(input.reference);
-    const [vaultTokenAccount, vaultBump] = await CashProgram.findVaultAccount(escrow);
+    const [cashLink, cashLinkBump] = await CashProgram.findCashLinkAccount(input.reference);
+    const [vaultTokenAccount, vaultBump] = await CashProgram.findVaultAccount(cashLink);
     const amount = new BN(input.amount);
     const fee = new BN(input.fee ?? 0);
     const total = amount.add(fee);
     const escrowParams: InitCashLinkParams = {
       mint,
       payer,
-      escrowBump,
+      cashLinkBump,
       vaultBump,
-      escrow,
+      cashLink,
       vaultToken: vaultTokenAccount,
       amount: amount,
       fee,
@@ -332,17 +332,17 @@ export class EscrowClient {
       .toString('base64');
   };
 
-  pay = async (input: EscrowInput): Promise<string> => {
+  pay = async (input: CashLinkInput): Promise<string> => {
     const escrowAddress = new PublicKey(input.escrowAddress);
     const walletAddress = new PublicKey(input.memo);
-    const escrow = await _getEscrowAccount(this.connection, escrowAddress);
-    if (escrow.data.state !== CashLinkState.Initialized) {
+    const cashLink = await _getCasLinkAccount(this.connection, escrowAddress);
+    if (cashLink.data.state !== CashLinkState.Initialized) {
       throw Error(INVALID_STATE);
     }
     const [vaultTokenAccount] = await CashProgram.findVaultAccount(escrowAddress);
-    const mint = new PublicKey(escrow.data.mint);
-    const amount = new BN(escrow.data.amount);
-    const fee = new BN(escrow.data.fee ?? 0);
+    const mint = new PublicKey(cashLink.data.mint);
+    const amount = new BN(cashLink.data.amount);
+    const fee = new BN(cashLink.data.fee ?? 0);
     const total = amount.add(fee);
     const transaction = new Transaction();
     if (mint.equals(spl.NATIVE_MINT)) {
@@ -385,9 +385,9 @@ export class EscrowClient {
       reference,
       payer,
       vaultBump,
-      escrowBump,
+      cashLinkBump,
       authority,
-      escrow,
+      cashLink,
       vaultToken,
       mint,
     } = params;
@@ -395,8 +395,8 @@ export class EscrowClient {
       amount,
       fee,
       reference,
-      vault_bump: vaultBump,
-      cash_link_bump: escrowBump,
+      vaultBump: vaultBump,
+      cashLinkBump: cashLinkBump,
     });
     const keys = [
       {
@@ -415,258 +415,12 @@ export class EscrowClient {
         isWritable: true,
       },
       {
-        pubkey: escrow,
+        pubkey: cashLink,
         isSigner: false,
         isWritable: true,
       },
       {
         pubkey: vaultToken,
-        isSigner: false,
-        isWritable: true,
-      },
-      {
-        pubkey: mint,
-        isSigner: false,
-        isWritable: false,
-      },
-      {
-        pubkey: SYSVAR_RENT_PUBKEY,
-        isSigner: false,
-        isWritable: false,
-      },
-      {
-        pubkey: SystemProgram.programId,
-        isSigner: false,
-        isWritable: false,
-      },
-      {
-        pubkey: spl.TOKEN_PROGRAM_ID,
-        isSigner: false,
-        isWritable: false,
-      },
-    ];
-    return new TransactionInstruction({
-      keys,
-      data,
-      programId: CashProgram.PUBKEY,
-    });
-  };
-
-  initializeDeposit = async (input: InitializePaymentInput): Promise<string> => {
-    const walletAddress = new PublicKey(input.wallet);
-    const mint = new PublicKey(input.mint);
-    const [deposit, bump] = await CashProgram.findDepositAccount(input.reference);
-    const amount = new BN(input.amount);
-    const fee = new BN(input.fee ?? 0);
-    // const fixedFee = new BN(input.fixedFee ?? 0);
-    const [sourceToken, destinationToken, collectionFeeToken] = await Promise.all([
-      _findAssociatedTokenAddress(walletAddress, mint),
-      _findAssociatedTokenAddress(this.fundingWallet, mint),
-      _findAssociatedTokenAddress(this.feeWallet, mint),
-    ]);
-    const depositParams: InitDepositParams = {
-      mint,
-      user: walletAddress,
-      bump,
-      deposit,
-      sourceToken,
-      collectionToken: destinationToken,
-      collectionFeeToken,
-      amount: amount,
-      fee,
-      reference: input.reference,
-      payer: this.feePayer.publicKey,
-    };
-
-    const transaction = new Transaction();
-    transaction.add(this.initDeposit(depositParams));
-    if (input.memo) {
-      transaction.add(this.memoInstruction(input.memo, this.authority.publicKey));
-    }
-    const { blockhash } = await this.connection.getLatestBlockhash(input.commitment ?? 'finalized');
-    transaction.recentBlockhash = blockhash;
-    transaction.feePayer = this.feePayer.publicKey;
-    transaction.partialSign(this.feePayer, this.authority);
-    return transaction
-      .serialize({
-        requireAllSignatures: false,
-      })
-      .toString('base64');
-  };
-
-  initDeposit = (params: InitDepositParams) => {
-    const {
-      amount,
-      fee,
-      reference,
-      bump,
-      user,
-      deposit,
-      sourceToken,
-      collectionToken,
-      collectionFeeToken,
-      mint,
-    } = params;
-    const data = InitDepositArgs.serialize({
-      amount,
-      fee,
-      bump,
-      reference,
-    });
-    const keys = [
-      {
-        pubkey: user,
-        isSigner: true,
-        isWritable: false,
-      },
-      {
-        pubkey: this.feePayer.publicKey,
-        isSigner: true,
-        isWritable: false,
-      },
-      {
-        pubkey: deposit,
-        isSigner: false,
-        isWritable: true,
-      },
-      {
-        pubkey: sourceToken,
-        isSigner: false,
-        isWritable: true,
-      },
-      {
-        pubkey: collectionToken,
-        isSigner: false,
-        isWritable: true,
-      },
-      {
-        pubkey: collectionFeeToken,
-        isSigner: false,
-        isWritable: true,
-      },
-      {
-        pubkey: mint,
-        isSigner: false,
-        isWritable: false,
-      },
-      {
-        pubkey: SYSVAR_RENT_PUBKEY,
-        isSigner: false,
-        isWritable: false,
-      },
-      {
-        pubkey: SystemProgram.programId,
-        isSigner: false,
-        isWritable: false,
-      },
-      {
-        pubkey: spl.TOKEN_PROGRAM_ID,
-        isSigner: false,
-        isWritable: false,
-      },
-    ];
-    return new TransactionInstruction({
-      keys,
-      data,
-      programId: CashProgram.PUBKEY,
-    });
-  };
-
-  initializeWithdrawal = async (input: InitializePaymentInput): Promise<string> => {
-    const walletAddress = new PublicKey(input.wallet);
-    const mint = new PublicKey(input.mint);
-    const [withdraw, bump] = await CashProgram.findWithdrawAccount(input.reference);
-    const amount = new BN(input.amount);
-    const fee = new BN(input.fee ?? 0);
-    // const fixedFee = new BN(input.fixedFee ?? 0);
-    const [sourceToken, collectionFeeToken] = await Promise.all([
-      _findAssociatedTokenAddress(this.withdrawalWallet.publicKey, mint),
-      _findAssociatedTokenAddress(this.feeWallet, mint),
-    ]);
-    const destinationToken = await spl.getOrCreateAssociatedTokenAccount(
-      this.connection,
-      this.feePayer,
-      mint,
-      walletAddress,
-      true,
-    );
-    const withdrawalParams: InitWithdrawParams = {
-      mint,
-      wallet: this.withdrawalWallet.publicKey,
-      bump,
-      withdraw,
-      sourceToken,
-      destinationToken: destinationToken.address,
-      collectionFeeToken,
-      amount: amount,
-      fee,
-      reference: input.reference,
-      payer: this.feePayer.publicKey,
-    };
-
-    const transaction = new Transaction();
-    transaction.add(this.initWithdrawal(withdrawalParams));
-    if (input.memo) {
-      transaction.add(this.memoInstruction(input.memo, this.authority.publicKey));
-    }
-    const { blockhash } = await this.connection.getLatestBlockhash(input.commitment ?? 'finalized');
-    transaction.recentBlockhash = blockhash;
-    transaction.feePayer = this.feePayer.publicKey;
-    transaction.partialSign(this.feePayer, this.authority, this.withdrawalWallet);
-    return transaction
-      .serialize({
-        requireAllSignatures: false,
-      })
-      .toString('base64');
-  };
-
-  initWithdrawal = (params: InitWithdrawParams) => {
-    const {
-      amount,
-      fee,
-      reference,
-      bump,
-      wallet,
-      withdraw,
-      sourceToken,
-      destinationToken,
-      collectionFeeToken,
-      mint,
-    } = params;
-    const data = InitWithdrawArgs.serialize({
-      amount,
-      fee,
-      bump,
-      reference,
-    });
-    const keys = [
-      {
-        pubkey: wallet,
-        isSigner: true,
-        isWritable: false,
-      },
-      {
-        pubkey: this.feePayer.publicKey,
-        isSigner: true,
-        isWritable: false,
-      },
-      {
-        pubkey: withdraw,
-        isSigner: false,
-        isWritable: true,
-      },
-      {
-        pubkey: sourceToken,
-        isSigner: false,
-        isWritable: true,
-      },
-      {
-        pubkey: destinationToken,
-        isSigner: false,
-        isWritable: true,
-      },
-      {
-        pubkey: collectionFeeToken,
         isSigner: false,
         isWritable: true,
       },
@@ -723,14 +477,14 @@ export class EscrowClient {
     );
   };
 
-  settle = async (input: EscrowInput): Promise<string> => {
+  settle = async (input: CashLinkInput): Promise<string> => {
     const escrowAddress = new PublicKey(input.escrowAddress);
     const walletAddress = new PublicKey(input.memo);
-    const escrow = await _getEscrowAccount(this.connection, escrowAddress);
+    const cashLink = await _getCasLinkAccount(this.connection, escrowAddress);
     const transaction = new Transaction();
     const signers = [this.feePayer, this.authority];
-    const mint = new PublicKey(escrow.data.mint);
-    const payer = new PublicKey(escrow.data.payer);
+    const mint = new PublicKey(cashLink.data.mint);
+    const payer = new PublicKey(cashLink.data.payer);
     const isNative = mint.equals(spl.NATIVE_MINT);
     const [destinationToken, feeToken, payerToken] = isNative
       ? [walletAddress, this.feeWallet, payer]
@@ -739,21 +493,21 @@ export class EscrowClient {
             spl.getOrCreateAssociatedTokenAccount(
               this.connection,
               this.feePayer,
-              new PublicKey(escrow.data.mint),
+              new PublicKey(cashLink.data.mint),
               walletAddress,
               true,
             ),
             spl.getOrCreateAssociatedTokenAccount(
               this.connection,
               this.feePayer,
-              new PublicKey(escrow.data.mint),
+              new PublicKey(cashLink.data.mint),
               this.feeWallet,
               true,
             ),
             spl.getOrCreateAssociatedTokenAccount(
               this.connection,
               this.feePayer,
-              new PublicKey(escrow.data.mint),
+              new PublicKey(cashLink.data.mint),
               payer,
               true,
             ),
@@ -764,8 +518,8 @@ export class EscrowClient {
       feeToken,
       payerToken,
       authority: this.authority.publicKey,
-      escrow: escrow.pubkey,
-      vaultToken: new PublicKey(escrow.data.vaultToken),
+      cashLink: cashLink.pubkey,
+      vaultToken: new PublicKey(cashLink.data.vaultToken),
       mint: mint,
       feePayer: this.feePayer.publicKey,
     });
@@ -784,13 +538,13 @@ export class EscrowClient {
     return signature;
   };
 
-  settleAndClose = async (input: EscrowInput): Promise<string> => {
+  settleAndClose = async (input: CashLinkInput): Promise<string> => {
     const escrowAddress = new PublicKey(input.escrowAddress);
     const walletAddress = new PublicKey(input.walletAddress);
-    const escrow = await _getEscrowAccount(this.connection, escrowAddress);
-    const mint = new PublicKey(escrow.data.mint);
+    const cashLink = await _getCasLinkAccount(this.connection, escrowAddress);
+    const mint = new PublicKey(cashLink.data.mint);
     const isNative = mint.equals(spl.NATIVE_MINT);
-    const payer = new PublicKey(escrow.data.payer);
+    const payer = new PublicKey(cashLink.data.payer);
     const [destinationToken, feeToken, payerToken] = isNative
       ? [walletAddress, this.feeWallet, payer]
       : (
@@ -798,21 +552,21 @@ export class EscrowClient {
             spl.getOrCreateAssociatedTokenAccount(
               this.connection,
               this.feePayer,
-              new PublicKey(escrow.data.mint),
+              new PublicKey(cashLink.data.mint),
               walletAddress,
               true,
             ),
             spl.getOrCreateAssociatedTokenAccount(
               this.connection,
               this.feePayer,
-              new PublicKey(escrow.data.mint),
+              new PublicKey(cashLink.data.mint),
               this.feeWallet,
               true,
             ),
             spl.getOrCreateAssociatedTokenAccount(
               this.connection,
               this.feePayer,
-              new PublicKey(escrow.data.mint),
+              new PublicKey(cashLink.data.mint),
               payer,
               true,
             ),
@@ -823,13 +577,13 @@ export class EscrowClient {
       feeToken,
       payerToken,
       authority: this.authority.publicKey,
-      escrow: escrow.pubkey,
-      vaultToken: new PublicKey(escrow.data.vaultToken),
+      cashLink: cashLink.pubkey,
+      vaultToken: new PublicKey(cashLink.data.vaultToken),
       mint: mint,
       feePayer: this.feePayer.publicKey,
     });
     const closeInstruction = this.closeInstruction({
-      escrow: new PublicKey(input.escrowAddress),
+      cashLink: new PublicKey(input.escrowAddress),
       authority: this.authority.publicKey,
       feePayer: this.feePayer.publicKey,
     });
@@ -867,7 +621,7 @@ export class EscrowClient {
           isSigner: false,
           isWritable: true,
         },
-        { pubkey: params.escrow, isSigner: false, isWritable: true },
+        { pubkey: params.cashLink, isSigner: false, isWritable: true },
         { pubkey: params.payerToken, isSigner: false, isWritable: true },
         { pubkey: params.feePayer, isSigner: true, isWritable: false },
         { pubkey: params.mint, isSigner: false, isWritable: false },
@@ -910,15 +664,15 @@ export class EscrowClient {
 
   hasPaid = async (escrowAddress: PublicKey, commitment?: Commitment): Promise<boolean> => {
     try {
-      const [escrow, vault] = await Promise.all([
-        this.getEscrow(escrowAddress, commitment),
+      const [cashLink, vault] = await Promise.all([
+        this.getCashLink(escrowAddress, commitment),
         this.getVault(escrowAddress, commitment),
       ]);
-      if (!escrow || !escrow.data || !vault) {
+      if (!cashLink || !cashLink.data || !vault) {
         return false;
       }
-      const amount = new BN(escrow.data.amount ?? 0);
-      const fee = new BN(escrow.data.fee ?? 0);
+      const amount = new BN(cashLink.data.amount ?? 0);
+      const fee = new BN(cashLink.data.fee ?? 0);
       const total = amount.add(fee);
       const vaultAmount = new BN(vault.amount.toString());
       return vaultAmount.gte(total);
@@ -927,9 +681,9 @@ export class EscrowClient {
     }
   };
 
-  getVault = async (escrow: PublicKey, commitment?: Commitment): Promise<spl.Account | null> => {
+  getVault = async (cashLink: PublicKey, commitment?: Commitment): Promise<spl.Account | null> => {
     try {
-      const [vault] = await CashProgram.findVaultAccount(escrow);
+      const [vault] = await CashProgram.findVaultAccount(cashLink);
       return await spl.getAccount(this.connection, vault, commitment);
     } catch (error: unknown) {
       if (
@@ -942,31 +696,9 @@ export class EscrowClient {
     }
   };
 
-  getEscrow = async (address: PublicKey, commitment?: Commitment): Promise<CashLink | null> => {
+  getCashLink = async (address: PublicKey, commitment?: Commitment): Promise<CashLink | null> => {
     try {
-      return await _getEscrowAccount(this.connection, address, commitment);
-    } catch (error) {
-      if (error.message === FAILED_TO_FIND_ACCOUNT) {
-        return null;
-      }
-      throw error;
-    }
-  };
-
-  getWithdraw = async (address: PublicKey): Promise<Withdraw> => {
-    try {
-      return await _getWithdrawAccount(this.connection, address);
-    } catch (error) {
-      if (error.message === FAILED_TO_FIND_ACCOUNT) {
-        return null;
-      }
-      throw error;
-    }
-  };
-
-  getDeposit = async (address: PublicKey): Promise<Withdraw> => {
-    try {
-      return await _getDepositAccount(this.connection, address);
+      return await _getCasLinkAccount(this.connection, address, commitment);
     } catch (error) {
       if (error.message === FAILED_TO_FIND_ACCOUNT) {
         return null;
@@ -988,7 +720,7 @@ const _findAssociatedTokenAddress = async (
   )[0];
 };
 
-const _getEscrowAccount = async (
+const _getCasLinkAccount = async (
   connection: Connection,
   escrowAddress: PublicKey,
   commitment?: Commitment,
@@ -998,42 +730,9 @@ const _getEscrowAccount = async (
     if (accountInfo == null) {
       throw new Error(FAILED_TO_FIND_ACCOUNT);
     }
-    const escrow = CashLink.from(new Account(escrowAddress, accountInfo));
-    return escrow;
+    const cashLink = CashLink.from(new Account(escrowAddress, accountInfo));
+    return cashLink;
   } catch (error) {
     return null;
-  }
-};
-
-const _getWithdrawAccount = async (
-  connection: Connection,
-  address: PublicKey,
-): Promise<Withdraw> => {
-  try {
-    const withdraw = await Withdraw.load(connection, address);
-    if (!withdraw || !withdraw.info) {
-      throw new Error(FAILED_TO_FIND_ACCOUNT);
-    }
-    if (!withdraw || !withdraw.info) {
-      throw new Error(FAILED_TO_FIND_ACCOUNT);
-    }
-    return withdraw;
-  } catch (error) {
-    throw new Error(FAILED_TO_FIND_ACCOUNT);
-  }
-};
-
-const _getDepositAccount = async (connection: Connection, address: PublicKey): Promise<Deposit> => {
-  try {
-    const deposit = await Deposit.load(connection, address);
-    if (!deposit || !deposit.info) {
-      throw new Error(FAILED_TO_FIND_ACCOUNT);
-    }
-    if (!deposit || !deposit.info) {
-      throw new Error(FAILED_TO_FIND_ACCOUNT);
-    }
-    return deposit;
-  } catch (error) {
-    throw new Error(FAILED_TO_FIND_ACCOUNT);
   }
 };

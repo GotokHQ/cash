@@ -1,5 +1,5 @@
 import { Commitment } from '@solana/web3.js';
-export interface InitializePaymentInput {
+export interface InitializeCashLinkInput {
   wallet: string;
   mint: string;
   reference: string;
@@ -8,7 +8,7 @@ export interface InitializePaymentInput {
   memo?: string;
   commitment?: Commitment;
 }
-export interface EscrowInput {
+export interface CashLinkInput {
   walletAddress: string;
   escrowAddress: string;
   memo?: string;

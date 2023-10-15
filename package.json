@@ -2,8 +2,8 @@
     "name": "@gotok/cash",
     "version": "0.0.1",
     "description": "Cash Link JavaScript API.",
-    "main": "dist/src/cash.js",
-    "types": "dist/src/cash.d.ts",
+    "main": "dist/src/index.js",
+    "types": "dist/src/index.d.ts",
     "scripts": {
         "build:docs": "typedoc",
         "build": "rimraf dist && tsc -p tsconfig.json",
@@ -23,7 +23,8 @@
     ],
     "keywords": [
         "solana",
-        "blockchain"
+        "blockchain",
+        "cash"
     ],
     "homepage": "https://gotok.app",
     "repository": "https://github.com/GotokHQ/card.git",

@@ -7,7 +7,7 @@ import {
 } from '@metaplex-foundation/mpl-core';
 import { AccountInfo } from '@solana/web3.js';
 import BN from 'bn.js';
-import { CashProgram } from '../cashProgram';
+import { CashProgram } from '../cash_program';
 
 export const MAX_ESCROW_DATA_LEN = 164;
 
