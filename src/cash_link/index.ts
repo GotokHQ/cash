@@ -42,27 +42,16 @@ export const FEE_MISMATCH = 'Fee mismatch';
 export const TRANSACTION_SEND_ERROR = 'Transaction send error';
 export const MEMO_PROGRAM_ID = new PublicKey('Memo1UhkJRfHyvLMcVucJwxXeuD728EqVDDwQDxFMNo');
 
-export class EscrowClient {
+export class CashLinkClient {
   private feePayer: Keypair;
   private authority: Keypair;
-  private withdrawalWallet: Keypair;
   private feeWallet: PublicKey;
-  private fundingWallet: PublicKey;
   private connection: Connection;
 
-  constructor(
-    feePayer: Keypair,
-    authority: Keypair,
-    feeWallet: PublicKey,
-    fundingWallet: PublicKey,
-    withdrawalWallet: Keypair,
-    connection: Connection,
-  ) {
+  constructor(feePayer: Keypair, authority: Keypair, feeWallet: PublicKey, connection: Connection) {
     this.feePayer = feePayer;
     this.authority = authority;
     this.feeWallet = feeWallet;
-    this.fundingWallet = fundingWallet;
-    this.withdrawalWallet = withdrawalWallet;
     this.connection = connection;
   }
 
