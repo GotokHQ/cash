@@ -10,7 +10,7 @@ export interface InitializeCashLinkInput {
 }
 export interface CashLinkInput {
   walletAddress: string;
-  escrowAddress: string;
+  cashLinkAddress: string;
   memo?: string;
   commitment?: Commitment;
 }
@@ -20,7 +20,7 @@ export interface SettleAndTransferInput {
   transferTokenMintAddress: string;
   amountToSettle: string;
   amountToTransfer: string;
-  escrowAddress: string;
+  cashLinkAddress: string;
   memo?: string;
   fee?: string;
 }

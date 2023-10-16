@@ -56,7 +56,10 @@ export class CashLinkClient {
   }
 
   cancel = async (input: CashLinkInput): Promise<string> => {
-    const cashLink = await _getCasLinkAccount(this.connection, new PublicKey(input.escrowAddress));
+    const cashLink = await _getCasLinkAccount(
+      this.connection,
+      new PublicKey(input.cashLinkAddress),
+    );
     if (cashLink.data?.state === CashLinkState.Closed) {
       throw new Error(ACCOUNT_ALREADY_CANCELED);
     }
@@ -102,7 +105,10 @@ export class CashLinkClient {
   };
 
   cancelAndClose = async (input: CashLinkInput): Promise<string> => {
-    const cashLink = await _getCasLinkAccount(this.connection, new PublicKey(input.escrowAddress));
+    const cashLink = await _getCasLinkAccount(
+      this.connection,
+      new PublicKey(input.cashLinkAddress),
+    );
     if (cashLink.data?.state === CashLinkState.Closed) {
       throw new Error(ACCOUNT_ALREADY_CANCELED);
     }
@@ -131,7 +137,7 @@ export class CashLinkClient {
       feePayer: this.feePayer.publicKey,
     });
     const closeInstruction = this.closeInstruction({
-      cashLink: new PublicKey(input.escrowAddress),
+      cashLink: new PublicKey(input.cashLinkAddress),
       authority: this.authority.publicKey,
       feePayer: this.feePayer.publicKey,
     });
@@ -183,7 +189,10 @@ export class CashLinkClient {
   };
 
   close = async (input: CashLinkInput): Promise<string> => {
-    const cashLink = await _getCasLinkAccount(this.connection, new PublicKey(input.escrowAddress));
+    const cashLink = await _getCasLinkAccount(
+      this.connection,
+      new PublicKey(input.cashLinkAddress),
+    );
     if (
       !(
         cashLink.data?.state === CashLinkState.Initialized ||
@@ -193,7 +202,7 @@ export class CashLinkClient {
       throw new Error(ACCOUNT_NOT_INITIALIZED_OR_SETTLED);
     }
     const closeInstruction = this.closeInstruction({
-      cashLink: new PublicKey(input.escrowAddress),
+      cashLink: new PublicKey(input.cashLinkAddress),
       authority: this.authority.publicKey,
       feePayer: this.feePayer.publicKey,
     });
@@ -269,7 +278,7 @@ export class CashLinkClient {
       .toString('base64');
   };
 
-  initializeEscrowAndPay = async (input: InitializeCashLinkInput): Promise<string> => {
+  initializeAndPay = async (input: InitializeCashLinkInput): Promise<string> => {
     const payer = new PublicKey(input.wallet);
     const mint = new PublicKey(input.mint);
     const [cashLink, cashLinkBump] = await CashProgram.findCashLinkAccount(input.reference);
@@ -322,13 +331,13 @@ export class CashLinkClient {
   };
 
   pay = async (input: CashLinkInput): Promise<string> => {
-    const escrowAddress = new PublicKey(input.escrowAddress);
+    const cashLinkAddress = new PublicKey(input.cashLinkAddress);
     const walletAddress = new PublicKey(input.memo);
-    const cashLink = await _getCasLinkAccount(this.connection, escrowAddress);
+    const cashLink = await _getCasLinkAccount(this.connection, cashLinkAddress);
     if (cashLink.data.state !== CashLinkState.Initialized) {
       throw Error(INVALID_STATE);
     }
-    const [vaultTokenAccount] = await CashProgram.findVaultAccount(escrowAddress);
+    const [vaultTokenAccount] = await CashProgram.findVaultAccount(cashLinkAddress);
     const mint = new PublicKey(cashLink.data.mint);
     const amount = new BN(cashLink.data.amount);
     const fee = new BN(cashLink.data.fee ?? 0);
@@ -467,9 +476,9 @@ export class CashLinkClient {
   };
 
   settle = async (input: CashLinkInput): Promise<string> => {
-    const escrowAddress = new PublicKey(input.escrowAddress);
+    const cashLinkAddress = new PublicKey(input.cashLinkAddress);
     const walletAddress = new PublicKey(input.memo);
-    const cashLink = await _getCasLinkAccount(this.connection, escrowAddress);
+    const cashLink = await _getCasLinkAccount(this.connection, cashLinkAddress);
     const transaction = new Transaction();
     const signers = [this.feePayer, this.authority];
     const mint = new PublicKey(cashLink.data.mint);
@@ -528,9 +537,9 @@ export class CashLinkClient {
   };
 
   settleAndClose = async (input: CashLinkInput): Promise<string> => {
-    const escrowAddress = new PublicKey(input.escrowAddress);
+    const cashLinkAddress = new PublicKey(input.cashLinkAddress);
     const walletAddress = new PublicKey(input.walletAddress);
-    const cashLink = await _getCasLinkAccount(this.connection, escrowAddress);
+    const cashLink = await _getCasLinkAccount(this.connection, cashLinkAddress);
     const mint = new PublicKey(cashLink.data.mint);
     const isNative = mint.equals(spl.NATIVE_MINT);
     const payer = new PublicKey(cashLink.data.payer);
@@ -572,7 +581,7 @@ export class CashLinkClient {
       feePayer: this.feePayer.publicKey,
     });
     const closeInstruction = this.closeInstruction({
-      cashLink: new PublicKey(input.escrowAddress),
+      cashLink: new PublicKey(input.cashLinkAddress),
       authority: this.authority.publicKey,
       feePayer: this.feePayer.publicKey,
     });
@@ -651,11 +660,11 @@ export class CashLinkClient {
     });
   };
 
-  hasPaid = async (escrowAddress: PublicKey, commitment?: Commitment): Promise<boolean> => {
+  hasPaid = async (cashLinkAddress: PublicKey, commitment?: Commitment): Promise<boolean> => {
     try {
       const [cashLink, vault] = await Promise.all([
-        this.getCashLink(escrowAddress, commitment),
-        this.getVault(escrowAddress, commitment),
+        this.getCashLink(cashLinkAddress, commitment),
+        this.getVault(cashLinkAddress, commitment),
       ]);
       if (!cashLink || !cashLink.data || !vault) {
         return false;
@@ -711,15 +720,15 @@ const _findAssociatedTokenAddress = async (
 
 const _getCasLinkAccount = async (
   connection: Connection,
-  escrowAddress: PublicKey,
+  cashLinkAddress: PublicKey,
   commitment?: Commitment,
 ): Promise<CashLink | null> => {
   try {
-    const accountInfo = await connection.getAccountInfo(escrowAddress, commitment);
+    const accountInfo = await connection.getAccountInfo(cashLinkAddress, commitment);
     if (accountInfo == null) {
       throw new Error(FAILED_TO_FIND_ACCOUNT);
     }
-    const cashLink = CashLink.from(new Account(escrowAddress, accountInfo));
+    const cashLink = CashLink.from(new Account(cashLinkAddress, accountInfo));
     return cashLink;
   } catch (error) {
     return null;
