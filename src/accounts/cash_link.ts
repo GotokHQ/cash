@@ -5,7 +5,7 @@ import {
   Account,
   StringPublicKey,
 } from '@metaplex-foundation/mpl-core';
-import { AccountInfo } from '@solana/web3.js';
+import { AccountInfo, PublicKey } from '@solana/web3.js';
 import BN from 'bn.js';
 import { CashProgram } from '../cash_program';
 
@@ -14,7 +14,7 @@ export const MAX_ESCROW_DATA_LEN = 164;
 export enum CashLinkState {
   Uninitialized = 0,
   Initialized = 1,
-  Settled = 2,
+  Redeemed = 2,
   Canceled = 3,
   Closed = 4,
 }
@@ -23,13 +23,13 @@ export type CashLinkDataArgs = {
   state: CashLinkState;
   amount: BN;
   fee: BN;
-  vaultToken: StringPublicKey;
-  vaultBump: number;
+  sender: number;
+  reference: StringPublicKey;
+  redeemedAt?: BN;
+  canceledAt?: BN;
+  cashLinkBump: number;
   mint: StringPublicKey;
   authority: StringPublicKey;
-  payer: StringPublicKey;
-  settled_at?: BN;
-  canceled_at?: BN;
 };
 
 export class CashLinkData extends Borsh.Data<CashLinkDataArgs> {
@@ -37,24 +37,24 @@ export class CashLinkData extends Borsh.Data<CashLinkDataArgs> {
     ['state', 'u8'],
     ['amount', 'u64'],
     ['fee', 'u64'],
-    ['payer', 'pubkeyAsString'],
-    ['vaultToken', 'pubkeyAsString'],
-    ['vaultBump', 'u8'],
+    ['sender', 'pubkeyAsString'],
+    ['reference', 'pubkeyAsString'],
+    ['redeemedAt', { kind: 'option', type: 'u64' }],
+    ['canceledAt', { kind: 'option', type: 'u64' }],
+    ['cashLinkBump', 'u8'],
     ['mint', 'pubkeyAsString'],
     ['authority', 'pubkeyAsString'],
-    ['settled_at', { kind: 'option', type: 'u64' }],
-    ['canceled_at', { kind: 'option', type: 'u64' }],
   ]);
   state: CashLinkState;
   amount: BN;
   fee: BN;
-  payer: StringPublicKey;
-  vaultToken: StringPublicKey;
-  vaultBump: number;
+  sender: StringPublicKey;
+  reference: StringPublicKey;
+  redeemedAt: BN | null;
+  canceledAt: BN | null;
+  cashLinkBump: number;
   mint: StringPublicKey;
   authority: StringPublicKey;
-  settled_at: BN | null;
-  canceled_at: BN | null;
 
   constructor(args: CashLinkDataArgs) {
     super(args);
@@ -63,7 +63,6 @@ export class CashLinkData extends Borsh.Data<CashLinkDataArgs> {
 
 export class CashLink extends Account<CashLinkData> {
   static readonly PREFIX = 'cash';
-  static readonly VAULT_PREFIX = 'vault';
   constructor(pubkey: AnyPublicKey, info: AccountInfo<Buffer>) {
     super(pubkey, info);
     this.data = CashLinkData.deserialize(this.info.data);
@@ -72,7 +71,7 @@ export class CashLink extends Account<CashLinkData> {
     }
   }
 
-  static async getPDA(reference: string) {
+  static async getPDA(reference: PublicKey) {
     const [pubKey] = await CashProgram.findCashLinkAccount(reference);
     return pubKey;
   }

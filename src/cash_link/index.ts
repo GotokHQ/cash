@@ -23,8 +23,8 @@ import {
   InitCashLinkParams,
   CloseCashLinkArgs,
   CloseCashLinkParams,
-  SettleCashLinkArgs,
-  SettleCashLinkParams,
+  RedeemCashLinkArgs,
+  RedeemCashLinkParams,
 } from '../transactions';
 import { Account } from '@metaplex-foundation/mpl-core';
 
@@ -56,35 +56,30 @@ export class CashLinkClient {
   }
 
   cancel = async (input: CashLinkInput): Promise<string> => {
-    const cashLink = await _getCasLinkAccount(
-      this.connection,
-      new PublicKey(input.cashLinkAddress),
-    );
+    const cashLinkPda = new PublicKey(input.cashLinkAddress);
+    const cashLink = await _getCasLinkAccount(this.connection, cashLinkPda);
     if (cashLink.data?.state === CashLinkState.Closed) {
       throw new Error(ACCOUNT_ALREADY_CANCELED);
     }
-    if (cashLink.data?.state === CashLinkState.Settled) {
+    if (cashLink.data?.state === CashLinkState.Redeemed) {
       throw new Error(ACCOUNT_ALREADY_SETTLED);
     }
-    const payer = new PublicKey(cashLink.data.payer);
+    const sender = new PublicKey(cashLink.data.sender);
     const mint = new PublicKey(cashLink.data.mint);
-    const isNative = mint.equals(spl.NATIVE_MINT);
     const cancelInstruction = await this.cancelInstruction({
       mint,
       authority: this.authority.publicKey,
       cashLink: cashLink.pubkey,
-      payerToken: isNative
-        ? payer
-        : (
-            await spl.getOrCreateAssociatedTokenAccount(
-              this.connection,
-              this.feePayer,
-              new PublicKey(cashLink.data.mint),
-              payer,
-              true,
-            )
-          ).address,
-      vaultToken: new PublicKey(cashLink.data.vaultToken),
+      senderToken: (
+        await spl.getOrCreateAssociatedTokenAccount(
+          this.connection,
+          this.feePayer,
+          mint,
+          sender,
+          true,
+        )
+      ).address,
+      vaultToken: await _findAssociatedTokenAddress(cashLinkPda, mint),
       feePayer: this.feePayer.publicKey,
     });
     const transaction = new Transaction().add(cancelInstruction);
@@ -105,35 +100,30 @@ export class CashLinkClient {
   };
 
   cancelAndClose = async (input: CashLinkInput): Promise<string> => {
-    const cashLink = await _getCasLinkAccount(
-      this.connection,
-      new PublicKey(input.cashLinkAddress),
-    );
+    const cashLinkPda = new PublicKey(input.cashLinkAddress);
+    const cashLink = await _getCasLinkAccount(this.connection, cashLinkPda);
     if (cashLink.data?.state === CashLinkState.Closed) {
       throw new Error(ACCOUNT_ALREADY_CANCELED);
     }
-    if (cashLink.data?.state === CashLinkState.Settled) {
+    if (cashLink.data?.state === CashLinkState.Redeemed) {
       throw new Error(ACCOUNT_ALREADY_SETTLED);
     }
-    const payer = new PublicKey(cashLink.data.payer);
+    const sender = new PublicKey(cashLink.data.sender);
     const mint = new PublicKey(cashLink.data.mint);
-    const isNative = mint.equals(spl.NATIVE_MINT);
     const cancelInstruction = await this.cancelInstruction({
       mint,
       authority: this.authority.publicKey,
       cashLink: cashLink.pubkey,
-      payerToken: isNative
-        ? payer
-        : (
-            await spl.getOrCreateAssociatedTokenAccount(
-              this.connection,
-              this.feePayer,
-              new PublicKey(cashLink.data.mint),
-              payer,
-              true,
-            )
-          ).address,
-      vaultToken: new PublicKey(cashLink.data.vaultToken),
+      senderToken: (
+        await spl.getOrCreateAssociatedTokenAccount(
+          this.connection,
+          this.feePayer,
+          mint,
+          sender,
+          true,
+        )
+      ).address,
+      vaultToken: await _findAssociatedTokenAddress(cashLinkPda, mint),
       feePayer: this.feePayer.publicKey,
     });
     const closeInstruction = this.closeInstruction({
@@ -165,7 +155,7 @@ export class CashLinkClient {
       keys: [
         { pubkey: params.authority, isSigner: true, isWritable: false },
         { pubkey: params.cashLink, isSigner: false, isWritable: true },
-        { pubkey: params.payerToken, isSigner: false, isWritable: true },
+        { pubkey: params.senderToken, isSigner: false, isWritable: true },
         { pubkey: params.vaultToken, isSigner: false, isWritable: true },
         { pubkey: params.feePayer, isSigner: true, isWritable: true },
         { pubkey: params.mint, isSigner: false, isWritable: false },
@@ -196,7 +186,7 @@ export class CashLinkClient {
     if (
       !(
         cashLink.data?.state === CashLinkState.Initialized ||
-        cashLink.data?.state === CashLinkState.Settled
+        cashLink.data?.state === CashLinkState.Redeemed
       )
     ) {
       throw new Error(ACCOUNT_NOT_INITIALIZED_OR_SETTLED);
@@ -241,29 +231,29 @@ export class CashLinkClient {
     });
   };
 
-  initializeEscrow = async (input: InitializeCashLinkInput): Promise<string> => {
-    const payer = new PublicKey(input.wallet);
+  initialize = async (input: InitializeCashLinkInput): Promise<string> => {
+    const sender = new PublicKey(input.wallet);
     const mint = new PublicKey(input.mint);
-    const [cashLink, cashLinkBump] = await CashProgram.findCashLinkAccount(input.reference);
-    const [vaultTokenAccount, vaultBump] = await CashProgram.findVaultAccount(cashLink);
+    const reference = new PublicKey(input.reference);
+    const [cashLink, cashLinkBump] = await CashProgram.findCashLinkAccount(reference);
+    const vaultToken = await _findAssociatedTokenAddress(cashLink, mint);
     const amount = new BN(input.amount);
     const fee = new BN(input.fee ?? 0);
-    const escrowParams: InitCashLinkParams = {
+    const initParams: InitCashLinkParams = {
       mint,
-      payer,
+      sender,
       cashLinkBump,
-      vaultBump,
       cashLink,
-      vaultToken: vaultTokenAccount,
+      vaultToken,
       amount: amount,
       fee,
-      reference: input.reference,
+      reference,
       authority: this.authority.publicKey,
       feePayer: this.feePayer.publicKey,
     };
 
     const transaction = new Transaction();
-    transaction.add(this.initInstruction(escrowParams));
+    transaction.add(this.initInstruction(initParams));
     if (input.memo) {
       transaction.add(this.memoInstruction(input.memo, this.authority.publicKey));
     }
@@ -279,41 +269,41 @@ export class CashLinkClient {
   };
 
   initializeAndPay = async (input: InitializeCashLinkInput): Promise<string> => {
-    const payer = new PublicKey(input.wallet);
+    const sender = new PublicKey(input.wallet);
     const mint = new PublicKey(input.mint);
-    const [cashLink, cashLinkBump] = await CashProgram.findCashLinkAccount(input.reference);
-    const [vaultTokenAccount, vaultBump] = await CashProgram.findVaultAccount(cashLink);
+    const reference = new PublicKey(input.reference);
+    const [cashLink, cashLinkBump] = await CashProgram.findCashLinkAccount(reference);
+    const vaultToken = await _findAssociatedTokenAddress(cashLink, mint);
     const amount = new BN(input.amount);
     const fee = new BN(input.fee ?? 0);
     const total = amount.add(fee);
-    const escrowParams: InitCashLinkParams = {
+    const initParams: InitCashLinkParams = {
       mint,
-      payer,
+      sender,
       cashLinkBump,
-      vaultBump,
       cashLink,
-      vaultToken: vaultTokenAccount,
+      vaultToken,
       amount: amount,
       fee,
-      reference: input.reference,
+      reference,
       authority: this.authority.publicKey,
       feePayer: this.feePayer.publicKey,
     };
 
     const transaction = new Transaction();
-    transaction.add(this.initInstruction(escrowParams));
+    transaction.add(this.initInstruction(initParams));
     if (mint.equals(spl.NATIVE_MINT)) {
       transaction.add(
         SystemProgram.transfer({
-          fromPubkey: payer,
-          toPubkey: vaultTokenAccount,
+          fromPubkey: sender,
+          toPubkey: vaultToken,
           lamports: total.toNumber(),
         }),
       );
     } else {
-      const source = await _findAssociatedTokenAddress(payer, mint);
+      const source = await _findAssociatedTokenAddress(sender, mint);
       transaction.add(
-        spl.createTransferInstruction(source, vaultTokenAccount, payer, BigInt(total.toString())),
+        spl.createTransferInstruction(source, vaultToken, sender, BigInt(total.toString())),
       );
     }
     if (input.memo) {
@@ -337,8 +327,8 @@ export class CashLinkClient {
     if (cashLink.data.state !== CashLinkState.Initialized) {
       throw Error(INVALID_STATE);
     }
-    const [vaultTokenAccount] = await CashProgram.findVaultAccount(cashLinkAddress);
     const mint = new PublicKey(cashLink.data.mint);
+    const vaultToken = await _findAssociatedTokenAddress(cashLinkAddress, mint);
     const amount = new BN(cashLink.data.amount);
     const fee = new BN(cashLink.data.fee ?? 0);
     const total = amount.add(fee);
@@ -347,19 +337,14 @@ export class CashLinkClient {
       transaction.add(
         SystemProgram.transfer({
           fromPubkey: walletAddress,
-          toPubkey: vaultTokenAccount,
+          toPubkey: vaultToken,
           lamports: total.toNumber(),
         }),
       );
     } else {
       const source = await _findAssociatedTokenAddress(walletAddress, mint);
       transaction.add(
-        spl.createTransferInstruction(
-          source,
-          vaultTokenAccount,
-          walletAddress,
-          BigInt(total.toString()),
-        ),
+        spl.createTransferInstruction(source, vaultToken, walletAddress, BigInt(total.toString())),
       );
     }
     if (input.memo) {
@@ -377,23 +362,11 @@ export class CashLinkClient {
   };
 
   initInstruction = (params: InitCashLinkParams): TransactionInstruction => {
-    const {
-      amount,
-      fee,
-      reference,
-      payer,
-      vaultBump,
-      cashLinkBump,
-      authority,
-      cashLink,
-      vaultToken,
-      mint,
-    } = params;
+    const { amount, fee, reference, sender, cashLinkBump, authority, cashLink, vaultToken, mint } =
+      params;
     const data = InitCashLinkArgs.serialize({
       amount,
       fee,
-      reference,
-      vaultBump: vaultBump,
       cashLinkBump: cashLinkBump,
     });
     const keys = [
@@ -403,7 +376,7 @@ export class CashLinkClient {
         isWritable: false,
       },
       {
-        pubkey: payer,
+        pubkey: sender,
         isSigner: false,
         isWritable: false,
       },
@@ -417,10 +390,15 @@ export class CashLinkClient {
         isSigner: false,
         isWritable: true,
       },
+      // {
+      //   pubkey: vaultToken,
+      //   isSigner: false,
+      //   isWritable: true,
+      // },
       {
-        pubkey: vaultToken,
+        pubkey: reference,
         isSigner: false,
-        isWritable: true,
+        isWritable: false,
       },
       {
         pubkey: mint,
@@ -475,50 +453,48 @@ export class CashLinkClient {
     );
   };
 
-  settle = async (input: CashLinkInput): Promise<string> => {
+  redeem = async (input: CashLinkInput): Promise<string> => {
     const cashLinkAddress = new PublicKey(input.cashLinkAddress);
-    const walletAddress = new PublicKey(input.memo);
+    const recipient = new PublicKey(input.walletAddress);
     const cashLink = await _getCasLinkAccount(this.connection, cashLinkAddress);
     const transaction = new Transaction();
     const signers = [this.feePayer, this.authority];
     const mint = new PublicKey(cashLink.data.mint);
-    const payer = new PublicKey(cashLink.data.payer);
-    const isNative = mint.equals(spl.NATIVE_MINT);
-    const [destinationToken, feeToken, payerToken] = isNative
-      ? [walletAddress, this.feeWallet, payer]
-      : (
-          await Promise.all([
-            spl.getOrCreateAssociatedTokenAccount(
-              this.connection,
-              this.feePayer,
-              new PublicKey(cashLink.data.mint),
-              walletAddress,
-              true,
-            ),
-            spl.getOrCreateAssociatedTokenAccount(
-              this.connection,
-              this.feePayer,
-              new PublicKey(cashLink.data.mint),
-              this.feeWallet,
-              true,
-            ),
-            spl.getOrCreateAssociatedTokenAccount(
-              this.connection,
-              this.feePayer,
-              new PublicKey(cashLink.data.mint),
-              payer,
-              true,
-            ),
-          ])
-        ).map((acc) => acc.address);
-    const transactionInstruction = await this.settleInstruction({
-      destinationToken,
+    const sender = new PublicKey(cashLink.data.sender);
+    const vaultToken = await _findAssociatedTokenAddress(cashLinkAddress, mint);
+    const [recipientToken, feeToken, senderToken] = (
+      await Promise.all([
+        spl.getOrCreateAssociatedTokenAccount(
+          this.connection,
+          this.feePayer,
+          new PublicKey(cashLink.data.mint),
+          recipient,
+          true,
+        ),
+        spl.getOrCreateAssociatedTokenAccount(
+          this.connection,
+          this.feePayer,
+          new PublicKey(cashLink.data.mint),
+          this.feeWallet,
+          true,
+        ),
+        spl.getOrCreateAssociatedTokenAccount(
+          this.connection,
+          this.feePayer,
+          new PublicKey(cashLink.data.mint),
+          sender,
+          true,
+        ),
+      ])
+    ).map((acc) => acc.address);
+    const transactionInstruction = await this.redeemInstruction({
+      recipientToken,
       feeToken,
-      payerToken,
+      senderToken,
+      vaultToken,
+      mint,
       authority: this.authority.publicKey,
       cashLink: cashLink.pubkey,
-      vaultToken: new PublicKey(cashLink.data.vaultToken),
-      mint: mint,
       feePayer: this.feePayer.publicKey,
     });
     transaction.add(transactionInstruction);
@@ -536,48 +512,46 @@ export class CashLinkClient {
     return signature;
   };
 
-  settleAndClose = async (input: CashLinkInput): Promise<string> => {
+  redeemAndClose = async (input: CashLinkInput): Promise<string> => {
     const cashLinkAddress = new PublicKey(input.cashLinkAddress);
     const walletAddress = new PublicKey(input.walletAddress);
     const cashLink = await _getCasLinkAccount(this.connection, cashLinkAddress);
     const mint = new PublicKey(cashLink.data.mint);
-    const isNative = mint.equals(spl.NATIVE_MINT);
-    const payer = new PublicKey(cashLink.data.payer);
-    const [destinationToken, feeToken, payerToken] = isNative
-      ? [walletAddress, this.feeWallet, payer]
-      : (
-          await Promise.all([
-            spl.getOrCreateAssociatedTokenAccount(
-              this.connection,
-              this.feePayer,
-              new PublicKey(cashLink.data.mint),
-              walletAddress,
-              true,
-            ),
-            spl.getOrCreateAssociatedTokenAccount(
-              this.connection,
-              this.feePayer,
-              new PublicKey(cashLink.data.mint),
-              this.feeWallet,
-              true,
-            ),
-            spl.getOrCreateAssociatedTokenAccount(
-              this.connection,
-              this.feePayer,
-              new PublicKey(cashLink.data.mint),
-              payer,
-              true,
-            ),
-          ])
-        ).map((acc) => acc.address);
-    const settleInstruction = await this.settleInstruction({
-      destinationToken,
+    const vaultToken = await _findAssociatedTokenAddress(cashLinkAddress, mint);
+    const sender = new PublicKey(cashLink.data.sender);
+    const [recipientToken, feeToken, senderToken] = (
+      await Promise.all([
+        spl.getOrCreateAssociatedTokenAccount(
+          this.connection,
+          this.feePayer,
+          new PublicKey(cashLink.data.mint),
+          walletAddress,
+          true,
+        ),
+        spl.getOrCreateAssociatedTokenAccount(
+          this.connection,
+          this.feePayer,
+          new PublicKey(cashLink.data.mint),
+          this.feeWallet,
+          true,
+        ),
+        spl.getOrCreateAssociatedTokenAccount(
+          this.connection,
+          this.feePayer,
+          new PublicKey(cashLink.data.mint),
+          sender,
+          true,
+        ),
+      ])
+    ).map((acc) => acc.address);
+    const redeemInstruction = await this.redeemInstruction({
+      recipientToken,
       feeToken,
-      payerToken,
+      senderToken,
+      vaultToken,
+      mint,
       authority: this.authority.publicKey,
       cashLink: cashLink.pubkey,
-      vaultToken: new PublicKey(cashLink.data.vaultToken),
-      mint: mint,
       feePayer: this.feePayer.publicKey,
     });
     const closeInstruction = this.closeInstruction({
@@ -586,7 +560,7 @@ export class CashLinkClient {
       feePayer: this.feePayer.publicKey,
     });
     const transaction = new Transaction();
-    transaction.add(settleInstruction);
+    transaction.add(redeemInstruction);
     transaction.add(closeInstruction);
     if (input.memo) {
       transaction.add(this.memoInstruction(input.memo, this.authority.publicKey));
@@ -606,13 +580,13 @@ export class CashLinkClient {
     }
   };
 
-  settleInstruction = async (params: SettleCashLinkParams): Promise<TransactionInstruction> => {
+  redeemInstruction = async (params: RedeemCashLinkParams): Promise<TransactionInstruction> => {
     return new TransactionInstruction({
       programId: CashProgram.PUBKEY,
-      data: SettleCashLinkArgs.serialize(),
+      data: RedeemCashLinkArgs.serialize(),
       keys: [
         { pubkey: params.authority, isSigner: true, isWritable: false },
-        { pubkey: params.destinationToken, isSigner: false, isWritable: true },
+        { pubkey: params.recipientToken, isSigner: false, isWritable: true },
         { pubkey: params.feeToken, isSigner: false, isWritable: true },
         {
           pubkey: params.vaultToken,
@@ -620,7 +594,7 @@ export class CashLinkClient {
           isWritable: true,
         },
         { pubkey: params.cashLink, isSigner: false, isWritable: true },
-        { pubkey: params.payerToken, isSigner: false, isWritable: true },
+        { pubkey: params.senderToken, isSigner: false, isWritable: true },
         { pubkey: params.feePayer, isSigner: true, isWritable: false },
         { pubkey: params.mint, isSigner: false, isWritable: false },
         {
@@ -662,10 +636,12 @@ export class CashLinkClient {
 
   hasPaid = async (cashLinkAddress: PublicKey, commitment?: Commitment): Promise<boolean> => {
     try {
-      const [cashLink, vault] = await Promise.all([
-        this.getCashLink(cashLinkAddress, commitment),
-        this.getVault(cashLinkAddress, commitment),
-      ]);
+      const cashLink = await this.getCashLink(cashLinkAddress, commitment);
+      const vault = await this.getVault(
+        cashLinkAddress,
+        new PublicKey(cashLink.data.mint),
+        commitment,
+      );
       if (!cashLink || !cashLink.data || !vault) {
         return false;
       }
@@ -679,9 +655,13 @@ export class CashLinkClient {
     }
   };
 
-  getVault = async (cashLink: PublicKey, commitment?: Commitment): Promise<spl.Account | null> => {
+  getVault = async (
+    cashLink: PublicKey,
+    mint: PublicKey,
+    commitment?: Commitment,
+  ): Promise<spl.Account | null> => {
     try {
-      const [vault] = await CashProgram.findVaultAccount(cashLink);
+      const vault = await _findAssociatedTokenAddress(cashLink, mint);
       return await spl.getAccount(this.connection, vault, commitment);
     } catch (error: unknown) {
       if (

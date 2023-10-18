@@ -11,7 +11,7 @@ pub enum CashError {
     InvalidMint,
     #[error("Invalid Instruction")]
     InvalidInstruction,
-    #[error("No rent excemption")]
+    #[error("No rent exemption")]
     NotRentExempt,
     #[error("Amount mismatch")]
     ExpectedAmountMismatch,
@@ -43,6 +43,8 @@ pub enum CashError {
     InvalidVaultOwner,
     #[error("Invalid vault token owner")]
     InvalidVaultTokenOwner,
+    #[error("Invalid vault token")]
+    InvalidVaultToken,
     #[error("Invalid source token owner")]
     InvalidSrcTokenOwner,
     #[error("Invalid token owner")]

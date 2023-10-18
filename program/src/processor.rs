@@ -22,9 +22,9 @@ impl Processor {
                 msg!("Instruction: InitCashLink");
                 cashlink::process_init_cash_link(accounts, args, program_id)
             }
-            CashInstruction::Settle => {
-                msg!("Instruction: Settle CashLink");
-                cashlink::process_settlement(accounts, program_id)
+            CashInstruction::Redeem => {
+                msg!("Instruction: Redeem CashLink");
+                cashlink::process_redemption(accounts, program_id)
             }
             CashInstruction::Cancel => {
                 msg!("Instruction: Cancel CashLink");

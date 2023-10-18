@@ -6,8 +6,6 @@ type Args = {
   amount: BN;
   fee: BN;
   cashLinkBump: number;
-  vaultBump: number;
-  reference: string;
 };
 
 export class InitCashLinkArgs extends Borsh.Data<Args> {
@@ -16,28 +14,23 @@ export class InitCashLinkArgs extends Borsh.Data<Args> {
     ['amount', 'u64'],
     ['fee', 'u64'],
     ['cashLinkBump', 'u8'],
-    ['vaultBump', 'u8'],
-    ['reference', 'string'],
   ]);
 
   instruction = 0;
   amount: BN;
   fee: BN;
   cashLinkBump: number;
-  vaultBump: number;
-  reference: string;
 }
 
 export type InitCashLinkParams = {
   amount: BN;
   fee: BN;
-  reference: string;
   cashLinkBump: number;
-  vaultBump: number;
   authority: PublicKey;
   feePayer: PublicKey;
-  payer: PublicKey;
+  sender: PublicKey;
   cashLink: PublicKey;
   vaultToken: PublicKey;
+  reference: PublicKey;
   mint: PublicKey;
 };

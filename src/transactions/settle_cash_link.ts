@@ -9,18 +9,18 @@ type Args = {
   bump: number;
 };
 
-export class SettleCashLinkArgs extends Borsh.Data<Args> {
-  static readonly SCHEMA = SettleCashLinkArgs.struct([['instruction', 'u8']]);
+export class RedeemCashLinkArgs extends Borsh.Data<Args> {
+  static readonly SCHEMA = RedeemCashLinkArgs.struct([['instruction', 'u8']]);
 
   instruction = 1;
 }
 
-export type SettleCashLinkParams = {
+export type RedeemCashLinkParams = {
   authority: PublicKey;
   cashLink: PublicKey;
   vaultToken: PublicKey;
-  destinationToken: PublicKey;
-  payerToken: PublicKey;
+  recipientToken: PublicKey;
+  senderToken: PublicKey;
   feeToken: PublicKey;
   mint: PublicKey;
   feePayer: PublicKey;

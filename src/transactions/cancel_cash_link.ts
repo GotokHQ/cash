@@ -10,7 +10,7 @@ export class CancelCashLinkArgs extends Borsh.Data {
 export type CancelCashLinkParams = {
   authority: PublicKey;
   cashLink: PublicKey;
-  payerToken: PublicKey;
+  senderToken: PublicKey;
   vaultToken: PublicKey;
   feePayer: PublicKey;
   mint: PublicKey;

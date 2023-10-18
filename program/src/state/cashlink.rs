@@ -14,7 +14,7 @@ pub enum CashLinkState {
     #[default]
     Uninitialized = 0,
     Initialized,
-    Settled,
+    Redeemed,
     Canceled,
     Closed,
 }
@@ -24,23 +24,22 @@ pub struct CashLink {
     pub state: CashLinkState,
     pub amount: u64,
     pub fee: u64,
-    pub payer: Pubkey,
-    pub vault_token: Pubkey,
-    pub settled_at: Option<u64>,
+    pub sender: Pubkey,
+    pub reference: Pubkey,
+    pub redeemed_at: Option<u64>,
     pub canceled_at: Option<u64>,
-    pub vault_bump: u8,
+    pub cash_link_bump: u8,
     pub mint: Pubkey,
     pub authority: Pubkey,
 }
 
 impl CashLink {
     pub const PREFIX: &'static str = "cash";
-    pub const VAULT_PREFIX: &'static str = "vault";
     pub fn is_closed(&self) -> bool {
         self.state == CashLinkState::Closed
     }
     pub fn is_settled(&self) -> bool {
-        self.state == CashLinkState::Settled
+        self.state == CashLinkState::Redeemed
     }
     pub fn is_canceled(&self) -> bool {
         self.state == CashLinkState::Canceled

@@ -14,5 +14,6 @@ solana-program = "~1.17.1"
 thiserror = "~1.0.49"  
 borsh = "0.10"
 spl-token = { version="~4.0.0", features = [ "no-entrypoint" ] }
+spl-associated-token-account = { version="2.2.0", features = [ "no-entrypoint" ] }
 [lib]
 crate-type = ["cdylib", "lib"]

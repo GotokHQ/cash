@@ -16,7 +16,7 @@ use solana_program::{
     sysvar::{rent::Rent, Sysvar},
 };
 use spl_token::state::Account;
-
+use spl_associated_token_account::instruction::create_associated_token_account;
 /// Assert uninitialized
 pub fn assert_uninitialized<T: IsInitialized>(account: &T) -> ProgramResult {
     if account.is_initialized() {
@@ -257,6 +257,27 @@ pub fn create_new_account_raw<'a>(
         &[&signer_seeds],
     )?;
     Ok(())
+}
+
+pub fn create_associated_token_account_raw<'a>(
+    payer_info: &AccountInfo<'a>,
+    wallet_info: &AccountInfo<'a>,
+    mint_info: &AccountInfo<'a>,
+    spl_token_program_info: &AccountInfo<'a>,
+    rent_sysvar_info: &AccountInfo<'a>,
+    system_program_info: &AccountInfo<'a>,
+) -> ProgramResult {
+    invoke(
+        &create_associated_token_account(payer_info.key, wallet_info.key, mint_info.key, &spl_associated_token_account::id()),
+        &[
+            payer_info.clone(),
+            wallet_info.clone(),
+            mint_info.clone(),
+            system_program_info.clone(),
+            spl_token_program_info.clone(),
+            rent_sysvar_info.clone(),
+        ],
+    )
 }
 
 /// Checks two pubkeys for equality in a computationally cheap way using
