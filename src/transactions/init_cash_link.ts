@@ -30,7 +30,6 @@ export type InitCashLinkParams = {
   feePayer: PublicKey;
   sender: PublicKey;
   cashLink: PublicKey;
-  vaultToken: PublicKey;
   reference: PublicKey;
-  mint: PublicKey;
+  mint?: PublicKey | null;
 };

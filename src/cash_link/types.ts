@@ -1,7 +1,7 @@
 import { Commitment } from '@solana/web3.js';
 export interface InitializeCashLinkInput {
   wallet: string;
-  mint: string;
+  mint?: string;
   reference: string;
   amount: string;
   fee?: string;

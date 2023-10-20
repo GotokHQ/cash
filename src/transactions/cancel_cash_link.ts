@@ -11,7 +11,6 @@ export type CancelCashLinkParams = {
   authority: PublicKey;
   cashLink: PublicKey;
   senderToken: PublicKey;
-  vaultToken: PublicKey;
+  vaultToken?: PublicKey | null;
   feePayer: PublicKey;
-  mint: PublicKey;
 };

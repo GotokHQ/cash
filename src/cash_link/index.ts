@@ -56,33 +56,7 @@ export class CashLinkClient {
   }
 
   cancel = async (input: CashLinkInput): Promise<string> => {
-    const cashLinkPda = new PublicKey(input.cashLinkAddress);
-    const cashLink = await _getCasLinkAccount(this.connection, cashLinkPda);
-    if (cashLink.data?.state === CashLinkState.Closed) {
-      throw new Error(ACCOUNT_ALREADY_CANCELED);
-    }
-    if (cashLink.data?.state === CashLinkState.Redeemed) {
-      throw new Error(ACCOUNT_ALREADY_SETTLED);
-    }
-    const sender = new PublicKey(cashLink.data.sender);
-    const mint = new PublicKey(cashLink.data.mint);
-    const cancelInstruction = await this.cancelInstruction({
-      mint,
-      authority: this.authority.publicKey,
-      cashLink: cashLink.pubkey,
-      senderToken: (
-        await spl.getOrCreateAssociatedTokenAccount(
-          this.connection,
-          this.feePayer,
-          mint,
-          sender,
-          true,
-        )
-      ).address,
-      vaultToken: await _findAssociatedTokenAddress(cashLinkPda, mint),
-      feePayer: this.feePayer.publicKey,
-    });
-    const transaction = new Transaction().add(cancelInstruction);
+    const transaction = await this.cancelTransaction(input);
     if (input.memo) {
       transaction.add(this.memoInstruction(input.memo, this.authority.publicKey));
     }
@@ -100,38 +74,13 @@ export class CashLinkClient {
   };
 
   cancelAndClose = async (input: CashLinkInput): Promise<string> => {
-    const cashLinkPda = new PublicKey(input.cashLinkAddress);
-    const cashLink = await _getCasLinkAccount(this.connection, cashLinkPda);
-    if (cashLink.data?.state === CashLinkState.Closed) {
-      throw new Error(ACCOUNT_ALREADY_CANCELED);
-    }
-    if (cashLink.data?.state === CashLinkState.Redeemed) {
-      throw new Error(ACCOUNT_ALREADY_SETTLED);
-    }
-    const sender = new PublicKey(cashLink.data.sender);
-    const mint = new PublicKey(cashLink.data.mint);
-    const cancelInstruction = await this.cancelInstruction({
-      mint,
-      authority: this.authority.publicKey,
-      cashLink: cashLink.pubkey,
-      senderToken: (
-        await spl.getOrCreateAssociatedTokenAccount(
-          this.connection,
-          this.feePayer,
-          mint,
-          sender,
-          true,
-        )
-      ).address,
-      vaultToken: await _findAssociatedTokenAddress(cashLinkPda, mint),
-      feePayer: this.feePayer.publicKey,
-    });
+    const transaction = await this.cancelTransaction(input);
     const closeInstruction = this.closeInstruction({
       cashLink: new PublicKey(input.cashLinkAddress),
       authority: this.authority.publicKey,
       feePayer: this.feePayer.publicKey,
     });
-    const transaction = new Transaction().add(cancelInstruction, closeInstruction);
+    transaction.add(closeInstruction);
     if (input.memo) {
       transaction.add(this.memoInstruction(input.memo, this.authority.publicKey));
     }
@@ -148,33 +97,88 @@ export class CashLinkClient {
     }
   };
 
+  cancelTransaction = async (input: CashLinkInput): Promise<Transaction> => {
+    const cashLinkPda = new PublicKey(input.cashLinkAddress);
+    const cashLink = await _getCasLinkAccount(this.connection, cashLinkPda);
+    if (cashLink.data?.state === CashLinkState.Closed) {
+      throw new Error(ACCOUNT_ALREADY_CANCELED);
+    }
+    if (cashLink.data?.state === CashLinkState.Redeemed) {
+      throw new Error(ACCOUNT_ALREADY_SETTLED);
+    }
+    const sender = new PublicKey(cashLink.data.sender);
+    const cancelInstruction = await this.cancelInstruction({
+      authority: this.authority.publicKey,
+      cashLink: cashLink.pubkey,
+      senderToken: cashLink.data.mint
+        ? (
+            await spl.getOrCreateAssociatedTokenAccount(
+              this.connection,
+              this.feePayer,
+              new PublicKey(cashLink.data.mint),
+              sender,
+              true,
+            )
+          ).address
+        : sender,
+      vaultToken: cashLink.data.mint
+        ? await _findAssociatedTokenAddress(cashLinkPda, new PublicKey(cashLink.data.mint))
+        : null,
+      feePayer: this.feePayer.publicKey,
+    });
+    return new Transaction().add(cancelInstruction);
+  };
+
   cancelInstruction = async (params: CancelCashLinkParams): Promise<TransactionInstruction> => {
+    const keys = [
+      { pubkey: params.authority, isSigner: true, isWritable: false },
+      { pubkey: params.cashLink, isSigner: false, isWritable: true },
+      { pubkey: params.senderToken, isSigner: false, isWritable: true },
+      { pubkey: params.feePayer, isSigner: false, isWritable: true },
+      {
+        pubkey: SYSVAR_CLOCK_PUBKEY,
+        isSigner: false,
+        isWritable: false,
+      },
+      {
+        pubkey: spl.TOKEN_PROGRAM_ID,
+        isSigner: false,
+        isWritable: false,
+      },
+      {
+        pubkey: SystemProgram.programId,
+        isSigner: false,
+        isWritable: false,
+      },
+      {
+        pubkey: SYSVAR_RENT_PUBKEY,
+        isSigner: false,
+        isWritable: false,
+      },
+    ];
+    if (params.vaultToken) {
+      keys.push({
+        pubkey: params.vaultToken,
+        isSigner: false,
+        isWritable: true,
+      });
+    }
+    keys.push(
+      {
+        pubkey: spl.TOKEN_PROGRAM_ID,
+        isSigner: false,
+        isWritable: false,
+      },
+      {
+        pubkey: SystemProgram.programId,
+        isSigner: false,
+        isWritable: false,
+      },
+    );
     return new TransactionInstruction({
+      keys,
       programId: CashProgram.PUBKEY,
       data: CancelCashLinkArgs.serialize(),
-      keys: [
-        { pubkey: params.authority, isSigner: true, isWritable: false },
-        { pubkey: params.cashLink, isSigner: false, isWritable: true },
-        { pubkey: params.senderToken, isSigner: false, isWritable: true },
-        { pubkey: params.vaultToken, isSigner: false, isWritable: true },
-        { pubkey: params.feePayer, isSigner: true, isWritable: true },
-        { pubkey: params.mint, isSigner: false, isWritable: false },
-        {
-          pubkey: SYSVAR_CLOCK_PUBKEY,
-          isSigner: false,
-          isWritable: false,
-        },
-        {
-          pubkey: spl.TOKEN_PROGRAM_ID,
-          isSigner: false,
-          isWritable: false,
-        },
-        {
-          pubkey: SystemProgram.programId,
-          isSigner: false,
-          isWritable: false,
-        },
-      ],
     });
   };
 
@@ -232,28 +236,7 @@ export class CashLinkClient {
   };
 
   initialize = async (input: InitializeCashLinkInput): Promise<string> => {
-    const sender = new PublicKey(input.wallet);
-    const mint = new PublicKey(input.mint);
-    const reference = new PublicKey(input.reference);
-    const [cashLink, cashLinkBump] = await CashProgram.findCashLinkAccount(reference);
-    const vaultToken = await _findAssociatedTokenAddress(cashLink, mint);
-    const amount = new BN(input.amount);
-    const fee = new BN(input.fee ?? 0);
-    const initParams: InitCashLinkParams = {
-      mint,
-      sender,
-      cashLinkBump,
-      cashLink,
-      vaultToken,
-      amount: amount,
-      fee,
-      reference,
-      authority: this.authority.publicKey,
-      feePayer: this.feePayer.publicKey,
-    };
-
-    const transaction = new Transaction();
-    transaction.add(this.initInstruction(initParams));
+    const transaction = await this.initializeTransaction(input);
     if (input.memo) {
       transaction.add(this.memoInstruction(input.memo, this.authority.publicKey));
     }
@@ -269,41 +252,37 @@ export class CashLinkClient {
   };
 
   initializeAndPay = async (input: InitializeCashLinkInput): Promise<string> => {
+    const transaction = await this.initializeTransaction(input);
     const sender = new PublicKey(input.wallet);
-    const mint = new PublicKey(input.mint);
-    const reference = new PublicKey(input.reference);
-    const [cashLink, cashLinkBump] = await CashProgram.findCashLinkAccount(reference);
-    const vaultToken = await _findAssociatedTokenAddress(cashLink, mint);
     const amount = new BN(input.amount);
     const fee = new BN(input.fee ?? 0);
     const total = amount.add(fee);
-    const initParams: InitCashLinkParams = {
-      mint,
-      sender,
-      cashLinkBump,
-      cashLink,
-      vaultToken,
-      amount: amount,
-      fee,
-      reference,
-      authority: this.authority.publicKey,
-      feePayer: this.feePayer.publicKey,
-    };
-
-    const transaction = new Transaction();
-    transaction.add(this.initInstruction(initParams));
-    if (mint.equals(spl.NATIVE_MINT)) {
+    const [cashLinkAddress] = await CashProgram.findCashLinkAccount(new PublicKey(input.reference));
+    if (input.mint) {
+      const mint = new PublicKey(input.mint);
+      const vaultToken = await _findAssociatedTokenAddress(cashLinkAddress, mint);
+      if (mint.equals(spl.NATIVE_MINT)) {
+        transaction.add(
+          SystemProgram.transfer({
+            fromPubkey: sender,
+            toPubkey: vaultToken,
+            lamports: total.toNumber(),
+          }),
+          spl.createSyncNativeInstruction(vaultToken),
+        );
+      } else {
+        const source = await _findAssociatedTokenAddress(sender, mint);
+        transaction.add(
+          spl.createTransferInstruction(source, vaultToken, sender, BigInt(total.toString())),
+        );
+      }
+    } else {
       transaction.add(
         SystemProgram.transfer({
           fromPubkey: sender,
-          toPubkey: vaultToken,
+          toPubkey: cashLinkAddress,
           lamports: total.toNumber(),
         }),
-      );
-    } else {
-      const source = await _findAssociatedTokenAddress(sender, mint);
-      transaction.add(
-        spl.createTransferInstruction(source, vaultToken, sender, BigInt(total.toString())),
       );
     }
     if (input.memo) {
@@ -320,6 +299,42 @@ export class CashLinkClient {
       .toString('base64');
   };
 
+  initializeTransaction = async (input: InitializeCashLinkInput): Promise<Transaction> => {
+    const sender = new PublicKey(input.wallet);
+    const mint: PublicKey | null = input.mint ? new PublicKey(input.mint) : null;
+    const reference = new PublicKey(input.reference);
+    const [cashLink, cashLinkBump] = await CashProgram.findCashLinkAccount(reference);
+    const amount = new BN(input.amount);
+    const fee = new BN(input.fee ?? 0);
+
+    const initParams: InitCashLinkParams = {
+      mint,
+      sender,
+      cashLinkBump,
+      cashLink,
+      amount: amount,
+      fee,
+      reference,
+      authority: this.authority.publicKey,
+      feePayer: this.feePayer.publicKey,
+    };
+
+    const transaction = new Transaction();
+    // if (mint) {
+    //   const vaultToken = await _findAssociatedTokenAddress(cashLink, mint);
+    //   transaction.add(
+    //     spl.createAssociatedTokenAccountInstruction(
+    //       this.feePayer.publicKey,
+    //       vaultToken,
+    //       cashLink,
+    //       mint,
+    //     ),
+    //   );
+    // }
+    transaction.add(this.initInstruction(initParams));
+    return transaction;
+  };
+
   pay = async (input: CashLinkInput): Promise<string> => {
     const cashLinkAddress = new PublicKey(input.cashLinkAddress);
     const walletAddress = new PublicKey(input.memo);
@@ -327,24 +342,40 @@ export class CashLinkClient {
     if (cashLink.data.state !== CashLinkState.Initialized) {
       throw Error(INVALID_STATE);
     }
-    const mint = new PublicKey(cashLink.data.mint);
-    const vaultToken = await _findAssociatedTokenAddress(cashLinkAddress, mint);
     const amount = new BN(cashLink.data.amount);
     const fee = new BN(cashLink.data.fee ?? 0);
     const total = amount.add(fee);
     const transaction = new Transaction();
-    if (mint.equals(spl.NATIVE_MINT)) {
+    if (cashLink.data.mint) {
+      const mint = new PublicKey(cashLink.data.mint);
+      const vaultToken = await _findAssociatedTokenAddress(cashLinkAddress, mint);
+      if (mint.equals(spl.NATIVE_MINT)) {
+        transaction.add(
+          SystemProgram.transfer({
+            fromPubkey: walletAddress,
+            toPubkey: vaultToken,
+            lamports: total.toNumber(),
+          }),
+          spl.createSyncNativeInstruction(vaultToken),
+        );
+      } else {
+        const source = await _findAssociatedTokenAddress(walletAddress, mint);
+        transaction.add(
+          spl.createTransferInstruction(
+            source,
+            vaultToken,
+            walletAddress,
+            BigInt(total.toString()),
+          ),
+        );
+      }
+    } else {
       transaction.add(
         SystemProgram.transfer({
           fromPubkey: walletAddress,
-          toPubkey: vaultToken,
+          toPubkey: cashLinkAddress,
           lamports: total.toNumber(),
         }),
-      );
-    } else {
-      const source = await _findAssociatedTokenAddress(walletAddress, mint);
-      transaction.add(
-        spl.createTransferInstruction(source, vaultToken, walletAddress, BigInt(total.toString())),
       );
     }
     if (input.memo) {
@@ -362,8 +393,7 @@ export class CashLinkClient {
   };
 
   initInstruction = (params: InitCashLinkParams): TransactionInstruction => {
-    const { amount, fee, reference, sender, cashLinkBump, authority, cashLink, vaultToken, mint } =
-      params;
+    const { amount, fee, reference, sender, cashLinkBump, authority, cashLink, mint } = params;
     const data = InitCashLinkArgs.serialize({
       amount,
       fee,
@@ -401,11 +431,6 @@ export class CashLinkClient {
         isWritable: false,
       },
       {
-        pubkey: mint,
-        isSigner: false,
-        isWritable: false,
-      },
-      {
         pubkey: SYSVAR_RENT_PUBKEY,
         isSigner: false,
         isWritable: false,
@@ -421,6 +446,13 @@ export class CashLinkClient {
         isWritable: false,
       },
     ];
+    if (mint) {
+      keys.push({
+        pubkey: mint,
+        isSigner: false,
+        isWritable: false,
+      });
+    }
     return new TransactionInstruction({
       keys,
       data,
@@ -454,50 +486,7 @@ export class CashLinkClient {
   };
 
   redeem = async (input: CashLinkInput): Promise<string> => {
-    const cashLinkAddress = new PublicKey(input.cashLinkAddress);
-    const recipient = new PublicKey(input.walletAddress);
-    const cashLink = await _getCasLinkAccount(this.connection, cashLinkAddress);
-    const transaction = new Transaction();
-    const signers = [this.feePayer, this.authority];
-    const mint = new PublicKey(cashLink.data.mint);
-    const sender = new PublicKey(cashLink.data.sender);
-    const vaultToken = await _findAssociatedTokenAddress(cashLinkAddress, mint);
-    const [recipientToken, feeToken, senderToken] = (
-      await Promise.all([
-        spl.getOrCreateAssociatedTokenAccount(
-          this.connection,
-          this.feePayer,
-          new PublicKey(cashLink.data.mint),
-          recipient,
-          true,
-        ),
-        spl.getOrCreateAssociatedTokenAccount(
-          this.connection,
-          this.feePayer,
-          new PublicKey(cashLink.data.mint),
-          this.feeWallet,
-          true,
-        ),
-        spl.getOrCreateAssociatedTokenAccount(
-          this.connection,
-          this.feePayer,
-          new PublicKey(cashLink.data.mint),
-          sender,
-          true,
-        ),
-      ])
-    ).map((acc) => acc.address);
-    const transactionInstruction = await this.redeemInstruction({
-      recipientToken,
-      feeToken,
-      senderToken,
-      vaultToken,
-      mint,
-      authority: this.authority.publicKey,
-      cashLink: cashLink.pubkey,
-      feePayer: this.feePayer.publicKey,
-    });
-    transaction.add(transactionInstruction);
+    const transaction = await this.redeemTransaction(input);
     if (input.memo) {
       transaction.add(this.memoInstruction(input.memo, this.authority.publicKey));
     }
@@ -505,7 +494,7 @@ export class CashLinkClient {
       await this.connection.getLatestBlockhash(input.commitment ?? 'finalized')
     ).blockhash;
     transaction.feePayer = this.feePayer.publicKey;
-    transaction.sign(...signers);
+    transaction.sign(this.feePayer, this.authority);
     const signature = await this.connection.sendRawTransaction(transaction.serialize(), {
       skipPreflight: false,
     });
@@ -513,54 +502,12 @@ export class CashLinkClient {
   };
 
   redeemAndClose = async (input: CashLinkInput): Promise<string> => {
-    const cashLinkAddress = new PublicKey(input.cashLinkAddress);
-    const walletAddress = new PublicKey(input.walletAddress);
-    const cashLink = await _getCasLinkAccount(this.connection, cashLinkAddress);
-    const mint = new PublicKey(cashLink.data.mint);
-    const vaultToken = await _findAssociatedTokenAddress(cashLinkAddress, mint);
-    const sender = new PublicKey(cashLink.data.sender);
-    const [recipientToken, feeToken, senderToken] = (
-      await Promise.all([
-        spl.getOrCreateAssociatedTokenAccount(
-          this.connection,
-          this.feePayer,
-          new PublicKey(cashLink.data.mint),
-          walletAddress,
-          true,
-        ),
-        spl.getOrCreateAssociatedTokenAccount(
-          this.connection,
-          this.feePayer,
-          new PublicKey(cashLink.data.mint),
-          this.feeWallet,
-          true,
-        ),
-        spl.getOrCreateAssociatedTokenAccount(
-          this.connection,
-          this.feePayer,
-          new PublicKey(cashLink.data.mint),
-          sender,
-          true,
-        ),
-      ])
-    ).map((acc) => acc.address);
-    const redeemInstruction = await this.redeemInstruction({
-      recipientToken,
-      feeToken,
-      senderToken,
-      vaultToken,
-      mint,
-      authority: this.authority.publicKey,
-      cashLink: cashLink.pubkey,
-      feePayer: this.feePayer.publicKey,
-    });
+    const transaction = await this.redeemTransaction(input);
     const closeInstruction = this.closeInstruction({
       cashLink: new PublicKey(input.cashLinkAddress),
       authority: this.authority.publicKey,
       feePayer: this.feePayer.publicKey,
     });
-    const transaction = new Transaction();
-    transaction.add(redeemInstruction);
     transaction.add(closeInstruction);
     if (input.memo) {
       transaction.add(this.memoInstruction(input.memo, this.authority.publicKey));
@@ -580,39 +527,98 @@ export class CashLinkClient {
     }
   };
 
+  redeemTransaction = async (input: CashLinkInput): Promise<Transaction> => {
+    const cashLinkAddress = new PublicKey(input.cashLinkAddress);
+    const walletAddress = new PublicKey(input.walletAddress);
+    const cashLink = await _getCasLinkAccount(this.connection, cashLinkAddress);
+    const sender = new PublicKey(cashLink.data.sender);
+    let accountKeys = [walletAddress, this.feeWallet, sender];
+    let vaultToken: PublicKey | null = null;
+    if (cashLink.data.mint) {
+      const mint = new PublicKey(cashLink.data.mint);
+      vaultToken = await _findAssociatedTokenAddress(cashLinkAddress, mint);
+      accountKeys = (
+        await Promise.all([
+          spl.getOrCreateAssociatedTokenAccount(
+            this.connection,
+            this.feePayer,
+            new PublicKey(cashLink.data.mint),
+            accountKeys[0],
+            true,
+          ),
+          spl.getOrCreateAssociatedTokenAccount(
+            this.connection,
+            this.feePayer,
+            new PublicKey(cashLink.data.mint),
+            accountKeys[1],
+            true,
+          ),
+          spl.getOrCreateAssociatedTokenAccount(
+            this.connection,
+            this.feePayer,
+            new PublicKey(cashLink.data.mint),
+            accountKeys[2],
+            true,
+          ),
+        ])
+      ).map((acc) => acc.address);
+    }
+    const redeemInstruction = await this.redeemInstruction({
+      recipientToken: accountKeys[0],
+      feeToken: accountKeys[1],
+      senderToken: accountKeys[2],
+      vaultToken,
+      authority: this.authority.publicKey,
+      cashLink: cashLink.pubkey,
+      feePayer: this.feePayer.publicKey,
+    });
+    const transaction = new Transaction();
+    transaction.add(redeemInstruction);
+    return transaction;
+  };
+
   redeemInstruction = async (params: RedeemCashLinkParams): Promise<TransactionInstruction> => {
+    const keys = [
+      { pubkey: params.authority, isSigner: true, isWritable: false },
+      { pubkey: params.recipientToken, isSigner: false, isWritable: true },
+      { pubkey: params.feeToken, isSigner: false, isWritable: true },
+      { pubkey: params.cashLink, isSigner: false, isWritable: true },
+      { pubkey: params.senderToken, isSigner: false, isWritable: true },
+      { pubkey: params.feePayer, isSigner: true, isWritable: false },
+      {
+        pubkey: SYSVAR_CLOCK_PUBKEY,
+        isSigner: false,
+        isWritable: false,
+      },
+      {
+        pubkey: SYSVAR_RENT_PUBKEY,
+        isSigner: false,
+        isWritable: false,
+      },
+    ];
+    if (params.vaultToken) {
+      keys.push({
+        pubkey: params.vaultToken,
+        isSigner: false,
+        isWritable: true,
+      });
+    }
+    keys.push(
+      {
+        pubkey: spl.TOKEN_PROGRAM_ID,
+        isSigner: false,
+        isWritable: false,
+      },
+      {
+        pubkey: SystemProgram.programId,
+        isSigner: false,
+        isWritable: false,
+      },
+    );
     return new TransactionInstruction({
+      keys,
       programId: CashProgram.PUBKEY,
       data: RedeemCashLinkArgs.serialize(),
-      keys: [
-        { pubkey: params.authority, isSigner: true, isWritable: false },
-        { pubkey: params.recipientToken, isSigner: false, isWritable: true },
-        { pubkey: params.feeToken, isSigner: false, isWritable: true },
-        {
-          pubkey: params.vaultToken,
-          isSigner: false,
-          isWritable: true,
-        },
-        { pubkey: params.cashLink, isSigner: false, isWritable: true },
-        { pubkey: params.senderToken, isSigner: false, isWritable: true },
-        { pubkey: params.feePayer, isSigner: true, isWritable: false },
-        { pubkey: params.mint, isSigner: false, isWritable: false },
-        {
-          pubkey: SYSVAR_CLOCK_PUBKEY,
-          isSigner: false,
-          isWritable: false,
-        },
-        {
-          pubkey: spl.TOKEN_PROGRAM_ID,
-          isSigner: false,
-          isWritable: false,
-        },
-        {
-          pubkey: SystemProgram.programId,
-          isSigner: false,
-          isWritable: false,
-        },
-      ],
     });
   };
 

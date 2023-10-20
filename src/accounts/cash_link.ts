@@ -9,7 +9,7 @@ import { AccountInfo, PublicKey } from '@solana/web3.js';
 import BN from 'bn.js';
 import { CashProgram } from '../cash_program';
 
-export const MAX_ESCROW_DATA_LEN = 164;
+export const MAX_ESCROW_DATA_LEN = 165;
 
 export enum CashLinkState {
   Uninitialized = 0,
@@ -28,7 +28,7 @@ export type CashLinkDataArgs = {
   redeemedAt?: BN;
   canceledAt?: BN;
   cashLinkBump: number;
-  mint: StringPublicKey;
+  mint?: StringPublicKey;
   authority: StringPublicKey;
 };
 
@@ -42,7 +42,7 @@ export class CashLinkData extends Borsh.Data<CashLinkDataArgs> {
     ['redeemedAt', { kind: 'option', type: 'u64' }],
     ['canceledAt', { kind: 'option', type: 'u64' }],
     ['cashLinkBump', 'u8'],
-    ['mint', 'pubkeyAsString'],
+    ['mint', { kind: 'option', type: 'pubkeyAsString' }],
     ['authority', 'pubkeyAsString'],
   ]);
   state: CashLinkState;
@@ -53,7 +53,7 @@ export class CashLinkData extends Borsh.Data<CashLinkDataArgs> {
   redeemedAt: BN | null;
   canceledAt: BN | null;
   cashLinkBump: number;
-  mint: StringPublicKey;
+  mint?: StringPublicKey;
   authority: StringPublicKey;
 
   constructor(args: CashLinkDataArgs) {

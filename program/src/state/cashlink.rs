@@ -6,7 +6,7 @@ use solana_program::{
     program_pack::{IsInitialized, Pack, Sealed}, pubkey::Pubkey,
 };
 
-pub const CASH_LINK_DATA_SIZE: usize = 164;
+pub const CASH_LINK_DATA_SIZE: usize = 165;
 
 #[repr(C)]
 #[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq, Clone, Default)]
@@ -29,7 +29,7 @@ pub struct CashLink {
     pub redeemed_at: Option<u64>,
     pub canceled_at: Option<u64>,
     pub cash_link_bump: u8,
-    pub mint: Pubkey,
+    pub mint: Option<Pubkey>,
     pub authority: Pubkey,
 }
 
