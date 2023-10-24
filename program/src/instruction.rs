@@ -7,6 +7,7 @@ use solana_program::{
     pubkey::Pubkey,
     system_program, sysvar,
 };
+use spl_associated_token_account::get_associated_token_address;
 
 /// Initialize a cash_link arguments
 #[repr(C)]
@@ -30,12 +31,13 @@ pub enum CashInstruction {
     /// 0. `[signer]`   The cash_link authority responsible for approving / refunding payments due to some external conditions
     /// 1. `[]`         The account of the wallet owner initializing the cashlink
     /// 2. `[signer]`   The fee payer
-    /// 3. `[writable]` The cash_link account, it will hold all necessary info about the trade.
+    /// 3. `[writable]` The cash link account, it will hold all necessary info about the trade.
     /// 4. `[]` The reference
     /// 5. `[]` The rent sysvar
     /// 6. `[]` The system program
     /// 7. `[]` The token program
     /// 8. `[]` The token mint (Optional)
+    /// 9. `[writable]` The associated token for the mint derived from the cash link account (Optional)
     InitCashLink (InitCashLinkArgs),
     /// Redeem the cashlink
     ///
@@ -102,7 +104,9 @@ pub fn init_cash_link(
         AccountMeta::new_readonly(spl_token::id(), false),
     ];
     if let Some(key) = mint {
+        let associated_token_account = get_associated_token_address(cash_link, &key);
         accounts.push(AccountMeta::new_readonly(*key, false));
+        accounts.push(AccountMeta::new(associated_token_account, false));
     }
     Instruction::new_with_borsh(
         *program_id,

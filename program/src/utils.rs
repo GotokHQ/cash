@@ -3,6 +3,7 @@
 use std::convert::TryInto;
 
 use crate::error::CashError;
+
 use solana_program::{
     account_info::AccountInfo,
     entrypoint::ProgramResult,
@@ -261,20 +262,18 @@ pub fn create_new_account_raw<'a>(
 
 pub fn create_associated_token_account_raw<'a>(
     payer_info: &AccountInfo<'a>,
+    vault_token_info: &AccountInfo<'a>,
     wallet_info: &AccountInfo<'a>,
     mint_info: &AccountInfo<'a>,
-    spl_token_program_info: &AccountInfo<'a>,
     rent_sysvar_info: &AccountInfo<'a>,
-    system_program_info: &AccountInfo<'a>,
 ) -> ProgramResult {
     invoke(
-        &create_associated_token_account(payer_info.key, wallet_info.key, mint_info.key, &spl_associated_token_account::id()),
+        &create_associated_token_account(payer_info.key, wallet_info.key, mint_info.key, &spl_token::id()),
         &[
             payer_info.clone(),
+            vault_token_info.clone(),
             wallet_info.clone(),
             mint_info.clone(),
-            system_program_info.clone(),
-            spl_token_program_info.clone(),
             rent_sysvar_info.clone(),
         ],
     )
@@ -284,4 +283,8 @@ pub fn create_associated_token_account_raw<'a>(
 /// `sol_memcmp`
 pub fn cmp_pubkeys(a: &Pubkey, b: &Pubkey) -> bool {
     sol_memcmp(a.as_ref(), b.as_ref(), PUBKEY_BYTES) == 0
+}
+
+pub fn exists(account: &AccountInfo) -> Result<bool, ProgramError> {
+    Ok(account.try_lamports()? > 0)
 }

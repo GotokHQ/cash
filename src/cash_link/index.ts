@@ -331,7 +331,7 @@ export class CashLinkClient {
     //     ),
     //   );
     // }
-    transaction.add(this.initInstruction(initParams));
+    transaction.add(await this.initInstruction(initParams));
     return transaction;
   };
 
@@ -392,7 +392,7 @@ export class CashLinkClient {
       .toString('base64');
   };
 
-  initInstruction = (params: InitCashLinkParams): TransactionInstruction => {
+  initInstruction = async (params: InitCashLinkParams): Promise<TransactionInstruction> => {
     const { amount, fee, reference, sender, cashLinkBump, authority, cashLink, mint } = params;
     const data = InitCashLinkArgs.serialize({
       amount,
@@ -452,6 +452,18 @@ export class CashLinkClient {
         isSigner: false,
         isWritable: false,
       });
+      const vaultToken = await _findAssociatedTokenAddress(cashLink, mint);
+      keys.push({
+        pubkey: vaultToken,
+        isSigner: false,
+        isWritable: true,
+      });
+      keys.push({
+        pubkey: spl.ASSOCIATED_TOKEN_PROGRAM_ID,
+        isSigner: false,
+        isWritable: false,
+      });
+      console.log('vaultToken', vaultToken.toBase58());
     }
     return new TransactionInstruction({
       keys,
@@ -643,12 +655,15 @@ export class CashLinkClient {
   hasPaid = async (cashLinkAddress: PublicKey, commitment?: Commitment): Promise<boolean> => {
     try {
       const cashLink = await this.getCashLink(cashLinkAddress, commitment);
+      if (!cashLink || !cashLink.data) {
+        return false;
+      }
       const vault = await this.getVault(
         cashLinkAddress,
         new PublicKey(cashLink.data.mint),
         commitment,
       );
-      if (!cashLink || !cashLink.data || !vault) {
+      if (!vault) {
         return false;
       }
       const amount = new BN(cashLink.data.amount ?? 0);
@@ -692,17 +707,8 @@ export class CashLinkClient {
   };
 }
 
-const _findAssociatedTokenAddress = async (
-  walletAddress: PublicKey,
-  tokenMintAddress: PublicKey,
-) => {
-  return (
-    await PublicKey.findProgramAddress(
-      [walletAddress.toBuffer(), spl.TOKEN_PROGRAM_ID.toBuffer(), tokenMintAddress.toBuffer()],
-      spl.ASSOCIATED_TOKEN_PROGRAM_ID,
-    )
-  )[0];
-};
+const _findAssociatedTokenAddress = (walletAddress: PublicKey, tokenMintAddress: PublicKey) =>
+  spl.getAssociatedTokenAddressSync(tokenMintAddress, walletAddress, true);
 
 const _getCasLinkAccount = async (
   connection: Connection,
