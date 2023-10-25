@@ -97,7 +97,10 @@ export class CashLinkClient {
 
   cancelTransaction = async (input: CashLinkInput): Promise<Transaction> => {
     const cashLinkPda = new PublicKey(input.cashLinkAddress);
-    const cashLink = await _getCasLinkAccount(this.connection, cashLinkPda);
+    const cashLink = await _getCashLinkAccount(this.connection, cashLinkPda);
+    if (cashLink == null) {
+      throw new Error(FAILED_TO_FIND_ACCOUNT);
+    }
     if (cashLink.data?.state === CashLinkState.Canceled) {
       throw new Error(ACCOUNT_ALREADY_CANCELED);
     }
@@ -171,10 +174,13 @@ export class CashLinkClient {
   };
 
   close = async (input: CashLinkInput): Promise<string> => {
-    const cashLink = await _getCasLinkAccount(
+    const cashLink = await _getCashLinkAccount(
       this.connection,
       new PublicKey(input.cashLinkAddress),
     );
+    if (cashLink == null) {
+      throw new Error(FAILED_TO_FIND_ACCOUNT);
+    }
     if (
       !(
         cashLink.data?.state === CashLinkState.Initialized ||
@@ -328,7 +334,10 @@ export class CashLinkClient {
   pay = async (input: CashLinkInput): Promise<string> => {
     const cashLinkAddress = new PublicKey(input.cashLinkAddress);
     const walletAddress = new PublicKey(input.memo);
-    const cashLink = await _getCasLinkAccount(this.connection, cashLinkAddress);
+    const cashLink = await _getCashLinkAccount(this.connection, cashLinkAddress);
+    if (cashLink == null) {
+      throw new Error(FAILED_TO_FIND_ACCOUNT);
+    }
     if (cashLink.data.state !== CashLinkState.Initialized) {
       throw Error(INVALID_STATE);
     }
@@ -532,7 +541,10 @@ export class CashLinkClient {
   redeemTransaction = async (input: CashLinkInput): Promise<Transaction> => {
     const cashLinkAddress = new PublicKey(input.cashLinkAddress);
     const walletAddress = new PublicKey(input.walletAddress);
-    const cashLink = await _getCasLinkAccount(this.connection, cashLinkAddress);
+    const cashLink = await _getCashLinkAccount(this.connection, cashLinkAddress);
+    if (cashLink == null) {
+      throw new Error(FAILED_TO_FIND_ACCOUNT);
+    }
     const sender = new PublicKey(cashLink.data.sender);
     let accountKeys = [walletAddress, this.feeWallet, sender];
     let vaultToken: PublicKey | null = null;
@@ -687,7 +699,7 @@ export class CashLinkClient {
 
   getCashLink = async (address: PublicKey, commitment?: Commitment): Promise<CashLink | null> => {
     try {
-      return await _getCasLinkAccount(this.connection, address, commitment);
+      return await _getCashLinkAccount(this.connection, address, commitment);
     } catch (error) {
       if (error.message === FAILED_TO_FIND_ACCOUNT) {
         return null;
@@ -700,7 +712,7 @@ export class CashLinkClient {
 const _findAssociatedTokenAddress = (walletAddress: PublicKey, tokenMintAddress: PublicKey) =>
   spl.getAssociatedTokenAddressSync(tokenMintAddress, walletAddress, true);
 
-const _getCasLinkAccount = async (
+const _getCashLinkAccount = async (
   connection: Connection,
   cashLinkAddress: PublicKey,
   commitment?: Commitment,
@@ -708,7 +720,7 @@ const _getCasLinkAccount = async (
   try {
     const accountInfo = await connection.getAccountInfo(cashLinkAddress, commitment);
     if (accountInfo == null) {
-      throw new Error(FAILED_TO_FIND_ACCOUNT);
+      return null;
     }
     const cashLink = CashLink.from(new Account(cashLinkAddress, accountInfo));
     return cashLink;
