@@ -462,7 +462,6 @@ export class CashLinkClient {
         isSigner: false,
         isWritable: false,
       });
-      console.log('vaultToken', vaultToken.toBase58());
     }
     return new TransactionInstruction({
       keys,
