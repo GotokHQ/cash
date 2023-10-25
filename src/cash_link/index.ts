@@ -65,13 +65,11 @@ export class CashLinkClient {
     ).blockhash;
     transaction.feePayer = this.feePayer.publicKey;
     transaction.sign(this.feePayer, this.authority);
-    try {
-      const signature = await this.connection.sendRawTransaction(transaction.serialize());
-      return signature;
-    } catch (error) {
-      console.log('error', error);
-      throw new Error(TRANSACTION_SEND_ERROR);
-    }
+    return transaction
+      .serialize({
+        requireAllSignatures: false,
+      })
+      .toString('base64');
   };
 
   cancelAndClose = async (input: CashLinkInput): Promise<string> => {
@@ -90,13 +88,11 @@ export class CashLinkClient {
     ).blockhash;
     transaction.feePayer = this.feePayer.publicKey;
     transaction.sign(this.feePayer, this.authority);
-    try {
-      const signature = await this.connection.sendRawTransaction(transaction.serialize());
-      return signature;
-    } catch (error) {
-      console.log('error', error);
-      throw new Error(TRANSACTION_SEND_ERROR);
-    }
+    return transaction
+      .serialize({
+        requireAllSignatures: false,
+      })
+      .toString('base64');
   };
 
   cancelTransaction = async (input: CashLinkInput): Promise<Transaction> => {
@@ -201,9 +197,11 @@ export class CashLinkClient {
     ).blockhash;
     transaction.feePayer = this.feePayer.publicKey;
     transaction.sign(this.feePayer, this.authority);
-    return await this.connection.sendRawTransaction(transaction.serialize(), {
-      skipPreflight: true,
-    });
+    return transaction
+      .serialize({
+        requireAllSignatures: false,
+      })
+      .toString('base64');
   };
 
   closeInstruction = (params: CloseCashLinkParams): TransactionInstruction => {
