@@ -20,16 +20,18 @@ pub enum CashError {
     #[error("Amount overflow")]
     AmountOverflow,
     #[error("Account already settled")]
-    AccountAlreadySettled,
+    AccountAlreadyRedeemed,
     #[error("Account already canceled")]
     AccountAlreadyCanceled,
     #[error("Fee overflow")]
     FeeOverflow,
-    #[error("Account not settled or initialized")]
-    AccountNotSettledOrInitialized,
+    #[error("Account not redeemed or initialized")]
+    AccountNotRedeemedOrInitialized,
+    #[error("Account not redeemed or canceled")]
+    AccountNotRedeemedOrCanceled,
+    #[error("Account not canceled")]
+    AccountNotCanceled,
     #[error("Account not initialized")]
-    AccountNotSettledOrCanceled,
-    #[error("Account not settled or canceled")]
     AccountNotInitialized,
     #[error("Math overflow")]
     MathOverflow,

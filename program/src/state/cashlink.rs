@@ -16,7 +16,6 @@ pub enum CashLinkState {
     Initialized,
     Redeemed,
     Canceled,
-    Closed,
 }
 #[repr(C)]
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Default)]
@@ -35,20 +34,20 @@ pub struct CashLink {
 
 impl CashLink {
     pub const PREFIX: &'static str = "cash";
-    pub fn is_closed(&self) -> bool {
-        self.state == CashLinkState::Closed
-    }
-    pub fn is_settled(&self) -> bool {
+    pub fn redeemed(&self) -> bool {
         self.state == CashLinkState::Redeemed
     }
-    pub fn is_canceled(&self) -> bool {
+    pub fn canceled(&self) -> bool {
         self.state == CashLinkState::Canceled
+    }
+    pub fn initialized(&self) -> bool {
+        self.state == CashLinkState::Initialized
     }
 }
 
 impl IsInitialized for CashLink {
     fn is_initialized(&self) -> bool {
-        self.state == CashLinkState::Initialized
+        self.state != CashLinkState::Uninitialized
     }
 }
 

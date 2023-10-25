@@ -102,7 +102,7 @@ export class CashLinkClient {
   cancelTransaction = async (input: CashLinkInput): Promise<Transaction> => {
     const cashLinkPda = new PublicKey(input.cashLinkAddress);
     const cashLink = await _getCasLinkAccount(this.connection, cashLinkPda);
-    if (cashLink.data?.state === CashLinkState.Closed) {
+    if (cashLink.data?.state === CashLinkState.Canceled) {
       throw new Error(ACCOUNT_ALREADY_CANCELED);
     }
     if (cashLink.data?.state === CashLinkState.Redeemed) {

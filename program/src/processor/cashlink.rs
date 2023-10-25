@@ -1,7 +1,7 @@
 use crate::{
     error::CashError::{
-        self, AccountAlreadyCanceled, AccountAlreadyClosed, AccountAlreadySettled,
-        AccountNotInitialized, AccountNotSettledOrCanceled, AmountOverflow,
+        self, AccountAlreadyCanceled, AccountAlreadyRedeemed,
+        AccountNotInitialized, AccountNotCanceled, AmountOverflow,
         InsufficientSettlementFunds,
     },
     instruction::InitCashLinkArgs,
@@ -18,7 +18,7 @@ use solana_program::{
     entrypoint::ProgramResult,
     msg,
     program_error::ProgramError,
-    program_pack::{IsInitialized, Pack},
+    program_pack::Pack,
     pubkey::Pubkey,
     rent::Rent,
     sysvar::{clock::Clock, Sysvar},
@@ -173,15 +173,12 @@ pub fn process_cancel(accounts: &[AccountInfo], program_id: &Pubkey) -> ProgramR
     let clock = &Clock::from_account_info(clock_info)?;
     let rent_info = next_account_info(account_info_iter)?;
 
-    if !cash_link.is_initialized() {
-        if cash_link.is_canceled() {
+    if !cash_link.initialized() {
+        if cash_link.canceled() {
             return Err(AccountAlreadyCanceled.into());
         }
-        if cash_link.is_settled() {
-            return Err(AccountAlreadySettled.into());
-        }
-        if cash_link.is_closed() {
-            return Err(AccountAlreadyClosed.into());
+        if cash_link.redeemed() {
+            return Err(AccountAlreadyRedeemed.into());
         }
         return Err(AccountNotInitialized.into());
     }
@@ -279,15 +276,12 @@ pub fn process_redemption(accounts: &[AccountInfo], program_id: &Pubkey) -> Prog
         Some(CashError::InvalidAuthorityId),
     )?;
 
-    if !cash_link.is_initialized() {
-        if cash_link.is_canceled() {
+    if !cash_link.initialized() {
+        if cash_link.canceled() {
             return Err(AccountAlreadyCanceled.into());
         }
-        if cash_link.is_settled() {
-            return Err(AccountAlreadySettled.into());
-        }
-        if cash_link.is_closed() {
-            return Err(AccountAlreadyClosed.into());
+        if cash_link.redeemed() {
+            return Err(AccountAlreadyRedeemed.into());
         }
         return Err(AccountNotInitialized.into());
     }
@@ -421,11 +415,8 @@ pub fn process_close(accounts: &[AccountInfo], program_id: &Pubkey) -> ProgramRe
         &cash_link.authority,
         Some(CashError::InvalidAuthorityId),
     )?;
-    if cash_link.is_closed() {
-        return Err(AccountAlreadyClosed.into());
-    }
-    if !(cash_link.is_settled() || cash_link.is_canceled()) {
-        return Err(AccountNotSettledOrCanceled.into());
+    if !cash_link.canceled() {
+        return Err(AccountNotCanceled.into());
     }
     msg!("Closing the cash_link account...");
     empty_account_balance(cash_link_info, fee_payer_info)?;

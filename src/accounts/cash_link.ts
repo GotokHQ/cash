@@ -16,7 +16,6 @@ export enum CashLinkState {
   Initialized = 1,
   Redeemed = 2,
   Canceled = 3,
-  Closed = 4,
 }
 
 export type CashLinkDataArgs = {
