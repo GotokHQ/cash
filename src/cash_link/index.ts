@@ -661,6 +661,7 @@ export class CashLinkClient {
       }
       const cashLink = CashLink.from(accountInfo);
       let vaultAmount: BN | undefined;
+      console.log('has min', cashLink.data.mint);
       if (cashLink.data.mint) {
         const vault = await this.getVault(
           cashLinkAddress,
