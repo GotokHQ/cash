@@ -655,11 +655,10 @@ export class CashLinkClient {
 
   hasPaid = async (cashLinkAddress: PublicKey, commitment?: Commitment): Promise<boolean> => {
     try {
-      const accountInfo = await this.getCashLinkAccountInfo(cashLinkAddress, commitment);
-      if (!accountInfo || !accountInfo.data) {
-        return false;
+      const cashLink = await this.getCashLink(cashLinkAddress, commitment);
+      if (cashLink == null) {
+        throw new Error(FAILED_TO_FIND_ACCOUNT);
       }
-      const cashLink = CashLink.from(accountInfo);
       let vaultAmount: BN | undefined;
       console.log('has min', cashLink.data.mint);
       if (cashLink.data.mint) {
@@ -676,7 +675,7 @@ export class CashLinkClient {
         const minBalance = new BN(
           await this.connection.getMinimumBalanceForRentExemption(MAX_DATA_LEN, commitment),
         );
-        const lamports = new BN(accountInfo.info.lamports);
+        const lamports = new BN(cashLink.info.lamports);
         console.log('lamports', lamports.toNumber());
         console.log('minBalance', minBalance.toNumber());
         if (lamports.gte(minBalance)) {
@@ -726,20 +725,6 @@ export class CashLinkClient {
       throw error;
     }
   };
-
-  getCashLinkAccountInfo = async (
-    address: PublicKey,
-    commitment?: Commitment,
-  ): Promise<Account<CashLink> | null> => {
-    try {
-      return await _getCashLinkAccountInfo(this.connection, address, commitment);
-    } catch (error) {
-      if (error.message === FAILED_TO_FIND_ACCOUNT) {
-        return null;
-      }
-      throw error;
-    }
-  };
 }
 
 const _findAssociatedTokenAddress = (walletAddress: PublicKey, tokenMintAddress: PublicKey) =>
@@ -757,22 +742,6 @@ const _getCashLinkAccount = async (
     }
     const cashLink = CashLink.from(new Account(cashLinkAddress, accountInfo));
     return cashLink;
-  } catch (error) {
-    return null;
-  }
-};
-
-const _getCashLinkAccountInfo = async (
-  connection: Connection,
-  cashLinkAddress: PublicKey,
-  commitment?: Commitment,
-): Promise<Account<CashLink> | null> => {
-  try {
-    const accountInfo = await connection.getAccountInfo(cashLinkAddress, commitment);
-    if (accountInfo == null) {
-      return null;
-    }
-    return new Account<CashLink>(cashLinkAddress, accountInfo);
   } catch (error) {
     return null;
   }
