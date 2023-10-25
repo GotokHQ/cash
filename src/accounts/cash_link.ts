@@ -9,7 +9,7 @@ import { AccountInfo, PublicKey } from '@solana/web3.js';
 import BN from 'bn.js';
 import { CashProgram } from '../cash_program';
 
-export const MAX_ESCROW_DATA_LEN = 165;
+export const MAX_DATA_LEN = 165;
 
 export enum CashLinkState {
   Uninitialized = 0,

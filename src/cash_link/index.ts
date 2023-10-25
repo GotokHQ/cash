@@ -15,7 +15,7 @@ import * as spl from '@solana/spl-token';
 import BN from 'bn.js';
 import { InitializeCashLinkInput, CashLinkInput } from './types';
 import { CashProgram } from '../cash_program';
-import { CashLink, CashLinkState } from '../accounts/cash_link';
+import { CashLink, CashLinkState, MAX_DATA_LEN } from '../accounts/cash_link';
 import {
   CancelCashLinkArgs,
   CancelCashLinkParams,
@@ -655,22 +655,36 @@ export class CashLinkClient {
 
   hasPaid = async (cashLinkAddress: PublicKey, commitment?: Commitment): Promise<boolean> => {
     try {
-      const cashLink = await this.getCashLink(cashLinkAddress, commitment);
-      if (!cashLink || !cashLink.data) {
+      const accountInfo = await this.getCashLinkAccountInfo(cashLinkAddress, commitment);
+      if (!accountInfo || !accountInfo.data) {
         return false;
       }
-      const vault = await this.getVault(
-        cashLinkAddress,
-        new PublicKey(cashLink.data.mint),
-        commitment,
-      );
-      if (!vault) {
-        return false;
+      const cashLink = CashLink.from(accountInfo);
+      let vaultAmount: BN | undefined;
+      if (cashLink.data.mint) {
+        const vault = await this.getVault(
+          cashLinkAddress,
+          new PublicKey(cashLink.data.mint),
+          commitment,
+        );
+        if (!vault) {
+          return false;
+        }
+        vaultAmount = new BN(vault.amount.toString());
+      } else {
+        const minBalance = new BN(
+          await this.connection.getMinimumBalanceForRentExemption(MAX_DATA_LEN, commitment),
+        );
+        const lamports = new BN(accountInfo.info.lamports);
+        if (lamports.gte(minBalance)) {
+          vaultAmount = new BN(accountInfo.info.lamports).sub(minBalance);
+        } else {
+          return false;
+        }
       }
       const amount = new BN(cashLink.data.amount ?? 0);
       const fee = new BN(cashLink.data.fee ?? 0);
       const total = amount.add(fee);
-      const vaultAmount = new BN(vault.amount.toString());
       return vaultAmount.gte(total);
     } catch (error: unknown) {
       throw error;
@@ -706,6 +720,20 @@ export class CashLinkClient {
       throw error;
     }
   };
+
+  getCashLinkAccountInfo = async (
+    address: PublicKey,
+    commitment?: Commitment,
+  ): Promise<Account<CashLink> | null> => {
+    try {
+      return await _getCashLinkAccountInfo(this.connection, address, commitment);
+    } catch (error) {
+      if (error.message === FAILED_TO_FIND_ACCOUNT) {
+        return null;
+      }
+      throw error;
+    }
+  };
 }
 
 const _findAssociatedTokenAddress = (walletAddress: PublicKey, tokenMintAddress: PublicKey) =>
@@ -723,6 +751,22 @@ const _getCashLinkAccount = async (
     }
     const cashLink = CashLink.from(new Account(cashLinkAddress, accountInfo));
     return cashLink;
+  } catch (error) {
+    return null;
+  }
+};
+
+const _getCashLinkAccountInfo = async (
+  connection: Connection,
+  cashLinkAddress: PublicKey,
+  commitment?: Commitment,
+): Promise<Account<CashLink> | null> => {
+  try {
+    const accountInfo = await connection.getAccountInfo(cashLinkAddress, commitment);
+    if (accountInfo == null) {
+      return null;
+    }
+    return new Account<CashLink>(cashLinkAddress, accountInfo);
   } catch (error) {
     return null;
   }
