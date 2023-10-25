@@ -660,7 +660,6 @@ export class CashLinkClient {
         throw new Error(FAILED_TO_FIND_ACCOUNT);
       }
       let vaultAmount: BN | undefined;
-      console.log('has min', cashLink.data.mint);
       if (cashLink.data.mint) {
         const vault = await this.getVault(
           cashLinkAddress,
@@ -676,11 +675,8 @@ export class CashLinkClient {
           await this.connection.getMinimumBalanceForRentExemption(MAX_DATA_LEN, commitment),
         );
         const lamports = new BN(cashLink.info.lamports);
-        console.log('lamports', lamports.toNumber());
-        console.log('minBalance', minBalance.toNumber());
         if (lamports.gte(minBalance)) {
           vaultAmount = lamports.sub(minBalance);
-          console.log('vaultAmount', vaultAmount.toNumber());
         } else {
           return false;
         }
@@ -688,8 +684,6 @@ export class CashLinkClient {
       const amount = new BN(cashLink.data.amount ?? 0);
       const fee = new BN(cashLink.data.fee ?? 0);
       const total = amount.add(fee);
-      console.log('total', total.toNumber());
-      console.log('vaultAmount', vaultAmount.toNumber());
       return vaultAmount.gte(total);
     } catch (error: unknown) {
       throw error;
