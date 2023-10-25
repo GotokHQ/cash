@@ -69,6 +69,7 @@ export class CashLinkClient {
       const signature = await this.connection.sendRawTransaction(transaction.serialize());
       return signature;
     } catch (error) {
+      console.log('error', error);
       throw new Error(TRANSACTION_SEND_ERROR);
     }
   };
@@ -93,6 +94,7 @@ export class CashLinkClient {
       const signature = await this.connection.sendRawTransaction(transaction.serialize());
       return signature;
     } catch (error) {
+      console.log('error', error);
       throw new Error(TRANSACTION_SEND_ERROR);
     }
   };
@@ -137,16 +139,6 @@ export class CashLinkClient {
       { pubkey: params.feePayer, isSigner: false, isWritable: true },
       {
         pubkey: SYSVAR_CLOCK_PUBKEY,
-        isSigner: false,
-        isWritable: false,
-      },
-      {
-        pubkey: spl.TOKEN_PROGRAM_ID,
-        isSigner: false,
-        isWritable: false,
-      },
-      {
-        pubkey: SystemProgram.programId,
         isSigner: false,
         isWritable: false,
       },
