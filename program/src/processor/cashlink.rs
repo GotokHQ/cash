@@ -9,7 +9,7 @@ use crate::{
     utils::{
         assert_account_key, assert_initialized, assert_owned_by, assert_signer,
         assert_token_owned_by, create_associated_token_account_raw, create_new_account_raw,
-        empty_account_balance, exists, native_transfer, spl_token_close, spl_token_transfer,
+        empty_account_balance, exists, spl_token_close, spl_token_transfer,
     },
 };
 
@@ -230,18 +230,12 @@ pub fn process_cancel(accounts: &[AccountInfo], program_id: &Pubkey) -> ProgramR
             .checked_sub(min_lamports)
             .ok_or(AmountOverflow)?;
         if remaining_amount > 0 {
-            native_transfer(
-                cash_link_info,
-                sender_token_info,
-                cash_link.fee,
-                &[&signer_seeds],
-            )?;
-            // **cash_link_info.lamports.borrow_mut() = min_lamports;
+            **cash_link_info.lamports.borrow_mut() = min_lamports;
 
-            // let dest_starting_lamports = sender_token_info.lamports();
-            // **sender_token_info.lamports.borrow_mut() = dest_starting_lamports
-            //     .checked_add(remaining_amount)
-            //     .ok_or(AmountOverflow)?;
+            let dest_starting_lamports = sender_token_info.lamports();
+            **sender_token_info.lamports.borrow_mut() = dest_starting_lamports
+                .checked_add(remaining_amount)
+                .ok_or(AmountOverflow)?;
         }
     }
 
@@ -368,29 +362,24 @@ pub fn process_redemption(accounts: &[AccountInfo], program_id: &Pubkey) -> Prog
             return Err(InsufficientSettlementFunds.into());
         }
         let remaining = available_amount.checked_sub(total).ok_or(AmountOverflow)?;
+        **cash_link_info.lamports.borrow_mut() = min_lamports;
         if cash_link.amount > 0 {
-            native_transfer(
-                cash_link_info,
-                recipient_token_info,
-                cash_link.amount,
-                &[&signer_seeds],
-            )?;
+            let dest_starting_lamports = recipient_token_info.lamports();
+            **recipient_token_info.lamports.borrow_mut() = dest_starting_lamports
+                .checked_add(cash_link.amount)
+                .ok_or(AmountOverflow)?;
         }
         if cash_link.fee > 0 {
-            native_transfer(
-                cash_link_info,
-                fee_token_info,
-                cash_link.fee,
-                &[&signer_seeds],
-            )?;
+            let dest_starting_lamports = fee_token_info.lamports();
+            **fee_token_info.lamports.borrow_mut() = dest_starting_lamports
+                .checked_add(cash_link.fee)
+                .ok_or(AmountOverflow)?;
         }
         if remaining > 0 {
-            native_transfer(
-                cash_link_info,
-                sender_token_info,
-                remaining,
-                &[&signer_seeds],
-            )?;
+            let dest_starting_lamports = sender_token_info.lamports();
+            **sender_token_info.lamports.borrow_mut() = dest_starting_lamports
+                .checked_add(remaining)
+                .ok_or(AmountOverflow)?;
         }
     }
     msg!("Mark the cash_link account as redeemed...");

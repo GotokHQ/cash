@@ -676,8 +676,11 @@ export class CashLinkClient {
           await this.connection.getMinimumBalanceForRentExemption(MAX_DATA_LEN, commitment),
         );
         const lamports = new BN(accountInfo.info.lamports);
+        console.log('lamports', lamports.toNumber());
+        console.log('minBalance', minBalance.toNumber());
         if (lamports.gte(minBalance)) {
-          vaultAmount = new BN(accountInfo.info.lamports).sub(minBalance);
+          vaultAmount = lamports.sub(minBalance);
+          console.log('vaultAmount', vaultAmount.toNumber());
         } else {
           return false;
         }
@@ -685,6 +688,8 @@ export class CashLinkClient {
       const amount = new BN(cashLink.data.amount ?? 0);
       const fee = new BN(cashLink.data.fee ?? 0);
       const total = amount.add(fee);
+      console.log('total', total.toNumber());
+      console.log('vaultAmount', vaultAmount.toNumber());
       return vaultAmount.gte(total);
     } catch (error: unknown) {
       throw error;
