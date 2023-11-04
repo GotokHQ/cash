@@ -15,7 +15,7 @@ export class InitCashLinkArgs extends Borsh.Data<InitArgs> {
     ['amount', 'u64'],
     ['fee', 'u64'],
     ['cashLinkBump', 'u8'],
-    ['pay', 'bool'],
+    ['pay', 'u8'],
   ]);
 
   instruction = 0;
