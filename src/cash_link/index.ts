@@ -313,6 +313,7 @@ export class CashLinkClient {
       reference,
       authority: this.authority.publicKey,
       feePayer: this.feePayer.publicKey,
+      pay: input.pay ?? false,
     };
 
     const transaction = new Transaction();
@@ -392,10 +393,11 @@ export class CashLinkClient {
   };
 
   initInstruction = async (params: InitCashLinkParams): Promise<TransactionInstruction> => {
-    const { amount, fee, reference, sender, cashLinkBump, authority, cashLink, mint } = params;
+    const { amount, fee, reference, sender, cashLinkBump, authority, cashLink, mint, pay } = params;
     const data = InitCashLinkArgs.serialize({
       amount,
       fee,
+      pay,
       cashLinkBump: cashLinkBump,
     });
     const keys = [
@@ -406,8 +408,8 @@ export class CashLinkClient {
       },
       {
         pubkey: sender,
-        isSigner: false,
-        isWritable: false,
+        isSigner: pay,
+        isWritable: pay && !mint,
       },
       {
         pubkey: this.feePayer.publicKey,
@@ -439,11 +441,6 @@ export class CashLinkClient {
         isSigner: false,
         isWritable: false,
       },
-      {
-        pubkey: spl.TOKEN_PROGRAM_ID,
-        isSigner: false,
-        isWritable: false,
-      },
     ];
     if (mint) {
       keys.push({
@@ -457,12 +454,25 @@ export class CashLinkClient {
         isSigner: false,
         isWritable: true,
       });
+      if (pay) {
+        const senderToken = await _findAssociatedTokenAddress(sender, mint);
+        keys.push({
+          pubkey: senderToken,
+          isSigner: false,
+          isWritable: true,
+        });
+      }
       keys.push({
         pubkey: spl.ASSOCIATED_TOKEN_PROGRAM_ID,
         isSigner: false,
         isWritable: false,
       });
     }
+    keys.push({
+      pubkey: spl.TOKEN_PROGRAM_ID,
+      isSigner: false,
+      isWritable: false,
+    });
     return new TransactionInstruction({
       keys,
       data,

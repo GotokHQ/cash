@@ -2,14 +2,14 @@ import { Borsh, StringPublicKey } from '@metaplex-foundation/mpl-core';
 import { PublicKey } from '@solana/web3.js';
 import BN from 'bn.js';
 
-type Args = {
+export type SettleArgs = {
   amount: BN;
   feeBps: number;
   key: StringPublicKey;
   bump: number;
 };
 
-export class RedeemCashLinkArgs extends Borsh.Data<Args> {
+export class RedeemCashLinkArgs extends Borsh.Data<SettleArgs> {
   static readonly SCHEMA = RedeemCashLinkArgs.struct([['instruction', 'u8']]);
 
   instruction = 1;

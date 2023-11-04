@@ -6,6 +6,7 @@ export interface InitializeCashLinkInput {
   amount: string;
   fee?: string;
   memo?: string;
+  pay?: boolean;
   commitment?: Commitment;
 }
 export interface CashLinkInput {
