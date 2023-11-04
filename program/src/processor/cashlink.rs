@@ -9,7 +9,7 @@ use crate::{
     utils::{
         assert_account_key, assert_initialized, assert_owned_by, assert_signer,
         assert_token_owned_by, create_associated_token_account_raw, create_new_account_raw,
-        empty_account_balance, exists, spl_token_close, spl_token_transfer,
+        empty_account_balance, exists, spl_token_close, spl_token_transfer, native_transfer,
     },
 };
 
@@ -42,10 +42,9 @@ pub fn process_init_cash_link(
     let reference_info = next_account_info(account_info_iter)?;
     let rent_info = next_account_info(account_info_iter)?;
     let system_account_info = next_account_info(account_info_iter)?;
-    let _ = next_account_info(account_info_iter)?;
 
     msg!("Start to read the mint info for the cashlink");
-    let mint_info = if account_info_iter.len() > 0 {
+    let mint_info = if account_info_iter.len() > 1 {
         msg!("Read the mint info for the cashlink");
         Some(next_account_info(account_info_iter)?)
     } else {
@@ -78,6 +77,12 @@ pub fn process_init_cash_link(
     cash_link.authority = *authority_info.key;
     cash_link.sender = *sender_info.key;
 
+
+    let total = args
+    .amount
+    .checked_add(args.fee)
+    .ok_or::<ProgramError>(CashError::MathOverflow.into())?;
+
     match mint_info {
         Some(info) => {
             cash_link.mint = Some(*info.key);
@@ -107,8 +112,29 @@ pub fn process_init_cash_link(
                     rent_info,
                 )?;
             }
+            if args.pay {
+                let sender_token_info = next_account_info(account_info_iter)?;
+                assert_owned_by(sender_token_info, &spl_token::id())?;
+                let sender_token: TokenAccount = assert_initialized(sender_token_info)?;
+                assert_token_owned_by(&sender_token, sender_info.key)?;
+                spl_token_transfer(
+                    sender_token_info,
+                    vault_token_info,
+                    sender_info,
+                    total,
+                    &[],
+                )?;
+            }
         }
-        None => cash_link.mint = None,
+        None => {
+            native_transfer(
+                sender_info,
+                cash_link_info,
+                total,
+                &[],
+            )?;
+            cash_link.mint = None;
+        }
     };
     CashLink::pack(cash_link, &mut cash_link_info.data.borrow_mut())?;
     Ok(())

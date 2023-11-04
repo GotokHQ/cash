@@ -17,6 +17,7 @@ pub struct InitCashLinkArgs {
     pub amount: u64,
     pub fee: u64,
     pub cash_link_bump: u8,
+    pub pay: bool
 }
 
 #[repr(C)]
@@ -29,15 +30,16 @@ pub enum CashInstruction {
     /// Accounts expected:
     ///
     /// 0. `[signer]`   The cash_link authority responsible for approving / refunding payments due to some external conditions
-    /// 1. `[]`         The account of the wallet owner initializing the cashlink
+    /// 1. `[signer][writable]`The account of the wallet owner initializing the cashlink
     /// 2. `[signer]`   The fee payer
     /// 3. `[writable]` The cash link account, it will hold all necessary info about the trade.
     /// 4. `[]` The reference
     /// 5. `[]` The rent sysvar
     /// 6. `[]` The system program
-    /// 7. `[]` The token program
-    /// 8. `[]` The token mint (Optional)
-    /// 9. `[writable]` The associated token for the mint derived from the cash link account (Optional)
+    /// 7. `[]` The token mint (Optional)
+    /// 8. `[writable]` The associated token for the mint derived from the cash link account (Optional)
+    /// 10. `[writable]` The sender token that must be passed if pay is true and mint is some Optional)
+    /// 11. `[]` The token program
     InitCashLink (InitCashLinkArgs),
     /// Redeem the cashlink
     ///
@@ -93,21 +95,33 @@ pub fn init_cash_link(
     mint: Option<&Pubkey>,
     args: InitCashLinkArgs,
 ) -> Instruction {
+    let sender_key = if args.pay {
+        if mint.is_some() {
+            AccountMeta::new_readonly(*sender, true)
+        } else {
+            AccountMeta::new(*sender, true)
+        }
+    } else {
+        AccountMeta::new_readonly(*sender, false)
+    };
     let mut accounts = vec![
         AccountMeta::new_readonly(*authority, true),
-        AccountMeta::new_readonly(*sender, false),
+        sender_key,
         AccountMeta::new(*fee_payer, true),
         AccountMeta::new(*cash_link, false),
         AccountMeta::new_readonly(*reference, false),
         AccountMeta::new_readonly(sysvar::rent::id(), false),
         AccountMeta::new_readonly(system_program::id(), false),
-        AccountMeta::new_readonly(spl_token::id(), false),
     ];
     if let Some(key) = mint {
         let associated_token_account = get_associated_token_address(cash_link, &key);
         accounts.push(AccountMeta::new_readonly(*key, false));
         accounts.push(AccountMeta::new(associated_token_account, false));
+        let sender_token_account = get_associated_token_address(sender, &key);
+        accounts.push(AccountMeta::new(sender_token_account, false));
+        accounts.push(AccountMeta::new_readonly(spl_associated_token_account::id(), false),);
     }
+    accounts.push(AccountMeta::new(spl_token::id(), false));
     Instruction::new_with_borsh(
         *program_id,
         &CashInstruction::InitCashLink(args),
