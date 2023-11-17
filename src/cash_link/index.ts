@@ -514,37 +514,12 @@ export class CashLinkClient {
       await this.connection.getLatestBlockhash(input.commitment ?? 'finalized')
     ).blockhash;
     transaction.feePayer = this.feePayer.publicKey;
-    transaction.sign(this.feePayer, this.authority);
-    const signature = await this.connection.sendRawTransaction(transaction.serialize(), {
-      skipPreflight: false,
-    });
-    return signature;
-  };
-
-  redeemAndClose = async (input: CashLinkInput): Promise<string> => {
-    const transaction = await this.redeemTransaction(input);
-    const closeInstruction = this.closeInstruction({
-      cashLink: new PublicKey(input.cashLinkAddress),
-      authority: this.authority.publicKey,
-      feePayer: this.feePayer.publicKey,
-    });
-    transaction.add(closeInstruction);
-    if (input.memo) {
-      transaction.add(this.memoInstruction(input.memo, this.authority.publicKey));
-    }
-    transaction.recentBlockhash = (
-      await this.connection.getLatestBlockhash(input.commitment ?? 'finalized')
-    ).blockhash;
-    transaction.feePayer = this.feePayer.publicKey;
-    transaction.sign(this.feePayer, this.authority);
-    try {
-      const signature = await this.connection.sendRawTransaction(transaction.serialize(), {
-        skipPreflight: false,
-      });
-      return signature;
-    } catch (error) {
-      throw new Error(TRANSACTION_SEND_ERROR);
-    }
+    transaction.partialSign(this.feePayer, this.authority);
+    return transaction
+      .serialize({
+        requireAllSignatures: false,
+      })
+      .toString('base64');
   };
 
   redeemTransaction = async (input: CashLinkInput): Promise<Transaction> => {
