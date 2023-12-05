@@ -9,6 +9,12 @@ export interface InitializeCashLinkInput {
   pay?: boolean;
   commitment?: Commitment;
 }
+
+export interface ResultContext {
+  transaction: string;
+  slot: number;
+}
+
 export interface CashLinkInput {
   walletAddress: string;
   cashLinkAddress: string;

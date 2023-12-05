@@ -13,7 +13,7 @@ import {
 } from '@solana/web3.js';
 import * as spl from '@solana/spl-token';
 import BN from 'bn.js';
-import { InitializeCashLinkInput, CashLinkInput } from './types';
+import { InitializeCashLinkInput, CashLinkInput, ResultContext } from './types';
 import { CashProgram } from '../cash_program';
 import { CashLink, CashLinkState, MAX_DATA_LEN } from '../accounts/cash_link';
 import {
@@ -55,24 +55,25 @@ export class CashLinkClient {
     this.connection = connection;
   }
 
-  cancel = async (input: CashLinkInput): Promise<string> => {
+  cancel = async (input: CashLinkInput): Promise<ResultContext> => {
     const transaction = await this.cancelTransaction(input);
     if (input.memo) {
       transaction.add(this.memoInstruction(input.memo, this.authority.publicKey));
     }
-    transaction.recentBlockhash = (
-      await this.connection.getLatestBlockhash(input.commitment ?? 'finalized')
-    ).blockhash;
+    const { context, value } = await this.connection.getLatestBlockhashAndContext(
+      input.commitment ?? 'confirmed',
+    );
+    transaction.recentBlockhash = value.blockhash;
+    transaction.lastValidBlockHeight = value.lastValidBlockHeight;
     transaction.feePayer = this.feePayer.publicKey;
     transaction.sign(this.feePayer, this.authority);
-    return transaction
-      .serialize({
-        requireAllSignatures: false,
-      })
-      .toString('base64');
+    return {
+      transaction: transaction.serialize().toString('base64'),
+      slot: context.slot,
+    };
   };
 
-  cancelAndClose = async (input: CashLinkInput): Promise<string> => {
+  cancelAndClose = async (input: CashLinkInput): Promise<ResultContext> => {
     const transaction = await this.cancelTransaction(input);
     const closeInstruction = this.closeInstruction({
       cashLink: new PublicKey(input.cashLinkAddress),
@@ -83,16 +84,17 @@ export class CashLinkClient {
     if (input.memo) {
       transaction.add(this.memoInstruction(input.memo, this.authority.publicKey));
     }
-    transaction.recentBlockhash = (
-      await this.connection.getLatestBlockhash(input.commitment ?? 'finalized')
-    ).blockhash;
+    const { context, value } = await this.connection.getLatestBlockhashAndContext(
+      input.commitment ?? 'confirmed',
+    );
+    transaction.recentBlockhash = value.blockhash;
+    transaction.lastValidBlockHeight = value.lastValidBlockHeight;
     transaction.feePayer = this.feePayer.publicKey;
     transaction.sign(this.feePayer, this.authority);
-    return transaction
-      .serialize({
-        requireAllSignatures: false,
-      })
-      .toString('base64');
+    return {
+      transaction: transaction.serialize().toString('base64'),
+      slot: context.slot,
+    };
   };
 
   cancelTransaction = async (input: CashLinkInput): Promise<Transaction> => {
@@ -173,7 +175,7 @@ export class CashLinkClient {
     });
   };
 
-  close = async (input: CashLinkInput): Promise<string> => {
+  close = async (input: CashLinkInput): Promise<ResultContext> => {
     const cashLink = await _getCashLinkAccount(
       this.connection,
       new PublicKey(input.cashLinkAddress),
@@ -198,16 +200,16 @@ export class CashLinkClient {
     if (input.memo) {
       transaction.add(this.memoInstruction(input.memo, this.authority.publicKey));
     }
-    transaction.recentBlockhash = (
-      await this.connection.getLatestBlockhash(input.commitment ?? 'finalized')
-    ).blockhash;
+    const { context, value } = await this.connection.getLatestBlockhashAndContext(
+      input.commitment ?? 'confirmed',
+    );
+    transaction.recentBlockhash = value.blockhash;
     transaction.feePayer = this.feePayer.publicKey;
     transaction.sign(this.feePayer, this.authority);
-    return transaction
-      .serialize({
-        requireAllSignatures: false,
-      })
-      .toString('base64');
+    return {
+      transaction: transaction.serialize().toString('base64'),
+      slot: context.slot,
+    };
   };
 
   closeInstruction = (params: CloseCashLinkParams): TransactionInstruction => {
@@ -231,23 +233,29 @@ export class CashLinkClient {
     });
   };
 
-  initialize = async (input: InitializeCashLinkInput): Promise<string> => {
+  initialize = async (input: InitializeCashLinkInput): Promise<ResultContext> => {
     const transaction = await this.initializeTransaction(input);
     if (input.memo) {
       transaction.add(this.memoInstruction(input.memo, this.authority.publicKey));
     }
-    const { blockhash } = await this.connection.getLatestBlockhash(input.commitment ?? 'finalized');
-    transaction.recentBlockhash = blockhash;
+    const { context, value } = await this.connection.getLatestBlockhashAndContext(
+      input.commitment ?? 'confirmed',
+    );
+    transaction.recentBlockhash = value.blockhash;
+    transaction.lastValidBlockHeight = value.lastValidBlockHeight;
     transaction.feePayer = this.feePayer.publicKey;
     transaction.partialSign(this.feePayer, this.authority);
-    return transaction
-      .serialize({
-        requireAllSignatures: false,
-      })
-      .toString('base64');
+    return {
+      transaction: transaction
+        .serialize({
+          requireAllSignatures: false,
+        })
+        .toString('base64'),
+      slot: context.slot,
+    };
   };
 
-  initializeAndPay = async (input: InitializeCashLinkInput): Promise<string> => {
+  initializeAndPay = async (input: InitializeCashLinkInput): Promise<ResultContext> => {
     const transaction = await this.initializeTransaction(input);
     const sender = new PublicKey(input.wallet);
     const amount = new BN(input.amount);
@@ -284,15 +292,21 @@ export class CashLinkClient {
     if (input.memo) {
       transaction.add(this.memoInstruction(input.memo, this.authority.publicKey));
     }
-    const { blockhash } = await this.connection.getLatestBlockhash(input.commitment ?? 'finalized');
-    transaction.recentBlockhash = blockhash;
+    const { context, value } = await this.connection.getLatestBlockhashAndContext(
+      input.commitment ?? 'confirmed',
+    );
+    transaction.recentBlockhash = value.blockhash;
+    transaction.lastValidBlockHeight = value.lastValidBlockHeight;
     transaction.feePayer = this.feePayer.publicKey;
     transaction.partialSign(this.feePayer, this.authority);
-    return transaction
-      .serialize({
-        requireAllSignatures: false,
-      })
-      .toString('base64');
+    return {
+      transaction: transaction
+        .serialize({
+          requireAllSignatures: false,
+        })
+        .toString('base64'),
+      slot: context.slot,
+    };
   };
 
   initializeTransaction = async (input: InitializeCashLinkInput): Promise<Transaction> => {
@@ -332,7 +346,7 @@ export class CashLinkClient {
     return transaction;
   };
 
-  pay = async (input: CashLinkInput): Promise<string> => {
+  pay = async (input: CashLinkInput): Promise<ResultContext> => {
     const cashLinkAddress = new PublicKey(input.cashLinkAddress);
     const walletAddress = new PublicKey(input.memo);
     const cashLink = await _getCashLinkAccount(this.connection, cashLinkAddress);
@@ -381,15 +395,21 @@ export class CashLinkClient {
     if (input.memo) {
       transaction.add(this.memoInstruction(input.memo, this.authority.publicKey));
     }
-    const { blockhash } = await this.connection.getLatestBlockhash(input.commitment ?? 'finalized');
-    transaction.recentBlockhash = blockhash;
+    const { context, value } = await this.connection.getLatestBlockhashAndContext(
+      input.commitment ?? 'confirmed',
+    );
+    transaction.recentBlockhash = value.blockhash;
+    transaction.lastValidBlockHeight = value.lastValidBlockHeight;
     transaction.feePayer = this.feePayer.publicKey;
     transaction.partialSign(this.feePayer, this.authority);
-    return transaction
-      .serialize({
-        requireAllSignatures: false,
-      })
-      .toString('base64');
+    return {
+      transaction: transaction
+        .serialize({
+          requireAllSignatures: false,
+        })
+        .toString('base64'),
+      slot: context.slot,
+    };
   };
 
   initInstruction = async (params: InitCashLinkParams): Promise<TransactionInstruction> => {
@@ -505,21 +525,26 @@ export class CashLinkClient {
     );
   };
 
-  redeem = async (input: CashLinkInput): Promise<string> => {
+  redeem = async (input: CashLinkInput): Promise<ResultContext> => {
     const transaction = await this.redeemTransaction(input);
     if (input.memo) {
       transaction.add(this.memoInstruction(input.memo, this.authority.publicKey));
     }
-    transaction.recentBlockhash = (
-      await this.connection.getLatestBlockhash(input.commitment ?? 'finalized')
-    ).blockhash;
+    const { context, value } = await this.connection.getLatestBlockhashAndContext(
+      input.commitment ?? 'confirmed',
+    );
+    transaction.recentBlockhash = value.blockhash;
+    transaction.lastValidBlockHeight = value.lastValidBlockHeight;
     transaction.feePayer = this.feePayer.publicKey;
     transaction.partialSign(this.feePayer, this.authority);
-    return transaction
-      .serialize({
-        requireAllSignatures: false,
-      })
-      .toString('base64');
+    return {
+      transaction: transaction
+        .serialize({
+          requireAllSignatures: false,
+        })
+        .toString('base64'),
+      slot: context.slot,
+    };
   };
 
   redeemTransaction = async (input: CashLinkInput): Promise<Transaction> => {
