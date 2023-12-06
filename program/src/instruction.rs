@@ -20,6 +20,15 @@ pub struct InitCashLinkArgs {
     pub pay: bool
 }
 
+/// Initialize a redemption arguments
+#[repr(C)]
+#[derive(BorshSerialize, BorshDeserialize, PartialEq, Debug, Clone)]
+/// Initialize a cash_link params
+pub struct InitCashRedemptionArgs {
+    pub bump: u8,
+    pub reference: String
+}
+
 #[repr(C)]
 #[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq, Clone,)]
 pub enum CashInstruction {
@@ -48,17 +57,18 @@ pub enum CashInstruction {
     ///
     /// 0. `[signer]` The account of the authority
     /// 1. `[signer]` The account of the recipient
-    /// 2. `[writable]` The recipient token account for the token they will receive should the trade go through
-    /// 3. `[writable]` The fee token account for the token they will receive should the trade go through
-    /// 4. `[writable]` The cash_link account holding the cash_link info
+    /// 2. `[writable]` The fee token account for the token they will receive should the trade go through
+    /// 3. `[writable]` The cash_link account holding the cash_link info
+    /// 4. `[writable]` The redemption account to flag a user has redeemed this cashlink
     /// 5. `[writable]` The payer token account of the payer that initialized the cash_link  
     /// 6. `[writable]` The fee payer token account to receive tokens from the vault
     /// 7. `[]` The clock account
     /// 8. `[]` The rent account
-    /// 9. `[writable]` The vault token account to get tokens. This value is Optional. if the mint is set, then this must be set.
-    /// 10. `[]` The token program
+    /// 9. `[writable][Optional]` The vault token account to get tokens. This value is Optional. if the mint is set, then this must be set.
+    /// 10. `[writable][Optional]` The recipient token account for the token they will receive should the trade go through
     /// 11. `[]` The system program
-    Redeem,
+    /// 12. `[]` The token program
+    Redeem(InitCashRedemptionArgs),
     /// Cancel the cash_link
     ///
     ///
@@ -171,14 +181,17 @@ pub fn redeem_cash_link(
     collection_fee_token: &Pubkey,
     vault_token: Option<&Pubkey>,
     cash_link: &Pubkey,
+    redemption_pda: &Pubkey,
     sender_token: &Pubkey,
     fee_payer: &Pubkey,
+    args: InitCashRedemptionArgs
 ) -> Instruction {
     let mut accounts = vec![
         AccountMeta::new_readonly(*authority, true),
         AccountMeta::new_readonly(*recipient_wallet, true),
         AccountMeta::new(*collection_fee_token, false),
         AccountMeta::new(*cash_link, false),
+        AccountMeta::new(*redemption_pda, false),
         AccountMeta::new(*sender_token, false),
         AccountMeta::new(*fee_payer, true),
         AccountMeta::new_readonly(sysvar::clock::id(), false),
@@ -189,13 +202,12 @@ pub fn redeem_cash_link(
         accounts.push(AccountMeta::new(*recipient_token, false));
         accounts.push(AccountMeta::new(*key, false));
     }
-
-    accounts.push(AccountMeta::new_readonly(spl_token::id(), false));
     accounts.push(AccountMeta::new_readonly(system_program::id(), false));
+    accounts.push(AccountMeta::new_readonly(spl_token::id(), false));
 
     Instruction::new_with_borsh(
         *program_id,
-        &CashInstruction::Redeem,
+        &CashInstruction::Redeem(args),
         accounts,
     )
 }

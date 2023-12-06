@@ -27,6 +27,7 @@ import {
   RedeemCashLinkParams,
 } from '../transactions';
 import { Account } from '@metaplex-foundation/mpl-core';
+import { Redemption } from '../accounts/redemption';
 
 export const FAILED_TO_FIND_ACCOUNT = 'Failed to find account';
 export const INVALID_ACCOUNT_OWNER = 'Invalid account owner';
@@ -584,7 +585,9 @@ export class CashLinkClient {
         ])
       ).map((acc) => acc.address);
     }
+    const [pda, bump] = await CashProgram.findRedemptionAccount(cashLink.pubkey, input.reference);
     const redeemInstruction = await this.redeemInstruction({
+      bump,
       recipient: walletAddress,
       recipientToken: accountKeys[0],
       feeToken: accountKeys[1],
@@ -593,7 +596,8 @@ export class CashLinkClient {
       authority: this.authority.publicKey,
       cashLink: cashLink.pubkey,
       feePayer: this.feePayer.publicKey,
-      reference: new PublicKey(input.reference),
+      redemption: pda,
+      reference: input.reference,
     });
     const transaction = new Transaction();
     transaction.add(redeemInstruction);
@@ -603,9 +607,10 @@ export class CashLinkClient {
   redeemInstruction = async (params: RedeemCashLinkParams): Promise<TransactionInstruction> => {
     const keys = [
       { pubkey: params.authority, isSigner: true, isWritable: false },
-      { pubkey: params.recipient, isSigner: true, isWritable: false },
+      { pubkey: params.recipient, isSigner: true, isWritable: true },
       { pubkey: params.feeToken, isSigner: false, isWritable: true },
       { pubkey: params.cashLink, isSigner: false, isWritable: true },
+      { pubkey: params.redemption, isSigner: false, isWritable: true },
       { pubkey: params.senderToken, isSigner: false, isWritable: true },
       { pubkey: params.feePayer, isSigner: true, isWritable: false },
       {
@@ -629,17 +634,12 @@ export class CashLinkClient {
     }
     keys.push(
       {
-        pubkey: spl.TOKEN_PROGRAM_ID,
-        isSigner: false,
-        isWritable: false,
-      },
-      {
         pubkey: SystemProgram.programId,
         isSigner: false,
         isWritable: false,
       },
       {
-        pubkey: params.reference,
+        pubkey: spl.TOKEN_PROGRAM_ID,
         isSigner: false,
         isWritable: false,
       },
@@ -647,7 +647,10 @@ export class CashLinkClient {
     return new TransactionInstruction({
       keys,
       programId: CashProgram.PUBKEY,
-      data: RedeemCashLinkArgs.serialize(),
+      data: RedeemCashLinkArgs.serialize({
+        bump: params.bump,
+        reference: params.reference,
+      }),
     });
   };
 
@@ -735,6 +738,20 @@ export class CashLinkClient {
       throw error;
     }
   };
+
+  getCashLinkRedemption = async (
+    address: PublicKey,
+    commitment?: Commitment,
+  ): Promise<Redemption | null> => {
+    try {
+      return await _getCashLinkRedemptionAccount(this.connection, address, commitment);
+    } catch (error) {
+      if (error.message === FAILED_TO_FIND_ACCOUNT) {
+        return null;
+      }
+      throw error;
+    }
+  };
 }
 
 const _findAssociatedTokenAddress = (walletAddress: PublicKey, tokenMintAddress: PublicKey) =>
@@ -752,6 +769,22 @@ const _getCashLinkAccount = async (
     }
     const cashLink = CashLink.from(new Account(cashLinkAddress, accountInfo));
     return cashLink;
+  } catch (error) {
+    return null;
+  }
+};
+
+const _getCashLinkRedemptionAccount = async (
+  connection: Connection,
+  cashLinkAddress: PublicKey,
+  commitment?: Commitment,
+): Promise<Redemption | null> => {
+  try {
+    const accountInfo = await connection.getAccountInfo(cashLinkAddress, commitment);
+    if (accountInfo == null) {
+      return null;
+    }
+    return Redemption.from(new Account(cashLinkAddress, accountInfo));
   } catch (error) {
     return null;
   }

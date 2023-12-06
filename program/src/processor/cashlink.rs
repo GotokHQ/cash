@@ -1,15 +1,18 @@
 use crate::{
     error::CashError::{
-        self, AccountAlreadyCanceled, AccountAlreadyRedeemed,
-        AccountNotInitialized, AccountNotCanceled, AmountOverflow,
-        InsufficientSettlementFunds,
+        self, AccountAlreadyCanceled, AccountAlreadyRedeemed, AccountNotCanceled,
+        AccountNotInitialized, AmountOverflow, InsufficientSettlementFunds,
     },
-    instruction::InitCashLinkArgs,
-    state::cashlink::{CashLink, CashLinkState},
+    instruction::{InitCashLinkArgs, InitCashRedemptionArgs},
+    state::{
+        cashlink::{CashLink, CashLinkState},
+        redemption::Redemption,
+        FLAG_ACCOUNT_SIZE,
+    },
     utils::{
         assert_account_key, assert_initialized, assert_owned_by, assert_signer,
         assert_token_owned_by, create_associated_token_account_raw, create_new_account_raw,
-        empty_account_balance, exists, spl_token_close, spl_token_transfer, native_transfer,
+        empty_account_balance, exists, native_transfer, spl_token_close, spl_token_transfer,
     },
 };
 
@@ -77,11 +80,10 @@ pub fn process_init_cash_link(
     cash_link.authority = *authority_info.key;
     cash_link.sender = *sender_info.key;
 
-
     let total = args
-    .amount
-    .checked_add(args.fee)
-    .ok_or::<ProgramError>(CashError::MathOverflow.into())?;
+        .amount
+        .checked_add(args.fee)
+        .ok_or::<ProgramError>(CashError::MathOverflow.into())?;
 
     match mint_info {
         Some(info) => {
@@ -117,22 +119,11 @@ pub fn process_init_cash_link(
                 assert_owned_by(sender_token_info, &spl_token::id())?;
                 let sender_token: TokenAccount = assert_initialized(sender_token_info)?;
                 assert_token_owned_by(&sender_token, sender_info.key)?;
-                spl_token_transfer(
-                    sender_token_info,
-                    vault_token_info,
-                    sender_info,
-                    total,
-                    &[],
-                )?;
+                spl_token_transfer(sender_token_info, vault_token_info, sender_info, total, &[])?;
             }
         }
         None => {
-            native_transfer(
-                sender_info,
-                cash_link_info,
-                total,
-                &[],
-            )?;
+            native_transfer(sender_info, cash_link_info, total, &[])?;
             cash_link.mint = None;
         }
     };
@@ -273,7 +264,11 @@ pub fn process_cancel(accounts: &[AccountInfo], program_id: &Pubkey) -> ProgramR
 }
 
 //inside: impl Processor {}
-pub fn process_redemption(accounts: &[AccountInfo], program_id: &Pubkey) -> ProgramResult {
+pub fn process_redemption(
+    accounts: &[AccountInfo],
+    args: InitCashRedemptionArgs,
+    program_id: &Pubkey,
+) -> ProgramResult {
     msg!("Process redemption");
     let account_info_iter = &mut accounts.iter();
     let authority_info = next_account_info(account_info_iter)?;
@@ -285,8 +280,6 @@ pub fn process_redemption(accounts: &[AccountInfo], program_id: &Pubkey) -> Prog
     assert_signer(wallet_info)?;
 
     let fee_token_info = next_account_info(account_info_iter)?;
-    assert_owned_by(fee_token_info, &spl_token::id())?;
-
     let cash_link_info = next_account_info(account_info_iter)?;
     assert_owned_by(cash_link_info, program_id)?;
     let mut cash_link = CashLink::unpack(&cash_link_info.data.borrow())?;
@@ -306,6 +299,12 @@ pub fn process_redemption(accounts: &[AccountInfo], program_id: &Pubkey) -> Prog
         }
         return Err(AccountNotInitialized.into());
     }
+
+    let redemption_info = next_account_info(account_info_iter)?;
+    if redemption_info.lamports() > 0 && !redemption_info.data_is_empty() {
+        msg!("AccountAlreadyInitialized");
+        return Err(ProgramError::AccountAlreadyInitialized);
+    }
     let sender_token_info = next_account_info(account_info_iter)?;
     let fee_payer_info = next_account_info(account_info_iter)?;
     let clock_info = next_account_info(account_info_iter)?;
@@ -323,6 +322,7 @@ pub fn process_redemption(accounts: &[AccountInfo], program_id: &Pubkey) -> Prog
         .ok_or::<ProgramError>(CashError::MathOverflow.into())?;
 
     if let Some(mint) = cash_link.mint {
+        assert_owned_by(fee_token_info, &spl_token::id())?;
         let recipient_token_info = next_account_info(account_info_iter)?;
         assert_owned_by(recipient_token_info, &spl_token::id())?;
         let vault_token_info = next_account_info(account_info_iter)?;
@@ -413,7 +413,21 @@ pub fn process_redemption(accounts: &[AccountInfo], program_id: &Pubkey) -> Prog
                 .ok_or(AmountOverflow)?;
         }
     }
-    msg!("Mark the cash_link account as redeemed...");
+    let system_account_info = next_account_info(account_info_iter)?;
+    create_new_account_raw(
+        program_id,
+        redemption_info,
+        rent_info,
+        fee_payer_info,
+        system_account_info,
+        FLAG_ACCOUNT_SIZE,
+        &[
+            Redemption::PREFIX.as_bytes(),
+            cash_link_info.key.as_ref(),
+            args.reference.as_bytes(),
+            &[args.bump],
+        ],
+    )?;
     cash_link.state = CashLinkState::Redeemed;
     cash_link.redeemed_at = Some(clock.unix_timestamp as u64);
     CashLink::pack(cash_link, &mut cash_link_info.data.borrow_mut())?;

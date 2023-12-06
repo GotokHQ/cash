@@ -63,6 +63,8 @@ pub enum CashError {
     AccountInvalidState,
     #[error("Insufficient funds for settlement")]
     InsufficientSettlementFunds,
+    #[error("Invalid reference")]
+    InvalidReference,
 }
 
 impl From<CashError> for ProgramError {
