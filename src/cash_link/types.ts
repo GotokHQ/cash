@@ -18,7 +18,7 @@ export interface ResultContext {
 export interface CashLinkInput {
   walletAddress: string;
   cashLinkAddress: string;
-  memo?: string;
+  reference: string;
   commitment?: Commitment;
 }
 

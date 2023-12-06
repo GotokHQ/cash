@@ -23,4 +23,5 @@ export type RedeemCashLinkParams = {
   senderToken: PublicKey;
   feeToken: PublicKey;
   feePayer: PublicKey;
+  reference: PublicKey;
 };

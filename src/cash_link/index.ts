@@ -57,9 +57,6 @@ export class CashLinkClient {
 
   cancel = async (input: CashLinkInput): Promise<ResultContext> => {
     const transaction = await this.cancelTransaction(input);
-    if (input.memo) {
-      transaction.add(this.memoInstruction(input.memo, this.authority.publicKey));
-    }
     const { context, value } = await this.connection.getLatestBlockhashAndContext(
       input.commitment ?? 'confirmed',
     );
@@ -79,11 +76,9 @@ export class CashLinkClient {
       cashLink: new PublicKey(input.cashLinkAddress),
       authority: this.authority.publicKey,
       feePayer: this.feePayer.publicKey,
+      reference: new PublicKey(input.reference),
     });
     transaction.add(closeInstruction);
-    if (input.memo) {
-      transaction.add(this.memoInstruction(input.memo, this.authority.publicKey));
-    }
     const { context, value } = await this.connection.getLatestBlockhashAndContext(
       input.commitment ?? 'confirmed',
     );
@@ -128,6 +123,7 @@ export class CashLinkClient {
         ? await _findAssociatedTokenAddress(cashLinkPda, new PublicKey(cashLink.data.mint))
         : null,
       feePayer: this.feePayer.publicKey,
+      reference: new PublicKey(input.reference),
     });
     return new Transaction().add(cancelInstruction);
   };
@@ -167,6 +163,11 @@ export class CashLinkClient {
         isSigner: false,
         isWritable: false,
       },
+      {
+        pubkey: params.reference,
+        isSigner: false,
+        isWritable: false,
+      },
     );
     return new TransactionInstruction({
       keys,
@@ -195,11 +196,9 @@ export class CashLinkClient {
       cashLink: new PublicKey(input.cashLinkAddress),
       authority: this.authority.publicKey,
       feePayer: this.feePayer.publicKey,
+      reference: new PublicKey(input.reference),
     });
     const transaction = new Transaction().add(closeInstruction);
-    if (input.memo) {
-      transaction.add(this.memoInstruction(input.memo, this.authority.publicKey));
-    }
     const { context, value } = await this.connection.getLatestBlockhashAndContext(
       input.commitment ?? 'confirmed',
     );
@@ -226,6 +225,11 @@ export class CashLinkClient {
         { pubkey: params.feePayer, isSigner: false, isWritable: true },
         {
           pubkey: SystemProgram.programId,
+          isSigner: false,
+          isWritable: false,
+        },
+        {
+          pubkey: params.reference,
           isSigner: false,
           isWritable: false,
         },
@@ -348,7 +352,7 @@ export class CashLinkClient {
 
   pay = async (input: CashLinkInput): Promise<ResultContext> => {
     const cashLinkAddress = new PublicKey(input.cashLinkAddress);
-    const walletAddress = new PublicKey(input.memo);
+    const walletAddress = new PublicKey(input.walletAddress);
     const cashLink = await _getCashLinkAccount(this.connection, cashLinkAddress);
     if (cashLink == null) {
       throw new Error(FAILED_TO_FIND_ACCOUNT);
@@ -391,9 +395,6 @@ export class CashLinkClient {
           lamports: total.toNumber(),
         }),
       );
-    }
-    if (input.memo) {
-      transaction.add(this.memoInstruction(input.memo, this.authority.publicKey));
     }
     const { context, value } = await this.connection.getLatestBlockhashAndContext(
       input.commitment ?? 'confirmed',
@@ -527,9 +528,6 @@ export class CashLinkClient {
 
   redeem = async (input: CashLinkInput): Promise<ResultContext> => {
     const transaction = await this.redeemTransaction(input);
-    if (input.memo) {
-      transaction.add(this.memoInstruction(input.memo, this.authority.publicKey));
-    }
     const { context, value } = await this.connection.getLatestBlockhashAndContext(
       input.commitment ?? 'confirmed',
     );
@@ -594,6 +592,7 @@ export class CashLinkClient {
       authority: this.authority.publicKey,
       cashLink: cashLink.pubkey,
       feePayer: this.feePayer.publicKey,
+      reference: new PublicKey(input.reference),
     });
     const transaction = new Transaction();
     transaction.add(redeemInstruction);
@@ -634,6 +633,11 @@ export class CashLinkClient {
       },
       {
         pubkey: SystemProgram.programId,
+        isSigner: false,
+        isWritable: false,
+      },
+      {
+        pubkey: params.reference,
         isSigner: false,
         isWritable: false,
       },
