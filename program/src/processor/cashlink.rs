@@ -280,10 +280,11 @@ pub fn process_redemption(accounts: &[AccountInfo], program_id: &Pubkey) -> Prog
 
     assert_signer(authority_info)?;
 
-    let recipient_token_info = next_account_info(account_info_iter)?;
-    let fee_token_info = next_account_info(account_info_iter)?;
+    let wallet_info = next_account_info(account_info_iter)?;
 
-    assert_owned_by(recipient_token_info, &spl_token::id())?;
+    assert_signer(wallet_info)?;
+
+    let fee_token_info = next_account_info(account_info_iter)?;
     assert_owned_by(fee_token_info, &spl_token::id())?;
 
     let cash_link_info = next_account_info(account_info_iter)?;
@@ -322,6 +323,8 @@ pub fn process_redemption(accounts: &[AccountInfo], program_id: &Pubkey) -> Prog
         .ok_or::<ProgramError>(CashError::MathOverflow.into())?;
 
     if let Some(mint) = cash_link.mint {
+        let recipient_token_info = next_account_info(account_info_iter)?;
+        assert_owned_by(recipient_token_info, &spl_token::id())?;
         let vault_token_info = next_account_info(account_info_iter)?;
         assert_owned_by(vault_token_info, &spl_token::id())?;
         let associated_token_account = get_associated_token_address(&cash_link_info.key, &mint);
@@ -340,7 +343,9 @@ pub fn process_redemption(accounts: &[AccountInfo], program_id: &Pubkey) -> Prog
             .checked_sub(total)
             .ok_or::<ProgramError>(CashError::MathOverflow.into())?;
 
-        let _: TokenAccount = assert_initialized(recipient_token_info)?;
+        let recipient_token: TokenAccount = assert_initialized(recipient_token_info)?;
+        assert_token_owned_by(&recipient_token, &wallet_info.key)?;
+
         let _: TokenAccount = assert_initialized(fee_token_info)?;
         if cash_link.amount > 0 {
             spl_token_transfer(
@@ -390,8 +395,8 @@ pub fn process_redemption(accounts: &[AccountInfo], program_id: &Pubkey) -> Prog
         let remaining = available_amount.checked_sub(total).ok_or(AmountOverflow)?;
         **cash_link_info.lamports.borrow_mut() = min_lamports;
         if cash_link.amount > 0 {
-            let dest_starting_lamports = recipient_token_info.lamports();
-            **recipient_token_info.lamports.borrow_mut() = dest_starting_lamports
+            let dest_starting_lamports = wallet_info.lamports();
+            **wallet_info.lamports.borrow_mut() = dest_starting_lamports
                 .checked_add(cash_link.amount)
                 .ok_or(AmountOverflow)?;
         }

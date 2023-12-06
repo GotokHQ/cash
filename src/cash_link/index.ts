@@ -514,7 +514,7 @@ export class CashLinkClient {
 
   confirmTransaction = async (
     signature: string,
-    commitment?: Commitment,
+    commitment: Commitment = 'confirmed',
   ): Promise<RpcResponseAndContext<SignatureResult>> => {
     const latestBlockhash = await this.connection.getLatestBlockhash(commitment);
     return await this.connection.confirmTransaction(
@@ -585,6 +585,7 @@ export class CashLinkClient {
       ).map((acc) => acc.address);
     }
     const redeemInstruction = await this.redeemInstruction({
+      recipient: walletAddress,
       recipientToken: accountKeys[0],
       feeToken: accountKeys[1],
       senderToken: accountKeys[2],
@@ -602,7 +603,7 @@ export class CashLinkClient {
   redeemInstruction = async (params: RedeemCashLinkParams): Promise<TransactionInstruction> => {
     const keys = [
       { pubkey: params.authority, isSigner: true, isWritable: false },
-      { pubkey: params.recipientToken, isSigner: false, isWritable: true },
+      { pubkey: params.recipient, isSigner: true, isWritable: false },
       { pubkey: params.feeToken, isSigner: false, isWritable: true },
       { pubkey: params.cashLink, isSigner: false, isWritable: true },
       { pubkey: params.senderToken, isSigner: false, isWritable: true },
@@ -619,6 +620,7 @@ export class CashLinkClient {
       },
     ];
     if (params.vaultToken) {
+      keys.push({ pubkey: params.recipientToken, isSigner: false, isWritable: true });
       keys.push({
         pubkey: params.vaultToken,
         isSigner: false,

@@ -16,6 +16,7 @@ export class RedeemCashLinkArgs extends Borsh.Data<SettleArgs> {
 }
 
 export type RedeemCashLinkParams = {
+  recipient: PublicKey;
   authority: PublicKey;
   cashLink: PublicKey;
   vaultToken?: PublicKey;

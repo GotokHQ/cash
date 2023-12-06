@@ -47,16 +47,17 @@ pub enum CashInstruction {
     /// Accounts expected:
     ///
     /// 0. `[signer]` The account of the authority
-    /// 1. `[writable]` The recipient token account for the token they will receive should the trade go through
-    /// 2. `[writable]` The fee token account for the token they will receive should the trade go through
-    /// 3. `[writable]` The cash_link account holding the cash_link info
-    /// 4. `[writable]` The payer token account of the payer that initialized the cash_link  
-    /// 5. `[writable]` The fee payer token account to receive tokens from the vault
-    /// 6. `[]` The clock account
-    /// 7. `[]` The rent account
-    /// 8. `[writable]` The vault token account to get tokens. This value is Optional. if the mint is set, then this must be set.
-    /// 9. `[]` The token program
-    /// 10. `[]` The system program
+    /// 1. `[signer]` The account of the recipient
+    /// 2. `[writable]` The recipient token account for the token they will receive should the trade go through
+    /// 3. `[writable]` The fee token account for the token they will receive should the trade go through
+    /// 4. `[writable]` The cash_link account holding the cash_link info
+    /// 5. `[writable]` The payer token account of the payer that initialized the cash_link  
+    /// 6. `[writable]` The fee payer token account to receive tokens from the vault
+    /// 7. `[]` The clock account
+    /// 8. `[]` The rent account
+    /// 9. `[writable]` The vault token account to get tokens. This value is Optional. if the mint is set, then this must be set.
+    /// 10. `[]` The token program
+    /// 11. `[]` The system program
     Redeem,
     /// Cancel the cash_link
     ///
@@ -165,6 +166,7 @@ pub fn cancel_cash_link(
 pub fn redeem_cash_link(
     program_id: &Pubkey,
     authority: &Pubkey,
+    recipient_wallet: &Pubkey,
     recipient_token: &Pubkey,
     collection_fee_token: &Pubkey,
     vault_token: Option<&Pubkey>,
@@ -174,7 +176,7 @@ pub fn redeem_cash_link(
 ) -> Instruction {
     let mut accounts = vec![
         AccountMeta::new_readonly(*authority, true),
-        AccountMeta::new(*recipient_token, false),
+        AccountMeta::new_readonly(*recipient_wallet, true),
         AccountMeta::new(*collection_fee_token, false),
         AccountMeta::new(*cash_link, false),
         AccountMeta::new(*sender_token, false),
@@ -184,6 +186,7 @@ pub fn redeem_cash_link(
     ];
 
     if let Some(key) = vault_token {
+        accounts.push(AccountMeta::new(*recipient_token, false));
         accounts.push(AccountMeta::new(*key, false));
     }
 
