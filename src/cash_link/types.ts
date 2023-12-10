@@ -3,7 +3,7 @@ import { CashLinkDistributionType } from 'src/accounts';
 export interface InitializeCashLinkInput {
   wallet: string;
   mint?: string;
-  reference: string;
+  cashLinkReference: string;
   amount: string;
   feeBps?: number;
   fixedFee?: string;
@@ -22,10 +22,6 @@ export interface CashLinkInput {
   walletAddress: string;
   cashLinkReference: string;
   commitment?: Commitment;
-}
-
-export interface RedeemCashLinkInput extends CashLinkInput {
-  redemptionReference: string;
 }
 
 export interface SettleAndTransferInput {

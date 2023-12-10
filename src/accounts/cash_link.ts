@@ -5,11 +5,13 @@ import {
   Account,
   StringPublicKey,
 } from '@metaplex-foundation/mpl-core';
-import { AccountInfo } from '@solana/web3.js';
+import { AccountInfo, Connection, PublicKey } from '@solana/web3.js';
 import BN from 'bn.js';
+import bs58 from 'bs58';
 import { CashProgram } from '../cash_program';
+import { AccountType } from './account';
 
-export const MAX_DATA_LEN = 153;
+export const MAX_CASH_LINK_DATA_LEN = 123;
 
 export enum CashLinkState {
   Uninitialized = 0,
@@ -25,9 +27,12 @@ export enum CashLinkDistributionType {
 }
 
 export type CashLinkDataArgs = {
+  accountType: AccountType;
   state: CashLinkState;
   amount: BN;
-  fee: BN;
+  feeBps: number;
+  fixedFee: BN;
+  feeToRedeem: BN;
   remainingAmount: BN;
   remainingFee: BN;
   distributionType: CashLinkDistributionType;
@@ -42,9 +47,12 @@ export type CashLinkDataArgs = {
 
 export class CashLinkData extends Borsh.Data<CashLinkDataArgs> {
   static readonly SCHEMA = CashLinkData.struct([
+    ['accountType', 'u8'],
     ['state', 'u8'],
     ['amount', 'u64'],
-    ['fee', 'u64'],
+    ['feeBps', 'u16'],
+    ['fixedFee', 'u64'],
+    ['feeToRedeem', 'u64'],
     ['remainingAmount', 'u64'],
     ['remainingFee', 'u64'],
     ['distributionType', 'u8'],
@@ -56,9 +64,12 @@ export class CashLinkData extends Borsh.Data<CashLinkDataArgs> {
     ['totalRedemptions', 'u16'],
     ['maxNumRedemptions', 'u16'],
   ]);
+  accountType: AccountType;
   state: CashLinkState;
   amount: BN;
-  fee: BN;
+  feeBps: number;
+  fixedFee: BN;
+  feeToRedeem: BN;
   remainingAmount: BN;
   remainingFee: BN;
   distributionType: CashLinkDistributionType;
@@ -85,8 +96,44 @@ export class CashLink extends Account<CashLinkData> {
     }
   }
 
-  static async getPDA(reference: string) {
-    const [pubKey] = await CashProgram.findCashLinkAccount(reference);
+  static async getPDA(cashLinkReference: PublicKey) {
+    const [pubKey] = await CashProgram.findCashLinkAccount(cashLinkReference);
     return pubKey;
+  }
+
+  static async findMany(
+    connection: Connection,
+    filters: {
+      authority?: AnyPublicKey;
+      state?: CashLinkState;
+    } = {},
+  ) {
+    const baseFilters = [
+      // Filter for CashLink by account type
+      {
+        memcmp: {
+          offset: 0,
+          bytes: bs58.encode(Buffer.from([AccountType.CashLink])),
+        },
+      },
+      // Filter for assigned to authority
+      filters.authority && {
+        memcmp: {
+          offset: 1,
+          bytes: new PublicKey(filters.authority).toBase58(),
+        },
+      },
+      // Filter by state
+      filters.state && {
+        memcmp: {
+          offset: 33,
+          bytes: bs58.encode(Buffer.from([filters.state])),
+        },
+      },
+    ].filter(Boolean);
+
+    return (await CashProgram.getProgramAccounts(connection, { filters: baseFilters })).map(
+      (account) => CashLink.from(account),
+    );
   }
 }

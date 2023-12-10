@@ -14,14 +14,9 @@ import {
 } from '@solana/web3.js';
 import * as spl from '@solana/spl-token';
 import BN from 'bn.js';
-import {
-  InitializeCashLinkInput,
-  ResultContext,
-  RedeemCashLinkInput,
-  CashLinkInput,
-} from './types';
+import { InitializeCashLinkInput, ResultContext, CashLinkInput } from './types';
 import { CashProgram } from '../cash_program';
-import { CashLink, CashLinkState, MAX_DATA_LEN } from '../accounts/cash_link';
+import { CashLink, CashLinkState } from '../accounts/cash_link';
 import {
   CancelCashLinkArgs,
   CancelCashLinkParams,
@@ -65,7 +60,8 @@ export class CashLinkClient {
   }
 
   cancel = async (input: CashLinkInput): Promise<ResultContext> => {
-    const [cashLinkAddress, bump] = await CashProgram.findCashLinkAccount(input.cashLinkReference);
+    const cashLinkReference = new PublicKey(input.cashLinkReference);
+    const [cashLinkAddress, bump] = await CashProgram.findCashLinkAccount(cashLinkReference);
     const cashLink = await _getCashLinkAccount(this.connection, cashLinkAddress);
     if (cashLink == null) {
       throw new Error(FAILED_TO_FIND_ACCOUNT);
@@ -85,7 +81,8 @@ export class CashLinkClient {
   };
 
   cancelAndClose = async (input: CashLinkInput): Promise<ResultContext> => {
-    const [cashLinkAddress, bump] = await CashProgram.findCashLinkAccount(input.cashLinkReference);
+    const cashLinkReference = new PublicKey(input.cashLinkReference);
+    const [cashLinkAddress, bump] = await CashProgram.findCashLinkAccount(cashLinkReference);
     const cashLink = await _getCashLinkAccount(this.connection, cashLinkAddress);
     if (cashLink == null) {
       throw new Error(FAILED_TO_FIND_ACCOUNT);
@@ -114,7 +111,7 @@ export class CashLinkClient {
 
   cancelTransaction = async (
     cashLink: CashLink,
-    bump: number,
+    cashLinkBump: number,
     input: CashLinkInput,
   ): Promise<Transaction> => {
     if (cashLink.data?.state === CashLinkState.Canceled) {
@@ -142,8 +139,8 @@ export class CashLinkClient {
         ? await _findAssociatedTokenAddress(cashLink.pubkey, new PublicKey(cashLink.data.mint))
         : null,
       feePayer: this.feePayer.publicKey,
-      bump,
-      cashLinkReference: input.cashLinkReference,
+      cashLinkBump,
+      cashLinkReference: new PublicKey(input.cashLinkReference),
     });
     return new Transaction().add(cancelInstruction);
   };
@@ -152,6 +149,7 @@ export class CashLinkClient {
     const keys = [
       { pubkey: params.authority, isSigner: true, isWritable: false },
       { pubkey: params.cashLink, isSigner: false, isWritable: true },
+      { pubkey: params.cashLinkReference, isSigner: false, isWritable: false },
       { pubkey: params.senderToken, isSigner: false, isWritable: true },
       { pubkey: params.feePayer, isSigner: false, isWritable: true },
       {
@@ -188,14 +186,14 @@ export class CashLinkClient {
       keys,
       programId: CashProgram.PUBKEY,
       data: CancelCashLinkArgs.serialize({
-        bump: params.bump,
-        reference: params.cashLinkReference,
+        cashLinkBump: params.cashLinkBump,
       }),
     });
   };
 
   close = async (input: CashLinkInput): Promise<ResultContext> => {
-    const [cashLinkAddress] = await CashProgram.findCashLinkAccount(input.cashLinkReference);
+    const cashLinkReference = new PublicKey(input.cashLinkReference);
+    const [cashLinkAddress] = await CashProgram.findCashLinkAccount(cashLinkReference);
     const cashLink = await _getCashLinkAccount(this.connection, cashLinkAddress);
     if (cashLink == null || !cashLink.data) {
       throw new Error(FAILED_TO_FIND_ACCOUNT);
@@ -267,7 +265,8 @@ export class CashLinkClient {
   initializeTransaction = async (input: InitializeCashLinkInput): Promise<Transaction> => {
     const sender = new PublicKey(input.wallet);
     const mint: PublicKey | null = input.mint ? new PublicKey(input.mint) : null;
-    const [cashLink, cashLinkBump] = await CashProgram.findCashLinkAccount(input.reference);
+    const cashLinkReference = new PublicKey(input.cashLinkReference);
+    const [cashLink, cashLinkBump] = await CashProgram.findCashLinkAccount(cashLinkReference);
     const amount = new BN(input.amount);
     const fixedFee = new BN(input.fixedFee ?? 0);
     const feeToRedeem = new BN(input.feeToRedeem ?? 0);
@@ -283,7 +282,7 @@ export class CashLinkClient {
       feeToRedeem,
       maxNumRedemptions,
       amount: amount,
-      reference: input.reference,
+      cashLinkReference: cashLinkReference,
       authority: this.authority.publicKey,
       feePayer: this.feePayer.publicKey,
       distributionType: input.distributionType,
@@ -300,7 +299,7 @@ export class CashLinkClient {
       feeBps,
       fixedFee,
       feeToRedeem,
-      reference,
+      cashLinkReference,
       distributionType,
       sender,
       cashLinkBump,
@@ -314,8 +313,7 @@ export class CashLinkClient {
       feeBps,
       fixedFee,
       feeToRedeem,
-      bump: cashLinkBump,
-      reference,
+      cashLinkBump,
       distributionType,
       maxNumRedemptions,
     });
@@ -340,11 +338,11 @@ export class CashLinkClient {
         isSigner: false,
         isWritable: true,
       },
-      // {
-      //   pubkey: vaultToken,
-      //   isSigner: false,
-      //   isWritable: true,
-      // },
+      {
+        pubkey: cashLinkReference,
+        isSigner: false,
+        isWritable: false,
+      },
       {
         pubkey: SYSVAR_RENT_PUBKEY,
         isSigner: false,
@@ -417,7 +415,7 @@ export class CashLinkClient {
     );
   };
 
-  redeem = async (input: RedeemCashLinkInput): Promise<ResultContext> => {
+  redeem = async (input: CashLinkInput): Promise<ResultContext> => {
     const transaction = await this.redeemTransaction(input);
     const { context, value } = await this.connection.getLatestBlockhashAndContext(
       input.commitment ?? 'confirmed',
@@ -436,9 +434,10 @@ export class CashLinkClient {
     };
   };
 
-  redeemTransaction = async (input: RedeemCashLinkInput): Promise<Transaction> => {
+  redeemTransaction = async (input: CashLinkInput): Promise<Transaction> => {
+    const cashLinkReference = new PublicKey(input.cashLinkReference);
     const [cashLinkAddress, cashLinkBump] = await CashProgram.findCashLinkAccount(
-      input.cashLinkReference,
+      cashLinkReference,
     );
     const walletAddress = new PublicKey(input.walletAddress);
     const cashLink = await _getCashLinkAccount(this.connection, cashLinkAddress);
@@ -479,13 +478,12 @@ export class CashLinkClient {
     }
     const [redemption, redemptionBump] = await CashProgram.findRedemptionAccount(
       cashLinkAddress,
-      input.redemptionReference,
+      walletAddress,
     );
     const redeemInstruction = await this.redeemInstruction({
-      cashLinkBump: cashLinkBump,
-      cashLinkReference: input.cashLinkReference,
+      cashLinkBump,
+      cashLinkReference,
       redemptionBump: redemptionBump,
-      redemptionReference: input.redemptionReference,
       recipient: walletAddress,
       recipientToken: accountKeys[0],
       feeToken: accountKeys[1],
@@ -507,6 +505,7 @@ export class CashLinkClient {
       { pubkey: params.recipient, isSigner: true, isWritable: true },
       { pubkey: params.feeToken, isSigner: false, isWritable: true },
       { pubkey: params.cashLink, isSigner: false, isWritable: true },
+      { pubkey: params.cashLinkReference, isSigner: false, isWritable: false },
       { pubkey: params.redemption, isSigner: false, isWritable: true },
       { pubkey: params.senderToken, isSigner: false, isWritable: true },
       { pubkey: params.feePayer, isSigner: true, isWritable: false },
@@ -551,9 +550,7 @@ export class CashLinkClient {
       programId: CashProgram.PUBKEY,
       data: RedeemCashLinkArgs.serialize({
         cashLinkBump: params.cashLinkBump,
-        cashLinkReference: params.cashLinkReference,
         redemptionBump: params.redemptionBump,
-        redemptionReference: params.redemptionReference,
       }),
     });
   };
@@ -574,43 +571,6 @@ export class CashLinkClient {
       data: Buffer.from(memo, 'utf-8'),
       programId: MEMO_PROGRAM_ID,
     });
-  };
-
-  hasPaid = async (cashLinkAddress: PublicKey, commitment?: Commitment): Promise<boolean> => {
-    try {
-      const cashLink = await this.getCashLink(cashLinkAddress, commitment);
-      if (cashLink == null) {
-        throw new Error(FAILED_TO_FIND_ACCOUNT);
-      }
-      let vaultAmount: BN | undefined;
-      if (cashLink.data.mint) {
-        const vault = await this.getVault(
-          cashLinkAddress,
-          new PublicKey(cashLink.data.mint),
-          commitment,
-        );
-        if (!vault) {
-          return false;
-        }
-        vaultAmount = new BN(vault.amount.toString());
-      } else {
-        const minBalance = new BN(
-          await this.connection.getMinimumBalanceForRentExemption(MAX_DATA_LEN, commitment),
-        );
-        const lamports = new BN(cashLink.info.lamports);
-        if (lamports.gte(minBalance)) {
-          vaultAmount = lamports.sub(minBalance);
-        } else {
-          return false;
-        }
-      }
-      const amount = new BN(cashLink.data.amount ?? 0);
-      const fee = new BN(cashLink.data.fee ?? 0);
-      const total = amount.add(fee);
-      return vaultAmount.gte(total);
-    } catch (error: unknown) {
-      throw error;
-    }
   };
 
   getVault = async (
