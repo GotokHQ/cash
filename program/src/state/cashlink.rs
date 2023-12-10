@@ -7,9 +7,11 @@ use solana_program::{
     pubkey::Pubkey,
 };
 
+use super::AccountType;
 
 
-pub const CASH_LINK_DATA_SIZE: usize = 122;
+
+pub const CASH_LINK_DATA_SIZE: usize = 123;
 
 #[repr(C)]
 #[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq, Clone, Default)]
@@ -33,6 +35,7 @@ pub enum DistributionType {
 #[repr(C)]
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Default)]
 pub struct CashLink {
+    pub account_type: AccountType,
     pub state: CashLinkState,
     pub amount: u64,
     pub fee_bps: u16,

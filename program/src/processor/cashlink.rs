@@ -7,7 +7,7 @@ use crate::{
     math::SafeMath,
     state::{
         cashlink::{CashLink, CashLinkState, DistributionType},
-        redemption::{Redemption, REDEMPTION_SIZE},
+        redemption::{Redemption, REDEMPTION_SIZE}, AccountType,
     },
     utils::{
         assert_account_key, assert_initialized, assert_owned_by, assert_signer,
@@ -43,6 +43,7 @@ pub fn process_init_cash_link(
     let sender_info = next_account_info(account_info_iter)?;
     let fee_payer_info = next_account_info(account_info_iter)?;
     let cash_link_info = next_account_info(account_info_iter)?;
+    let cash_link_reference_info = next_account_info(account_info_iter)?;
     //let vault_token_info = next_account_info(account_info_iter)?;
     let rent_info = next_account_info(account_info_iter)?;
     let system_account_info = next_account_info(account_info_iter)?;
@@ -63,8 +64,8 @@ pub fn process_init_cash_link(
         system_account_info,
         &[
             CashLink::PREFIX.as_bytes(),
-            args.reference.as_bytes(),
-            &[args.bump],
+            cash_link_reference_info.key.as_ref(),
+            &[args.cash_link_bump],
         ],
     )?;
     if args.amount == 0 {
@@ -101,7 +102,7 @@ pub fn process_init_cash_link(
         .ok_or::<ProgramError>(CashError::Overflow.into())?
         .checked_add(total_redemption_fee)
         .ok_or::<ProgramError>(CashError::Overflow.into())?;
-
+    cash_link.account_type = AccountType::CashLink;
     cash_link.state = CashLinkState::Initialized;
     cash_link.amount = args.amount;
     cash_link.fee_bps = args.fee_bps;
@@ -215,6 +216,7 @@ pub fn process_cancel(
         &cash_link.authority,
         Some(CashError::InvalidAuthorityId),
     )?;
+    let cash_link_reference_info = next_account_info(account_info_iter)?;
 
     let sender_token_info = next_account_info(account_info_iter)?;
     let fee_payer_info = next_account_info(account_info_iter)?;
@@ -234,8 +236,8 @@ pub fn process_cancel(
     }
     let signer_seeds = [
         CashLink::PREFIX.as_bytes(),
-        args.reference.as_bytes(),
-        &[args.bump],
+        cash_link_reference_info.key.as_ref(),
+        &[args.cash_link_bump],
     ];
 
     if let Some(mint) = cash_link.mint {
@@ -332,6 +334,7 @@ pub fn process_redemption(
         }
         return Err(AccountNotInitialized.into());
     }
+    let cash_link_reference_info = next_account_info(account_info_iter)?;
 
     let redemption_info = next_account_info(account_info_iter)?;
     if redemption_info.lamports() > 0 && !redemption_info.data_is_empty() {
@@ -353,7 +356,7 @@ pub fn process_redemption(
 
     let signer_seeds = [
         CashLink::PREFIX.as_bytes(),
-        args.cash_link_reference.as_bytes(),
+        cash_link_reference_info.key.as_ref(),
         &[args.cash_link_bump],
     ];
 
@@ -518,11 +521,13 @@ pub fn process_redemption(
         &[
             Redemption::PREFIX.as_bytes(),
             cash_link_info.key.as_ref(),
-            args.redemption_reference.as_bytes(),
+            wallet_info.key.as_ref(),
             &[args.redemption_bump],
         ],
     )?;
     let mut redemption = Redemption::unpack_unchecked(&redemption_info.data.borrow_mut())?;
+    redemption.account_type = AccountType::Redemption;
+    redemption.cash_link = *cash_link_info.key;
     redemption.redeemed_at = clock.unix_timestamp as u64;
     redemption.wallet = *wallet_info.key;
     redemption.amount = amount_to_redeem;
