@@ -69,20 +69,21 @@ pub enum CashInstruction {
     /// Accounts expected:
     ///
     /// 0. `[signer]` The account of the authority
-    /// 1. `[signer]` The account of the recipient
-    /// 2. `[writable]` The fee token account for the token they will receive should the trade go through
-    /// 3. `[writable]` The cash_link account holding the cash_link info
-    /// 4. `[]` The cash_link reference key used for deriving the cash_link account pda
-    /// 5. `[writable]` The redemption account to flag a user has redeemed this cashlink
-    /// 6. `[writable]` The payer token account of the payer that initialized the cash_link  
-    /// 7. `[writable]` The fee payer token account to receive tokens from the vault
-    /// 8. `[]` The clock account
-    /// 9. `[]` The rent account
-    /// 10. `[]` The recent slot hash account
-    /// 11. `[writable][Optional]` The vault token account to get tokens. This value is Optional. if the mint is set, then this must be set.
-    /// 12. `[writable][Optional]` The recipient token account for the token they will receive should the trade go through
-    /// 13. `[]` The system program
-    /// 14. `[]` The token program
+    /// 1. `[]` The user account used mainly as a reference
+    /// 2. `[signer]` The user wallet
+    /// 3. `[writable]` The fee token account for the token they will receive should the trade go through
+    /// 4. `[writable]` The cash_link account holding the cash_link info
+    /// 5. `[]` The cash_link reference key used for deriving the cash_link account pda
+    /// 6. `[writable]` The redemption account to flag a user has redeemed this cashlink
+    /// 7. `[writable]` The payer token account of the payer that initialized the cash_link  
+    /// 8. `[writable]` The fee payer token account to receive tokens from the vault
+    /// 9. `[]` The clock account
+    /// 10. `[]` The rent account
+    /// 11. `[]` The recent slot hash account
+    /// 12. `[writable][Optional]` The vault token account to get tokens. This value is Optional. if the mint is set, then this must be set.
+    /// 13. `[writable][Optional]` The recipient token account for the token they will receive should the trade go through
+    /// 14. `[]` The system program
+    /// 15. `[]` The token program
     Redeem(InitCashRedemptionArgs),
     /// Cancel the cash_link
     ///
@@ -191,6 +192,7 @@ pub fn cancel_cash_link(
 pub fn redeem_cash_link(
     program_id: &Pubkey,
     authority: &Pubkey,
+    recipient: &Pubkey,
     recipient_wallet: &Pubkey,
     recipient_token: &Pubkey,
     collection_fee_token: &Pubkey,
@@ -204,6 +206,7 @@ pub fn redeem_cash_link(
 ) -> Instruction {
     let mut accounts = vec![
         AccountMeta::new_readonly(*authority, true),
+        AccountMeta::new_readonly(*recipient, false),
         AccountMeta::new_readonly(*recipient_wallet, true),
         AccountMeta::new(*collection_fee_token, false),
         AccountMeta::new(*cash_link, false),

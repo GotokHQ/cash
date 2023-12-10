@@ -29,4 +29,5 @@ export type RedeemCashLinkParams = {
   redemption: PublicKey;
   cashLinkBump: number;
   cashLinkReference: PublicKey;
+  userReference: PublicKey;
 };

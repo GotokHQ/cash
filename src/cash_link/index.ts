@@ -14,7 +14,12 @@ import {
 } from '@solana/web3.js';
 import * as spl from '@solana/spl-token';
 import BN from 'bn.js';
-import { InitializeCashLinkInput, ResultContext, CashLinkInput } from './types';
+import {
+  InitializeCashLinkInput,
+  ResultContext,
+  CashLinkInput,
+  RedeemCashLinkInput,
+} from './types';
 import { CashProgram } from '../cash_program';
 import { CashLink, CashLinkState } from '../accounts/cash_link';
 import {
@@ -415,7 +420,7 @@ export class CashLinkClient {
     );
   };
 
-  redeem = async (input: CashLinkInput): Promise<ResultContext> => {
+  redeem = async (input: RedeemCashLinkInput): Promise<ResultContext> => {
     const transaction = await this.redeemTransaction(input);
     const { context, value } = await this.connection.getLatestBlockhashAndContext(
       input.commitment ?? 'confirmed',
@@ -434,7 +439,8 @@ export class CashLinkClient {
     };
   };
 
-  redeemTransaction = async (input: CashLinkInput): Promise<Transaction> => {
+  redeemTransaction = async (input: RedeemCashLinkInput): Promise<Transaction> => {
+    const userReference = new PublicKey(input.userReference);
     const cashLinkReference = new PublicKey(input.cashLinkReference);
     const [cashLinkAddress, cashLinkBump] = await CashProgram.findCashLinkAccount(
       cashLinkReference,
@@ -481,6 +487,8 @@ export class CashLinkClient {
       walletAddress,
     );
     const redeemInstruction = await this.redeemInstruction({
+      redemption,
+      userReference,
       cashLinkBump,
       cashLinkReference,
       redemptionBump: redemptionBump,
@@ -492,7 +500,6 @@ export class CashLinkClient {
       authority: this.authority.publicKey,
       cashLink: cashLink.pubkey,
       feePayer: this.feePayer.publicKey,
-      redemption,
     });
     const transaction = new Transaction();
     transaction.add(redeemInstruction);
@@ -502,6 +509,7 @@ export class CashLinkClient {
   redeemInstruction = async (params: RedeemCashLinkParams): Promise<TransactionInstruction> => {
     const keys = [
       { pubkey: params.authority, isSigner: true, isWritable: false },
+      { pubkey: params.userReference, isSigner: false, isWritable: false },
       { pubkey: params.recipient, isSigner: true, isWritable: true },
       { pubkey: params.feeToken, isSigner: false, isWritable: true },
       { pubkey: params.cashLink, isSigner: false, isWritable: true },

@@ -16,7 +16,7 @@ export const MAX_REDEMPTION_DATA_LEN = 81;
 export type RedemptionDataArgs = {
   accountType: AccountType;
   cashLink: StringPublicKey;
-  wallet: StringPublicKey;
+  user: StringPublicKey;
   redeemedAt: BN;
   amount: BN;
 };
@@ -25,12 +25,14 @@ export class RedemptionData extends Borsh.Data<RedemptionDataArgs> {
   static readonly SCHEMA = RedemptionData.struct([
     ['accountType', 'u8'],
     ['cashLink', 'pubkeyAsString'],
-    ['wallet', 'pubkeyAsString'],
+    ['user', 'pubkeyAsString'],
     ['redeemedAt', 'u64'],
     ['amount', 'u64'],
   ]);
+  accountType: AccountType;
+  cashLink: StringPublicKey;
+  user: StringPublicKey;
   redeemedAt: BN;
-  wallet: StringPublicKey;
   amount: BN;
 
   constructor(args: RedemptionDataArgs) {
@@ -48,8 +50,8 @@ export class Redemption extends Account<RedemptionData> {
     }
   }
 
-  static async getPDA(cashLink: PublicKey, wallet: PublicKey) {
-    const [pubKey] = await CashProgram.findRedemptionAccount(cashLink, wallet);
+  static async getPDA(cashLink: PublicKey, user: PublicKey) {
+    const [pubKey] = await CashProgram.findRedemptionAccount(cashLink, user);
     return pubKey;
   }
 
@@ -57,7 +59,7 @@ export class Redemption extends Account<RedemptionData> {
     connection: Connection,
     filters: {
       cashLink?: AnyPublicKey;
-      wallet?: AnyPublicKey;
+      user?: AnyPublicKey;
     } = {},
   ) {
     const baseFilters = [
@@ -76,10 +78,10 @@ export class Redemption extends Account<RedemptionData> {
         },
       },
       // Filter for assigned to mint
-      filters.wallet && {
+      filters.user && {
         memcmp: {
           offset: 33,
-          bytes: new PublicKey(filters.wallet).toBase58(),
+          bytes: new PublicKey(filters.user).toBase58(),
         },
       },
     ].filter(Boolean);

@@ -16,10 +16,10 @@ export class CashProgram extends Program {
 
   static async findRedemptionAccount(
     cashLink: PublicKey,
-    wallet: PublicKey,
+    user: PublicKey,
   ): Promise<[PublicKey, number]> {
     return PublicKey.findProgramAddress(
-      [Buffer.from(Redemption.PREFIX), cashLink.toBuffer(), wallet.toBuffer()],
+      [Buffer.from(Redemption.PREFIX), cashLink.toBuffer(), user.toBuffer()],
       CashProgram.PUBKEY,
     );
   }
