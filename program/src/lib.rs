@@ -3,6 +3,7 @@ pub mod instruction;
 pub mod processor;
 pub mod state;
 pub mod utils;
+pub mod math;
 
 
 #[cfg(not(feature = "no-entrypoint"))]
@@ -15,11 +16,11 @@ declare_id!("cashQKx31fVsquVKXQ9prKqVtSYf8SqcYt9Jyvg966q");
 
 
 /// Generates cash link program address
-pub fn find_cash_link_program_address(program_id: &Pubkey, reference: &Pubkey) -> (Pubkey, u8) {
+pub fn find_cash_link_program_address(program_id: &Pubkey, reference: String) -> (Pubkey, u8) {
     Pubkey::find_program_address(
         &[
             CashLink::PREFIX.as_bytes(),
-            reference.as_ref()
+            reference.as_bytes()
         ],
         program_id,
     )

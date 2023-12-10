@@ -9,15 +9,21 @@ use solana_program::{
 };
 use spl_associated_token_account::get_associated_token_address;
 
+use crate::state::cashlink::DistributionType;
+
 /// Initialize a cash_link arguments
 #[repr(C)]
 #[derive(BorshSerialize, BorshDeserialize, PartialEq, Debug, Clone)]
 /// Initialize a cash_link params
 pub struct InitCashLinkArgs {
     pub amount: u64,
-    pub fee: u64,
-    pub cash_link_bump: u8,
-    pub pay: bool
+    pub fee_bps: u16,
+    pub fixed_fee: u64,
+    pub fee_to_redeem: u64,
+    pub bump: u8,
+    pub reference: String,
+    pub distribution_type: DistributionType,
+    pub max_num_redemptions: u16,
 }
 
 /// Initialize a redemption arguments
@@ -25,8 +31,19 @@ pub struct InitCashLinkArgs {
 #[derive(BorshSerialize, BorshDeserialize, PartialEq, Debug, Clone)]
 /// Initialize a cash_link params
 pub struct InitCashRedemptionArgs {
+    pub redemption_bump: u8,
+    pub redemption_reference: String,
+    pub cash_link_bump: u8,
+    pub cash_link_reference: String
+}
+
+/// Cancel a cash link
+#[repr(C)]
+#[derive(BorshSerialize, BorshDeserialize, PartialEq, Debug, Clone)]
+/// Cancel a cash_link params
+pub struct CancelCashRedemptionArgs {
     pub bump: u8,
-    pub reference: String
+    pub reference: String,
 }
 
 #[repr(C)]
@@ -64,10 +81,11 @@ pub enum CashInstruction {
     /// 6. `[writable]` The fee payer token account to receive tokens from the vault
     /// 7. `[]` The clock account
     /// 8. `[]` The rent account
-    /// 9. `[writable][Optional]` The vault token account to get tokens. This value is Optional. if the mint is set, then this must be set.
-    /// 10. `[writable][Optional]` The recipient token account for the token they will receive should the trade go through
-    /// 11. `[]` The system program
-    /// 12. `[]` The token program
+    /// 9. `[]` The recent slot hash account
+    /// 10. `[writable][Optional]` The vault token account to get tokens. This value is Optional. if the mint is set, then this must be set.
+    /// 11. `[writable][Optional]` The recipient token account for the token they will receive should the trade go through
+    /// 12. `[]` The system program
+    /// 13. `[]` The token program
     Redeem(InitCashRedemptionArgs),
     /// Cancel the cash_link
     ///
@@ -83,7 +101,7 @@ pub enum CashInstruction {
     /// 6. `[writable]` The vault token account to get tokens from and eventually close. This value is Optional. if the mint is set, then this must be set.
     /// 7. `[]` The token program
     /// 8. `[]` The system program
-    Cancel,
+    Cancel(CancelCashRedemptionArgs),
     /// Close the cash_link
     ///
     ///
@@ -102,25 +120,19 @@ pub fn init_cash_link(
     sender: &Pubkey,
     fee_payer: &Pubkey,
     cash_link: &Pubkey,
-    reference: &Pubkey,
     mint: Option<&Pubkey>,
     args: InitCashLinkArgs,
 ) -> Instruction {
-    let sender_key = if args.pay {
-        if mint.is_some() {
-            AccountMeta::new_readonly(*sender, true)
-        } else {
-            AccountMeta::new(*sender, true)
-        }
+    let sender_key = if mint.is_some() {
+        AccountMeta::new_readonly(*sender, true)
     } else {
-        AccountMeta::new_readonly(*sender, false)
+        AccountMeta::new(*sender, true)
     };
     let mut accounts = vec![
         AccountMeta::new_readonly(*authority, true),
         sender_key,
         AccountMeta::new(*fee_payer, true),
         AccountMeta::new(*cash_link, false),
-        AccountMeta::new_readonly(*reference, false),
         AccountMeta::new_readonly(sysvar::rent::id(), false),
         AccountMeta::new_readonly(system_program::id(), false),
     ];
@@ -148,6 +160,7 @@ pub fn cancel_cash_link(
     sender_token: &Pubkey,
     vault_token: Option<&Pubkey>,
     fee_payer: &Pubkey,
+    args: CancelCashRedemptionArgs,
 ) -> Instruction {
     let mut accounts = vec![
         AccountMeta::new_readonly(*authority, true),
@@ -167,7 +180,7 @@ pub fn cancel_cash_link(
 
     Instruction::new_with_borsh(
         *program_id,
-        &CashInstruction::Cancel,
+        &CashInstruction::Cancel(args),
         accounts,
     )
 }
@@ -196,6 +209,7 @@ pub fn redeem_cash_link(
         AccountMeta::new(*fee_payer, true),
         AccountMeta::new_readonly(sysvar::clock::id(), false),
         AccountMeta::new_readonly(sysvar::rent::id(), false),
+        AccountMeta::new_readonly(sysvar::slot_hashes::id(), false),
     ];
 
     if let Some(key) = vault_token {

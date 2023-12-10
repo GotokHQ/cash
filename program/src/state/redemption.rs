@@ -3,31 +3,28 @@ use solana_program::{
     borsh0_10::try_from_slice_unchecked,
     msg,
     program_error::ProgramError,
-    program_pack::{IsInitialized, Pack, Sealed},
+    program_pack::{Pack, Sealed}, pubkey::Pubkey,
 };
 
-use super::FLAG_ACCOUNT_SIZE;
+pub const REDEMPTION_SIZE: usize = 48;
 
 #[repr(C)]
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Default)]
 pub struct Redemption {
-    pub is_initialized: bool,
+    pub redeemed_at: u64,
+    pub wallet: Pubkey,
+    pub amount: u64
 }
 
 impl Redemption {
     pub const PREFIX: &'static str = "redeem";
 }
 
-impl IsInitialized for Redemption {
-    fn is_initialized(&self) -> bool {
-        self.is_initialized
-    }
-}
 
 impl Sealed for Redemption {}
 
 impl Pack for Redemption {
-    const LEN: usize = FLAG_ACCOUNT_SIZE;
+    const LEN: usize = REDEMPTION_SIZE;
 
     fn pack_into_slice(&self, dst: &mut [u8]) {
         let mut slice = dst;

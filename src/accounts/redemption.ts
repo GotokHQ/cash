@@ -1,16 +1,31 @@
-import { Borsh, AnyPublicKey, ERROR_INVALID_OWNER, Account } from '@metaplex-foundation/mpl-core';
+import {
+  Borsh,
+  AnyPublicKey,
+  ERROR_INVALID_OWNER,
+  Account,
+  StringPublicKey,
+} from '@metaplex-foundation/mpl-core';
 import { AccountInfo, PublicKey } from '@solana/web3.js';
 import { CashProgram } from '../cash_program';
+import BN from 'bn.js';
 
-export const MAX_DEPOSIT_DATA_LEN = 1;
+export const MAX_DEPOSIT_DATA_LEN = 48;
 
 export type RedemptionDataArgs = {
-  isInitialized: boolean;
+  redeemedAt: BN;
+  wallet: StringPublicKey;
+  amount: BN;
 };
 
 export class RedemptionData extends Borsh.Data<RedemptionDataArgs> {
-  static readonly SCHEMA = RedemptionData.struct([['isInitialized', 'u8']]);
-  isInitialized: boolean;
+  static readonly SCHEMA = RedemptionData.struct([
+    ['redeemedAt', 'u64'],
+    ['wallet', 'pubkeyAsString'],
+    ['amount', 'u64'],
+  ]);
+  redeemedAt: BN;
+  wallet: StringPublicKey;
+  amount: BN;
 
   constructor(args: RedemptionDataArgs) {
     super(args);

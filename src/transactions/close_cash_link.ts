@@ -10,5 +10,4 @@ export type CloseCashLinkParams = {
   authority: PublicKey;
   cashLink: PublicKey;
   feePayer: PublicKey;
-  reference: PublicKey;
 };

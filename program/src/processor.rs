@@ -26,13 +26,13 @@ impl Processor {
                 msg!("Instruction: Redeem CashLink");
                 cashlink::process_redemption(accounts, args, program_id)
             }
-            CashInstruction::Cancel => {
+            CashInstruction::Cancel(args) => {
                 msg!("Instruction: Cancel CashLink");
-                cashlink::process_cancel(accounts, program_id)
+                cashlink::process_cancel(accounts,  program_id, args,)
             }
             CashInstruction::Close => {
                 msg!("Instruction: Close");
-                cashlink::process_close(accounts, program_id)
+                cashlink::process_close(accounts,  program_id)
             }
         }
     }

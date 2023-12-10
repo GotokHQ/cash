@@ -2,8 +2,9 @@
 
 use std::convert::TryInto;
 
-use crate::error::CashError;
+use crate::{error::CashError, state::cashlink::CashLink};
 
+use borsh::BorshSerialize;
 use solana_program::{
     account_info::AccountInfo,
     entrypoint::ProgramResult,
@@ -15,9 +16,13 @@ use solana_program::{
     pubkey::{Pubkey, PUBKEY_BYTES},
     system_instruction,
     sysvar::{rent::Rent, Sysvar},
+    clock::Clock,
 };
 use spl_token::state::Account;
 use spl_associated_token_account::instruction::create_associated_token_account;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::Hasher;
+
 /// Assert uninitialized
 pub fn assert_uninitialized<T: IsInitialized>(account: &T) -> ProgramResult {
     if account.is_initialized() {
@@ -207,15 +212,15 @@ pub fn spl_token_init<'a>(
 pub fn calculate_fee(amount: u64, fee_basis_points: u64) -> Result<u64, ProgramError> {
     Ok(amount
         .checked_mul(fee_basis_points)
-        .ok_or::<ProgramError>(CashError::MathOverflow.into())?
+        .ok_or::<ProgramError>(CashError::Overflow.into())?
         .checked_div(10000)
-        .ok_or::<ProgramError>(CashError::MathOverflow.into())?)
+        .ok_or::<ProgramError>(CashError::Overflow.into())?)
 }
 
 pub fn calculate_amount_with_fee(amount: u64, fee_basis_points: u64) -> Result<u64, ProgramError> {
     Ok(amount
         .checked_add(calculate_fee(amount, fee_basis_points)?)
-        .ok_or::<ProgramError>(CashError::MathOverflow.into())?)
+        .ok_or::<ProgramError>(CashError::Overflow.into())?)
 }
 
 pub fn create_new_account_raw<'a>(
@@ -287,4 +292,28 @@ pub fn cmp_pubkeys(a: &Pubkey, b: &Pubkey) -> bool {
 
 pub fn exists(account: &AccountInfo) -> Result<bool, ProgramError> {
     Ok(account.try_lamports()? > 0)
+}
+
+/// get random value
+pub fn get_random_value(
+    recent_slothash: &[u8],
+    cash_link: &CashLink,
+    clock: &Clock,
+) -> Result<u16, ProgramError> {
+    // Hash slot, current timestamp and value from last slothash and proving process data and receive new random u16
+    let mut hasher = DefaultHasher::new();
+
+    // recent slothash
+    hasher.write(recent_slothash);
+    // slot
+    hasher.write_u64(clock.slot);
+    // timestamp
+    hasher.write_i64(clock.unix_timestamp);
+    // ProvingProcess(to make hash different for each instruction in the same slot)
+    hasher.write(cash_link.try_to_vec()?.as_ref());
+
+    let mut random_value: [u8; 2] = [0u8; 2];
+    random_value.copy_from_slice(&hasher.finish().to_le_bytes()[..2]);
+
+    Ok(u16::from_le_bytes(random_value))
 }

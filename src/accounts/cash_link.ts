@@ -5,30 +5,39 @@ import {
   Account,
   StringPublicKey,
 } from '@metaplex-foundation/mpl-core';
-import { AccountInfo, PublicKey } from '@solana/web3.js';
+import { AccountInfo } from '@solana/web3.js';
 import BN from 'bn.js';
 import { CashProgram } from '../cash_program';
 
-export const MAX_DATA_LEN = 165;
+export const MAX_DATA_LEN = 153;
 
 export enum CashLinkState {
   Uninitialized = 0,
   Initialized = 1,
   Redeemed = 2,
-  Canceled = 3,
+  Redeeming = 3,
+  Canceled = 4,
+}
+
+export enum CashLinkDistributionType {
+  Fixed = 0,
+  Random = 1,
 }
 
 export type CashLinkDataArgs = {
   state: CashLinkState;
   amount: BN;
   fee: BN;
+  remainingAmount: BN;
+  remainingFee: BN;
+  distributionType: CashLinkDistributionType;
   sender: number;
-  reference: StringPublicKey;
-  redeemedAt?: BN;
+  lastRedeemedAt?: BN;
   canceledAt?: BN;
-  cashLinkBump: number;
   mint?: StringPublicKey;
   authority: StringPublicKey;
+  totalRedemptions: BN;
+  maxNumRedemptions: BN;
 };
 
 export class CashLinkData extends Borsh.Data<CashLinkDataArgs> {
@@ -36,24 +45,30 @@ export class CashLinkData extends Borsh.Data<CashLinkDataArgs> {
     ['state', 'u8'],
     ['amount', 'u64'],
     ['fee', 'u64'],
+    ['remainingAmount', 'u64'],
+    ['remainingFee', 'u64'],
+    ['distributionType', 'u8'],
     ['sender', 'pubkeyAsString'],
-    ['reference', 'pubkeyAsString'],
-    ['redeemedAt', { kind: 'option', type: 'u64' }],
+    ['lastRedeemedAt', { kind: 'option', type: 'u64' }],
     ['canceledAt', { kind: 'option', type: 'u64' }],
-    ['cashLinkBump', 'u8'],
     ['mint', { kind: 'option', type: 'pubkeyAsString' }],
     ['authority', 'pubkeyAsString'],
+    ['totalRedemptions', 'u16'],
+    ['maxNumRedemptions', 'u16'],
   ]);
   state: CashLinkState;
   amount: BN;
   fee: BN;
+  remainingAmount: BN;
+  remainingFee: BN;
+  distributionType: CashLinkDistributionType;
   sender: StringPublicKey;
-  reference: StringPublicKey;
-  redeemedAt: BN | null;
+  lastRedeemedAt: BN | null;
   canceledAt: BN | null;
-  cashLinkBump: number;
   mint?: StringPublicKey;
   authority: StringPublicKey;
+  totalRedemptions: BN;
+  maxNumRedemptions: BN;
 
   constructor(args: CashLinkDataArgs) {
     super(args);
@@ -70,7 +85,7 @@ export class CashLink extends Account<CashLinkData> {
     }
   }
 
-  static async getPDA(reference: PublicKey) {
+  static async getPDA(reference: string) {
     const [pubKey] = await CashProgram.findCashLinkAccount(reference);
     return pubKey;
   }
