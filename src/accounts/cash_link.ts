@@ -5,13 +5,13 @@ import {
   Account,
   StringPublicKey,
 } from '@metaplex-foundation/mpl-core';
-import { AccountInfo, Connection, PublicKey } from '@solana/web3.js';
+import { AccountInfo, Commitment, Connection, PublicKey } from '@solana/web3.js';
 import BN from 'bn.js';
 import bs58 from 'bs58';
 import { CashProgram } from '../cash_program';
 import { AccountType } from './account';
 
-export const MAX_CASH_LINK_DATA_LEN = 123;
+export const MAX_CASH_LINK_DATA_LEN = 156;
 
 export enum CashLinkState {
   Uninitialized = 0,
@@ -54,7 +54,6 @@ export class CashLinkData extends Borsh.Data<CashLinkDataArgs> {
     ['fixedFee', 'u64'],
     ['feeToRedeem', 'u64'],
     ['remainingAmount', 'u64'],
-    ['remainingFee', 'u64'],
     ['distributionType', 'u8'],
     ['sender', 'pubkeyAsString'],
     ['lastRedeemedAt', { kind: 'option', type: 'u64' }],
@@ -107,6 +106,7 @@ export class CashLink extends Account<CashLinkData> {
       authority?: AnyPublicKey;
       state?: CashLinkState;
     } = {},
+    commitment?: Commitment,
   ) {
     const baseFilters = [
       // Filter for CashLink by account type
@@ -132,8 +132,8 @@ export class CashLink extends Account<CashLinkData> {
       },
     ].filter(Boolean);
 
-    return (await CashProgram.getProgramAccounts(connection, { filters: baseFilters })).map(
-      (account) => CashLink.from(account),
-    );
+    return (
+      await CashProgram.getProgramAccounts(connection, { filters: baseFilters, commitment })
+    ).map((account) => CashLink.from(account));
   }
 }
