@@ -6,7 +6,7 @@ import {
   StringPublicKey,
 } from '@metaplex-foundation/mpl-core';
 import bs58 from 'bs58';
-import { AccountInfo, Connection, PublicKey } from '@solana/web3.js';
+import { AccountInfo, Commitment, Connection, PublicKey } from '@solana/web3.js';
 import { CashProgram } from '../cash_program';
 import { AccountType } from './account';
 import BN from 'bn.js';
@@ -61,6 +61,7 @@ export class Redemption extends Account<RedemptionData> {
       cashLink?: AnyPublicKey;
       user?: AnyPublicKey;
     } = {},
+    commitment?: Commitment,
   ) {
     const baseFilters = [
       // Filter for Redemption by account type
@@ -86,8 +87,11 @@ export class Redemption extends Account<RedemptionData> {
       },
     ].filter(Boolean);
 
-    return (await CashProgram.getProgramAccounts(connection, { filters: baseFilters })).map(
-      (account) => Redemption.from(account),
-    );
+    return (
+      await CashProgram.getProgramAccounts(connection, {
+        filters: baseFilters,
+        commitment: commitment,
+      })
+    ).map((account) => Redemption.from(account));
   }
 }

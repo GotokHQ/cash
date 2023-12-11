@@ -484,7 +484,7 @@ export class CashLinkClient {
     }
     const [redemption, redemptionBump] = await CashProgram.findRedemptionAccount(
       cashLinkAddress,
-      walletAddress,
+      userReference,
     );
     const redeemInstruction = await this.redeemInstruction({
       redemption,
