@@ -636,7 +636,7 @@ const _getCashLinkAccount = async (
 ): Promise<CashLink | null> => {
   try {
     const accountInfo = await connection.getAccountInfo(cashLinkAddress, commitment);
-    if (accountInfo == null) {
+    if (accountInfo === null) {
       return null;
     }
     const cashLink = CashLink.from(new Account(cashLinkAddress, accountInfo));
@@ -653,7 +653,7 @@ const _getCashLinkRedemptionAccount = async (
 ): Promise<Redemption | null> => {
   try {
     const accountInfo = await connection.getAccountInfo(cashLinkAddress, commitment);
-    if (accountInfo == null) {
+    if (accountInfo === null) {
       return null;
     }
     return Redemption.from(new Account(cashLinkAddress, accountInfo));
