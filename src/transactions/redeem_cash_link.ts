@@ -2,15 +2,15 @@ import { Borsh } from '@metaplex-foundation/mpl-core';
 import { PublicKey } from '@solana/web3.js';
 
 export type RedeemArgs = {
-  bump: number;
-  reference: string;
+  redemptionBump: number;
+  cashLinkBump: number;
 };
 
 export class RedeemCashLinkArgs extends Borsh.Data<RedeemArgs> {
   static readonly SCHEMA = RedeemCashLinkArgs.struct([
     ['instruction', 'u8'],
-    ['bump', 'u8'],
-    ['reference', 'string'],
+    ['redemptionBump', 'u8'],
+    ['cashLinkBump', 'u8'],
   ]);
 
   instruction = 1;
@@ -25,7 +25,9 @@ export type RedeemCashLinkParams = {
   senderToken: PublicKey;
   feeToken: PublicKey;
   feePayer: PublicKey;
-  reference: string;
+  redemptionBump: number;
   redemption: PublicKey;
-  bump: number;
+  cashLinkBump: number;
+  cashLinkReference: PublicKey;
+  userReference: PublicKey;
 };

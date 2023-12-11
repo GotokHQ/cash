@@ -1,12 +1,15 @@
 import { Commitment } from '@solana/web3.js';
+import { CashLinkDistributionType } from 'src/accounts';
 export interface InitializeCashLinkInput {
   wallet: string;
   mint?: string;
-  reference: string;
+  cashLinkReference: string;
   amount: string;
-  fee?: string;
-  memo?: string;
-  pay?: boolean;
+  feeBps?: number;
+  fixedFee?: string;
+  feeToRedeem?: string;
+  distributionType: CashLinkDistributionType;
+  maxNumRedemptions: number;
   commitment?: Commitment;
 }
 
@@ -17,11 +20,13 @@ export interface ResultContext {
 
 export interface CashLinkInput {
   walletAddress: string;
-  cashLinkAddress: string;
-  reference: string;
+  cashLinkReference: string;
   commitment?: Commitment;
 }
 
+export interface RedeemCashLinkInput extends CashLinkInput {
+  userReference: string;
+}
 export interface SettleAndTransferInput {
   walletAddress: string;
   transferTokenMintAddress: string;

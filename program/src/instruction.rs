@@ -9,15 +9,20 @@ use solana_program::{
 };
 use spl_associated_token_account::get_associated_token_address;
 
+use crate::state::cashlink::DistributionType;
+
 /// Initialize a cash_link arguments
 #[repr(C)]
 #[derive(BorshSerialize, BorshDeserialize, PartialEq, Debug, Clone)]
 /// Initialize a cash_link params
 pub struct InitCashLinkArgs {
     pub amount: u64,
-    pub fee: u64,
+    pub fee_bps: u16,
+    pub fixed_fee: u64,
+    pub fee_to_redeem: u64,
     pub cash_link_bump: u8,
-    pub pay: bool
+    pub distribution_type: DistributionType,
+    pub max_num_redemptions: u16,
 }
 
 /// Initialize a redemption arguments
@@ -25,8 +30,16 @@ pub struct InitCashLinkArgs {
 #[derive(BorshSerialize, BorshDeserialize, PartialEq, Debug, Clone)]
 /// Initialize a cash_link params
 pub struct InitCashRedemptionArgs {
-    pub bump: u8,
-    pub reference: String
+    pub redemption_bump: u8,
+    pub cash_link_bump: u8,
+}
+
+/// Cancel a cash link
+#[repr(C)]
+#[derive(BorshSerialize, BorshDeserialize, PartialEq, Debug, Clone)]
+/// Cancel a cash_link params
+pub struct CancelCashRedemptionArgs {
+    pub cash_link_bump: u8,
 }
 
 #[repr(C)]
@@ -42,7 +55,7 @@ pub enum CashInstruction {
     /// 1. `[signer][writable]`The account of the wallet owner initializing the cashlink
     /// 2. `[signer]`   The fee payer
     /// 3. `[writable]` The cash link account, it will hold all necessary info about the trade.
-    /// 4. `[]` The reference
+    /// 4. `[]` The cash_link reference key used for deriving the cash_link account pda
     /// 5. `[]` The rent sysvar
     /// 6. `[]` The system program
     /// 7. `[]` The token mint (Optional)
@@ -56,18 +69,21 @@ pub enum CashInstruction {
     /// Accounts expected:
     ///
     /// 0. `[signer]` The account of the authority
-    /// 1. `[signer]` The account of the recipient
-    /// 2. `[writable]` The fee token account for the token they will receive should the trade go through
-    /// 3. `[writable]` The cash_link account holding the cash_link info
-    /// 4. `[writable]` The redemption account to flag a user has redeemed this cashlink
-    /// 5. `[writable]` The payer token account of the payer that initialized the cash_link  
-    /// 6. `[writable]` The fee payer token account to receive tokens from the vault
-    /// 7. `[]` The clock account
-    /// 8. `[]` The rent account
-    /// 9. `[writable][Optional]` The vault token account to get tokens. This value is Optional. if the mint is set, then this must be set.
-    /// 10. `[writable][Optional]` The recipient token account for the token they will receive should the trade go through
-    /// 11. `[]` The system program
-    /// 12. `[]` The token program
+    /// 1. `[]` The user account used mainly as a reference
+    /// 2. `[signer]` The user wallet
+    /// 3. `[writable]` The fee token account for the token they will receive should the trade go through
+    /// 4. `[writable]` The cash_link account holding the cash_link info
+    /// 5. `[]` The cash_link reference key used for deriving the cash_link account pda
+    /// 6. `[writable]` The redemption account to flag a user has redeemed this cashlink
+    /// 7. `[writable]` The payer token account of the payer that initialized the cash_link  
+    /// 8. `[writable]` The fee payer token account to receive tokens from the vault
+    /// 9. `[]` The clock account
+    /// 10. `[]` The rent account
+    /// 11. `[]` The recent slot hash account
+    /// 12. `[writable][Optional]` The vault token account to get tokens. This value is Optional. if the mint is set, then this must be set.
+    /// 13. `[writable][Optional]` The recipient token account for the token they will receive should the trade go through
+    /// 14. `[]` The system program
+    /// 15. `[]` The token program
     Redeem(InitCashRedemptionArgs),
     /// Cancel the cash_link
     ///
@@ -76,14 +92,15 @@ pub enum CashInstruction {
     ///
     /// 0. `[signer]` The account of the authority
     /// 1. `[writable]` The cash_link account holding the cash_link info   
-    /// 2. `[writable]` The payer token account of the payer that initialized the cash_link  
-    /// 3. `[writable]` The fee payer token account to receive tokens from the vault
-    /// 4. `[]` The clock account
-    /// 5. `[]` The rent account
-    /// 6. `[writable]` The vault token account to get tokens from and eventually close. This value is Optional. if the mint is set, then this must be set.
-    /// 7. `[]` The token program
-    /// 8. `[]` The system program
-    Cancel,
+    /// 2  `[]`         The cash_link reference key used for deriving the cash_link account pda
+    /// 3. `[writable]` The payer token account of the payer that initialized the cash_link  
+    /// 4. `[writable]` The fee payer token account to receive tokens from the vault
+    /// 5. `[]` The clock account
+    /// 6. `[]` The rent account
+    /// 7. `[writable]` The vault token account to get tokens from and eventually close. This value is Optional. if the mint is set, then this must be set.
+    /// 8. `[]` The token program
+    /// 9. `[]` The system program
+    Cancel(CancelCashRedemptionArgs),
     /// Close the cash_link
     ///
     ///
@@ -101,31 +118,27 @@ pub fn init_cash_link(
     authority: &Pubkey,
     sender: &Pubkey,
     fee_payer: &Pubkey,
-    cash_link: &Pubkey,
-    reference: &Pubkey,
+    cash_link_pda: &Pubkey,
+    cash_link_reference: &Pubkey,
     mint: Option<&Pubkey>,
     args: InitCashLinkArgs,
 ) -> Instruction {
-    let sender_key = if args.pay {
-        if mint.is_some() {
-            AccountMeta::new_readonly(*sender, true)
-        } else {
-            AccountMeta::new(*sender, true)
-        }
+    let sender_key = if mint.is_some() {
+        AccountMeta::new_readonly(*sender, true)
     } else {
-        AccountMeta::new_readonly(*sender, false)
+        AccountMeta::new(*sender, true)
     };
     let mut accounts = vec![
         AccountMeta::new_readonly(*authority, true),
         sender_key,
         AccountMeta::new(*fee_payer, true),
-        AccountMeta::new(*cash_link, false),
-        AccountMeta::new_readonly(*reference, false),
+        AccountMeta::new(*cash_link_pda, false),
+        AccountMeta::new_readonly(*cash_link_reference, false),
         AccountMeta::new_readonly(sysvar::rent::id(), false),
         AccountMeta::new_readonly(system_program::id(), false),
     ];
     if let Some(key) = mint {
-        let associated_token_account = get_associated_token_address(cash_link, &key);
+        let associated_token_account = get_associated_token_address(cash_link_pda, &key);
         accounts.push(AccountMeta::new_readonly(*key, false));
         accounts.push(AccountMeta::new(associated_token_account, false));
         let sender_token_account = get_associated_token_address(sender, &key);
@@ -145,13 +158,16 @@ pub fn cancel_cash_link(
     program_id: &Pubkey,
     authority: &Pubkey,
     cash_link: &Pubkey,
+    cash_link_reference: &Pubkey,
     sender_token: &Pubkey,
     vault_token: Option<&Pubkey>,
     fee_payer: &Pubkey,
+    args: CancelCashRedemptionArgs,
 ) -> Instruction {
     let mut accounts = vec![
         AccountMeta::new_readonly(*authority, true),
         AccountMeta::new(*cash_link, false),
+        AccountMeta::new_readonly(*cash_link_reference, false),
         AccountMeta::new(*sender_token, false),
         AccountMeta::new(*fee_payer, false),
         AccountMeta::new_readonly(sysvar::clock::id(), false),
@@ -167,7 +183,7 @@ pub fn cancel_cash_link(
 
     Instruction::new_with_borsh(
         *program_id,
-        &CashInstruction::Cancel,
+        &CashInstruction::Cancel(args),
         accounts,
     )
 }
@@ -176,11 +192,13 @@ pub fn cancel_cash_link(
 pub fn redeem_cash_link(
     program_id: &Pubkey,
     authority: &Pubkey,
+    recipient: &Pubkey,
     recipient_wallet: &Pubkey,
     recipient_token: &Pubkey,
     collection_fee_token: &Pubkey,
     vault_token: Option<&Pubkey>,
     cash_link: &Pubkey,
+    cash_link_reference: &Pubkey,
     redemption_pda: &Pubkey,
     sender_token: &Pubkey,
     fee_payer: &Pubkey,
@@ -188,14 +206,17 @@ pub fn redeem_cash_link(
 ) -> Instruction {
     let mut accounts = vec![
         AccountMeta::new_readonly(*authority, true),
+        AccountMeta::new_readonly(*recipient, false),
         AccountMeta::new_readonly(*recipient_wallet, true),
         AccountMeta::new(*collection_fee_token, false),
         AccountMeta::new(*cash_link, false),
+        AccountMeta::new_readonly(*cash_link_reference, false),
         AccountMeta::new(*redemption_pda, false),
         AccountMeta::new(*sender_token, false),
         AccountMeta::new(*fee_payer, true),
         AccountMeta::new_readonly(sysvar::clock::id(), false),
         AccountMeta::new_readonly(sysvar::rent::id(), false),
+        AccountMeta::new_readonly(sysvar::slot_hashes::id(), false),
     ];
 
     if let Some(key) = vault_token {

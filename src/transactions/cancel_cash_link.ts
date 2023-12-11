@@ -1,10 +1,17 @@
 import { Borsh } from '@metaplex-foundation/mpl-core';
 import { PublicKey } from '@solana/web3.js';
 
-export class CancelCashLinkArgs extends Borsh.Data {
-  static readonly SCHEMA = CancelCashLinkArgs.struct([['instruction', 'u8']]);
+export type InitCancelArgs = {
+  cashLinkBump: number;
+};
 
+export class CancelCashLinkArgs extends Borsh.Data<InitCancelArgs> {
+  static readonly SCHEMA = CancelCashLinkArgs.struct([
+    ['instruction', 'u8'],
+    ['cashLinkBump', 'u8'],
+  ]);
   instruction = 2;
+  cashLinkBump: number;
 }
 
 export type CancelCashLinkParams = {
@@ -13,5 +20,6 @@ export type CancelCashLinkParams = {
   senderToken: PublicKey;
   vaultToken?: PublicKey | null;
   feePayer: PublicKey;
-  reference: PublicKey;
+  cashLinkReference: PublicKey;
+  cashLinkBump: number;
 };

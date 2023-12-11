@@ -33,8 +33,6 @@ pub enum CashError {
     AccountNotCanceled,
     #[error("Account not initialized")]
     AccountNotInitialized,
-    #[error("Math overflow")]
-    MathOverflow,
     #[error("Invalid deposit key")]
     InvalidDepositKey,
     #[error("Invalid withdraw key")]
@@ -65,6 +63,24 @@ pub enum CashError {
     InsufficientSettlementFunds,
     #[error("Invalid reference")]
     InvalidReference,
+    /// Overflow
+    #[error("Overflow")]
+    Overflow,
+    /// Underflow
+    #[error("Underflow")]
+    Underflow,
+
+    #[error("MaxRedemptionsReached")]
+    MaxRedemptionsReached,
+
+    #[error("NoRemainingAmount")]
+    NoRemainingAmount,
+    #[error("InvalidSlotHashProgram")]
+    InvalidSlotHashProgram,
+    #[error("InvalidAmount")]
+    InvalidAmount,
+    #[error("InvalidNumberOfRedemptions")]
+    InvalidNumberOfRedemptions
 }
 
 impl From<CashError> for ProgramError {
