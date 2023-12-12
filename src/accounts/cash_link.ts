@@ -28,6 +28,7 @@ export enum CashLinkDistributionType {
 
 export type CashLinkDataArgs = {
   accountType: AccountType;
+  authority: StringPublicKey;
   state: CashLinkState;
   amount: BN;
   feeBps: number;
@@ -40,7 +41,6 @@ export type CashLinkDataArgs = {
   lastRedeemedAt?: BN;
   canceledAt?: BN;
   mint?: StringPublicKey;
-  authority: StringPublicKey;
   totalRedemptions: BN;
   maxNumRedemptions: BN;
 };
@@ -48,6 +48,7 @@ export type CashLinkDataArgs = {
 export class CashLinkData extends Borsh.Data<CashLinkDataArgs> {
   static readonly SCHEMA = CashLinkData.struct([
     ['accountType', 'u8'],
+    ['authority', 'pubkeyAsString'],
     ['state', 'u8'],
     ['amount', 'u64'],
     ['feeBps', 'u16'],
@@ -59,11 +60,11 @@ export class CashLinkData extends Borsh.Data<CashLinkDataArgs> {
     ['lastRedeemedAt', { kind: 'option', type: 'u64' }],
     ['canceledAt', { kind: 'option', type: 'u64' }],
     ['mint', { kind: 'option', type: 'pubkeyAsString' }],
-    ['authority', 'pubkeyAsString'],
     ['totalRedemptions', 'u16'],
     ['maxNumRedemptions', 'u16'],
   ]);
   accountType: AccountType;
+  authority: StringPublicKey;
   state: CashLinkState;
   amount: BN;
   feeBps: number;
@@ -76,7 +77,6 @@ export class CashLinkData extends Borsh.Data<CashLinkDataArgs> {
   lastRedeemedAt: BN | null;
   canceledAt: BN | null;
   mint?: StringPublicKey;
-  authority: StringPublicKey;
   totalRedemptions: BN;
   maxNumRedemptions: BN;
 
