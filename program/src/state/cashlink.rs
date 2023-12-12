@@ -36,6 +36,7 @@ pub enum DistributionType {
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Default)]
 pub struct CashLink {
     pub account_type: AccountType,
+    pub authority: Pubkey,
     pub state: CashLinkState,
     pub amount: u64,
     pub fee_bps: u16,
@@ -47,7 +48,6 @@ pub struct CashLink {
     pub last_redeemed_at: Option<u64>,
     pub canceled_at: Option<u64>,
     pub mint: Option<Pubkey>,
-    pub authority: Pubkey,
     pub total_redemptions: u16,
     pub max_num_redemptions: u16,
 }
