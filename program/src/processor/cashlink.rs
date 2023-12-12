@@ -114,7 +114,11 @@ pub fn process_init_cash_link(
     cash_link.sender = *sender_info.key;
     cash_link.distribution_type = args.distribution_type;
     cash_link.max_num_redemptions = args.max_num_redemptions;
-
+    if cash_link.distribution_type == DistributionType::Fixed {
+        msg!("Got Fixed Distribution");
+    } else {
+        msg!("Got Random Distribution");
+    }
     match mint_info {
         Some(info) => {
             cash_link.mint = Some(*info.key);
@@ -376,18 +380,14 @@ pub fn process_redemption(
             let most_recent_slothash = array_ref![data, 8, 8];
             let rand = get_random_value(most_recent_slothash, &cash_link, clock)?;
 
-            if cash_link.total_redemptions == cash_link.max_num_redemptions - 1 {
-                // Last redemption gets the remaining amount
-                cash_link.remaining_amount
-            } else {
-                // Calculate a random amount for this redemption
-                // let max_possible = cash_link.remaining_amount
-                //     / (cash_link.max_num_redemptions as u64 - cash_link.total_redemptions as u64);
-                // ((rand as u64) % max_possible) + 1
-                // Ensure that the random amount is at least 1 and at most the remaining amount
-                let max_possible = cash_link.remaining_amount;
-                (rand as u64 % max_possible) + 1
-            }
+
+            // Calculate a random amount for this redemption
+            // let max_possible = cash_link.remaining_amount
+            //     / (cash_link.max_num_redemptions as u64 - cash_link.total_redemptions as u64);
+            // ((rand as u64) % max_possible) + 1
+            // Ensure that the random amount is at least 1 and at most the remaining amount
+            let max_possible = cash_link.remaining_amount;
+            (rand as u64 % max_possible) + 1
         }
     };
 
