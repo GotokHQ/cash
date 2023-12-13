@@ -488,24 +488,29 @@ pub fn process_redemption(
     } else {
         let rent = &Rent::from_account_info(rent_info)?;
         let min_lamports = rent.minimum_balance(CashLink::LEN);
-        let source_starting_lamports = cash_link_info.lamports();
+        let mut source_starting_lamports = cash_link_info.lamports();
         let available_amount = source_starting_lamports
             .checked_sub(min_lamports)
             .ok_or(AmountOverflow)?;
         if available_amount < total {
             return Err(InsufficientSettlementFunds.into());
         }
-        **cash_link_info.lamports.borrow_mut() = min_lamports;
         if amount_to_redeem > 0 {
             let dest_starting_lamports = wallet_info.lamports();
             **wallet_info.lamports.borrow_mut() = dest_starting_lamports
                 .checked_add(amount_to_redeem)
+                .ok_or(AmountOverflow)?;
+            source_starting_lamports = source_starting_lamports
+                .checked_sub(amount_to_redeem)
                 .ok_or(AmountOverflow)?;
         }
         if total_fee_to_redeem > 0 {
             let dest_starting_lamports = fee_token_info.lamports();
             **fee_token_info.lamports.borrow_mut() = dest_starting_lamports
                 .checked_add(total_fee_to_redeem)
+                .ok_or(AmountOverflow)?;
+            source_starting_lamports = source_starting_lamports
+                .checked_sub(total_fee_to_redeem)
                 .ok_or(AmountOverflow)?;
         }
         let remaining = available_amount.checked_sub(total).ok_or(AmountOverflow)?;
@@ -514,7 +519,11 @@ pub fn process_redemption(
             **sender_token_info.lamports.borrow_mut() = dest_starting_lamports
                 .checked_add(remaining)
                 .ok_or(AmountOverflow)?;
+            source_starting_lamports = source_starting_lamports
+                .checked_sub(remaining)
+                .ok_or(AmountOverflow)?;
         }
+        **cash_link_info.lamports.borrow_mut() = source_starting_lamports;
     }
     let system_account_info = next_account_info(account_info_iter)?;
     create_new_account_raw(
