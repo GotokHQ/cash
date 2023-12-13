@@ -7,7 +7,8 @@ use crate::{
     math::SafeMath,
     state::{
         cashlink::{CashLink, CashLinkState, DistributionType},
-        redemption::{Redemption, REDEMPTION_SIZE}, AccountType,
+        redemption::{Redemption, REDEMPTION_SIZE},
+        AccountType,
     },
     utils::{
         assert_account_key, assert_initialized, assert_owned_by, assert_signer,
@@ -104,7 +105,7 @@ pub fn process_init_cash_link(
         .ok_or::<ProgramError>(CashError::Overflow.into())?;
     cash_link.account_type = AccountType::CashLink;
     cash_link.state = CashLinkState::Initialized;
-    cash_link.amount = args.amount;
+    cash_link.amount = total_amount;
     cash_link.fee_bps = args.fee_bps;
     cash_link.fixed_fee = args.fixed_fee;
     cash_link.fee_to_redeem = args.fee_to_redeem;
@@ -373,13 +374,15 @@ pub fn process_redemption(
     }
 
     let amount_to_redeem = match cash_link.distribution_type {
-        DistributionType::Fixed => cash_link.amount,
+        DistributionType::Fixed => cash_link
+            .amount
+            .checked_div(cash_link.max_num_redemptions as u64)
+            .ok_or(CashError::Overflow)?,
         DistributionType::Random => {
             // get slot hash
             let data = recent_slothashes_info.data.borrow();
             let most_recent_slothash = array_ref![data, 8, 8];
             let rand = get_random_value(most_recent_slothash, &cash_link, clock)?;
-
 
             // Calculate a random amount for this redemption
             // let max_possible = cash_link.remaining_amount
@@ -463,23 +466,25 @@ pub fn process_redemption(
             .amount
             .checked_sub(total)
             .ok_or::<ProgramError>(CashError::Overflow.into())?;
-        if cash_link.is_fully_redeemed() && remaining > 0 {
+        if cash_link.is_fully_redeemed() {
             let sender_token: TokenAccount = assert_initialized(sender_token_info)?;
             assert_token_owned_by(&sender_token, &cash_link.sender)?;
-            spl_token_transfer(
+            if remaining > 0 {
+                spl_token_transfer(
+                    vault_token_info,
+                    sender_token_info,
+                    cash_link_info,
+                    remaining,
+                    &[&signer_seeds],
+                )?;
+            }
+            spl_token_close(
                 vault_token_info,
-                sender_token_info,
+                fee_payer_info,
                 cash_link_info,
-                remaining,
                 &[&signer_seeds],
             )?;
         }
-        spl_token_close(
-            vault_token_info,
-            fee_payer_info,
-            cash_link_info,
-            &[&signer_seeds],
-        )?;
     } else {
         let rent = &Rent::from_account_info(rent_info)?;
         let min_lamports = rent.minimum_balance(CashLink::LEN);
