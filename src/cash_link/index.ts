@@ -102,7 +102,7 @@ export class CashLinkClient {
       transaction.add(closeInstruction);
     }
     const { context, value } = await this.connection.getLatestBlockhashAndContext(
-      input.commitment ?? 'confirmed',
+      input.commitment ?? 'finalized',
     );
     transaction.recentBlockhash = value.blockhash;
     transaction.lastValidBlockHeight = value.lastValidBlockHeight;
