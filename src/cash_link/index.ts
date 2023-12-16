@@ -72,9 +72,7 @@ export class CashLinkClient {
       throw new Error(FAILED_TO_FIND_ACCOUNT);
     }
     const transaction = await this.cancelTransaction(cashLink, bump, input);
-    const { context, value } = await this.connection.getLatestBlockhashAndContext(
-      input.commitment ?? 'confirmed',
-    );
+    const { context, value } = await this.connection.getLatestBlockhashAndContext(input.commitment);
     transaction.recentBlockhash = value.blockhash;
     transaction.lastValidBlockHeight = value.lastValidBlockHeight;
     transaction.feePayer = this.feePayer.publicKey;
@@ -101,9 +99,7 @@ export class CashLinkClient {
       });
       transaction.add(closeInstruction);
     }
-    const { context, value } = await this.connection.getLatestBlockhashAndContext(
-      input.commitment ?? 'finalized',
-    );
+    const { context, value } = await this.connection.getLatestBlockhashAndContext(input.commitment);
     transaction.recentBlockhash = value.blockhash;
     transaction.lastValidBlockHeight = value.lastValidBlockHeight;
     transaction.feePayer = this.feePayer.publicKey;
@@ -215,9 +211,7 @@ export class CashLinkClient {
       feePayer: this.feePayer.publicKey,
     });
     const transaction = new Transaction().add(closeInstruction);
-    const { context, value } = await this.connection.getLatestBlockhashAndContext(
-      input.commitment ?? 'confirmed',
-    );
+    const { context, value } = await this.connection.getLatestBlockhashAndContext(input.commitment);
     transaction.recentBlockhash = value.blockhash;
     transaction.feePayer = this.feePayer.publicKey;
     transaction.sign(this.feePayer, this.authority);
@@ -250,9 +244,7 @@ export class CashLinkClient {
 
   initialize = async (input: InitializeCashLinkInput): Promise<ResultContext> => {
     const transaction = await this.initializeTransaction(input);
-    const { context, value } = await this.connection.getLatestBlockhashAndContext(
-      input.commitment ?? 'confirmed',
-    );
+    const { context, value } = await this.connection.getLatestBlockhashAndContext(input.commitment);
     transaction.recentBlockhash = value.blockhash;
     transaction.lastValidBlockHeight = value.lastValidBlockHeight;
     transaction.feePayer = this.feePayer.publicKey;
@@ -422,9 +414,7 @@ export class CashLinkClient {
 
   redeem = async (input: RedeemCashLinkInput): Promise<ResultContext> => {
     const transaction = await this.redeemTransaction(input);
-    const { context, value } = await this.connection.getLatestBlockhashAndContext(
-      input.commitment ?? 'confirmed',
-    );
+    const { context, value } = await this.connection.getLatestBlockhashAndContext(input.commitment);
     transaction.recentBlockhash = value.blockhash;
     transaction.lastValidBlockHeight = value.lastValidBlockHeight;
     transaction.feePayer = this.feePayer.publicKey;
