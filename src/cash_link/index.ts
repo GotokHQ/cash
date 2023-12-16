@@ -93,7 +93,7 @@ export class CashLinkClient {
       throw new Error(FAILED_TO_FIND_ACCOUNT);
     }
     const transaction = await this.cancelTransaction(cashLink, bump, input);
-    if (cashLink.data.totalRedemptions.eq(new BN(0))) {
+    if (cashLink.data.totalRedemptions === 0) {
       const closeInstruction = this.closeInstruction({
         cashLink: cashLinkAddress,
         authority: this.authority.publicKey,
@@ -206,7 +206,7 @@ export class CashLinkClient {
     if (cashLink.data.state !== CashLinkState.Canceled) {
       throw new Error(ACCOUNT_NOT_CANCELED);
     }
-    if (!cashLink.data.totalRedemptions.eq(new BN(0))) {
+    if (cashLink.data.totalRedemptions !== 0) {
       throw new Error(ACCOUNT_HAS_REDEMPTIONS);
     }
     const closeInstruction = this.closeInstruction({

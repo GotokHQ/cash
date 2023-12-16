@@ -77,8 +77,8 @@ export class CashLinkData extends Borsh.Data<CashLinkDataArgs> {
   lastRedeemedAt: BN | null;
   canceledAt: BN | null;
   mint?: StringPublicKey;
-  totalRedemptions: BN;
-  maxNumRedemptions: BN;
+  totalRedemptions: number;
+  maxNumRedemptions: number;
 
   constructor(args: CashLinkDataArgs) {
     super(args);
