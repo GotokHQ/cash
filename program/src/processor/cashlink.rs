@@ -379,18 +379,32 @@ pub fn process_redemption(
             .checked_div(cash_link.max_num_redemptions as u64)
             .ok_or(CashError::Overflow)?,
         DistributionType::Random => {
-            // get slot hash
-            let data = recent_slothashes_info.data.borrow();
-            let most_recent_slothash = array_ref![data, 8, 8];
-            let rand = get_random_value(most_recent_slothash, &cash_link, clock)?;
+            if cash_link.max_num_redemptions == 1 || cash_link.total_redemptions == cash_link.max_num_redemptions - 1 {
+                 cash_link.remaining_amount
+            } else {
+                // get slot hash
+                let data = recent_slothashes_info.data.borrow();
+                let most_recent_slothash = array_ref![data, 8, 8];
+                let rand = get_random_value(most_recent_slothash, &cash_link, clock)?;
+                let max_num_redemptions_remaining = cash_link.max_num_redemptions
+                .checked_sub(cash_link.total_redemptions)
+                .ok_or(CashError::Overflow)?;
 
-            // Calculate a random amount for this redemption
-            // let max_possible = cash_link.remaining_amount
-            //     / (cash_link.max_num_redemptions as u64 - cash_link.total_redemptions as u64);
-            // ((rand as u64) % max_possible) + 1
-            // Ensure that the random amount is at least 1 and at most the remaining amount
-            let max_possible = cash_link.remaining_amount;
-            (rand as u64 % max_possible) + 1
+                let max_possible = cash_link.remaining_amount
+                    .checked_mul(2)
+                    .and_then(|amount| amount.checked_div(max_num_redemptions_remaining as u64))
+                    .ok_or(CashError::Overflow)?;
+
+                if max_possible == 0 {
+                    return Err(CashError::Overflow.into());
+                }
+
+                let final_amount = (rand as u64 % max_possible)
+                    .checked_add(1)
+                    .ok_or(CashError::Overflow)?;
+
+                final_amount
+            }
         }
     };
 
