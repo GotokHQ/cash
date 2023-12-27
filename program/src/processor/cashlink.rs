@@ -403,7 +403,7 @@ pub fn process_redemption(
                     .checked_add(1)
                     .ok_or(CashError::Overflow)?;
 
-                final_amount
+                std::cmp::min(final_amount, cash_link.remaining_amount)
             }
         }
     };
