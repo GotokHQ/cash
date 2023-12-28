@@ -436,7 +436,7 @@ export class CashLinkClient {
       cashLinkReference,
     );
     const walletAddress = new PublicKey(input.walletAddress);
-    const cashLink = await _getCashLinkAccount(this.connection, cashLinkAddress);
+    const cashLink = await _getCashLinkAccount(this.connection, cashLinkAddress, input.commitment);
     if (cashLink == null) {
       throw new Error(FAILED_TO_FIND_ACCOUNT);
     }
@@ -454,6 +454,7 @@ export class CashLinkClient {
             new PublicKey(cashLink.data.mint),
             accountKeys[0],
             true,
+            input.commitment,
           ),
           spl.getOrCreateAssociatedTokenAccount(
             this.connection,
@@ -461,6 +462,7 @@ export class CashLinkClient {
             new PublicKey(cashLink.data.mint),
             accountKeys[1],
             true,
+            input.commitment,
           ),
           spl.getOrCreateAssociatedTokenAccount(
             this.connection,
@@ -468,6 +470,7 @@ export class CashLinkClient {
             new PublicKey(cashLink.data.mint),
             accountKeys[2],
             true,
+            input.commitment,
           ),
         ])
       ).map((acc) => acc.address);
