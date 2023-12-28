@@ -436,6 +436,7 @@ export class CashLinkClient {
       cashLinkReference,
     );
     const walletAddress = new PublicKey(input.walletAddress);
+    console.log('commitment', input.commitment);
     const cashLink = await _getCashLinkAccount(this.connection, cashLinkAddress, input.commitment);
     if (cashLink == null) {
       throw new Error(FAILED_TO_FIND_ACCOUNT);
@@ -446,6 +447,7 @@ export class CashLinkClient {
     if (cashLink.data.mint) {
       const mint = new PublicKey(cashLink.data.mint);
       vaultToken = await _findAssociatedTokenAddress(cashLinkAddress, mint);
+      console.log(`commitment for mint: ${cashLink.data.mint.toString()}`, input.commitment);
       accountKeys = (
         await Promise.all([
           spl.getOrCreateAssociatedTokenAccount(
@@ -474,6 +476,8 @@ export class CashLinkClient {
           ),
         ])
       ).map((acc) => acc.address);
+
+      console.log(`done commitment for mint: ${cashLink.data.mint.toString()}`, input.commitment);
     }
     const [redemption, redemptionBump] = await CashProgram.findRedemptionAccount(
       cashLinkAddress,
