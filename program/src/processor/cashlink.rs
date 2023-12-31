@@ -1,3 +1,5 @@
+
+
 use crate::{
     error::CashError::{
         self, AccountAlreadyCanceled, AccountAlreadyRedeemed, AccountNotCanceled,
@@ -31,6 +33,7 @@ use solana_program::{
 };
 use spl_associated_token_account::get_associated_token_address;
 use spl_token::state::Account as TokenAccount;
+
 pub struct Processor;
 
 pub fn process_init_cash_link(
@@ -98,6 +101,17 @@ pub fn process_init_cash_link(
         DistributionType::Random => args.amount,
     };
 
+    if args.distribution_type == DistributionType::Random {
+        if args.min_amount.is_none() {
+            return Err(CashError::MinAmountNotSet.into());
+        }
+        if let Some(min_amount) = args.min_amount {
+            if min_amount > total_amount {
+                return Err(CashError::MinAmountMustBeLessThanAmount.into());
+            }
+        }
+    }
+
     let total = total_amount
         .checked_add(total_platform_fee)
         .ok_or::<ProgramError>(CashError::Overflow.into())?
@@ -115,6 +129,12 @@ pub fn process_init_cash_link(
     cash_link.sender = *sender_info.key;
     cash_link.distribution_type = args.distribution_type;
     cash_link.max_num_redemptions = args.max_num_redemptions;
+    cash_link.min_amount = match args.min_amount {
+        Some(amount) if amount > total_amount => 
+            return Err(CashError::MinAmountMustBeLessThanAmount.into()),
+        Some(amount) => amount,
+        None => 1,
+    };
     if cash_link.distribution_type == DistributionType::Fixed {
         msg!("Got Fixed Distribution");
     } else {
@@ -379,7 +399,7 @@ pub fn process_redemption(
             .checked_div(cash_link.max_num_redemptions as u64)
             .ok_or(CashError::Overflow)?,
         DistributionType::Random => {
-            if cash_link.max_num_redemptions == 1 || cash_link.total_redemptions == cash_link.max_num_redemptions - 1 {
+            if cash_link.max_num_redemptions == 1 {
                  cash_link.remaining_amount
             } else {
                 // get slot hash
@@ -389,21 +409,24 @@ pub fn process_redemption(
                 let max_num_redemptions_remaining = cash_link.max_num_redemptions
                 .checked_sub(cash_link.total_redemptions)
                 .ok_or(CashError::Overflow)?;
+                let min_total_required: u64 = cash_link.min_amount * max_num_redemptions_remaining as u64;
 
-                let max_possible = cash_link.remaining_amount
-                    .checked_mul(2)
-                    .and_then(|amount| amount.checked_div(max_num_redemptions_remaining as u64))
-                    .ok_or(CashError::Overflow)?;
-
-                if max_possible == 0 {
+                if cash_link.remaining_amount < min_total_required {
                     return Err(CashError::Overflow.into());
                 }
 
-                let final_amount = (rand as u64 % max_possible)
-                    .checked_add(1)
+                let max_possible = (cash_link.remaining_amount - min_total_required)
+                .checked_mul(2)
+                .and_then(|amount| amount.checked_div(max_num_redemptions_remaining as u64))
+                .unwrap_or(1)
+                .checked_add(cash_link.min_amount)
+                .ok_or(CashError::Overflow)?;
+
+                let distributed_amount = (rand as u64 % (max_possible - cash_link.min_amount))
+                    .checked_add(cash_link.min_amount)
                     .ok_or(CashError::Overflow)?;
 
-                std::cmp::min(final_amount, cash_link.remaining_amount)
+                distributed_amount
             }
         }
     };

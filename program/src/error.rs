@@ -80,7 +80,11 @@ pub enum CashError {
     #[error("InvalidAmount")]
     InvalidAmount,
     #[error("InvalidNumberOfRedemptions")]
-    InvalidNumberOfRedemptions
+    InvalidNumberOfRedemptions,
+    #[error("Minimum amount must be set for random distribution")]
+    MinAmountNotSet,
+    #[error("Minimum amount must be less than amount")]
+    MinAmountMustBeLessThanAmount
 }
 
 impl From<CashError> for ProgramError {

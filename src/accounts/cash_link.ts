@@ -11,7 +11,7 @@ import bs58 from 'bs58';
 import { CashProgram } from '../cash_program';
 import { AccountType } from './account';
 
-export const MAX_CASH_LINK_DATA_LEN = 156;
+export const MAX_CASH_LINK_DATA_LEN = 163;
 
 export enum CashLinkState {
   Uninitialized = 0,
@@ -43,6 +43,7 @@ export type CashLinkDataArgs = {
   mint?: StringPublicKey;
   totalRedemptions: BN;
   maxNumRedemptions: BN;
+  minAmount: BN;
 };
 
 export class CashLinkData extends Borsh.Data<CashLinkDataArgs> {
@@ -62,6 +63,7 @@ export class CashLinkData extends Borsh.Data<CashLinkDataArgs> {
     ['mint', { kind: 'option', type: 'pubkeyAsString' }],
     ['totalRedemptions', 'u16'],
     ['maxNumRedemptions', 'u16'],
+    ['minAmount', 'u64'],
   ]);
   accountType: AccountType;
   authority: StringPublicKey;
@@ -79,6 +81,7 @@ export class CashLinkData extends Borsh.Data<CashLinkDataArgs> {
   mint?: StringPublicKey;
   totalRedemptions: number;
   maxNumRedemptions: number;
+  minAmount: BN;
 
   constructor(args: CashLinkDataArgs) {
     super(args);

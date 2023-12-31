@@ -23,6 +23,7 @@ export class InitCashLinkArgs extends Borsh.Data<InitArgs> {
     ['cashLinkBump', 'u8'],
     ['distributionType', 'u8'],
     ['maxNumRedemptions', 'u16'],
+    ['minAmount', { kind: 'option', type: 'u64' }],
   ]);
 
   instruction = 0;
@@ -33,6 +34,7 @@ export class InitCashLinkArgs extends Borsh.Data<InitArgs> {
   cashLinkBump: number;
   distributionType: CashLinkDistributionType;
   maxNumRedemptions: number;
+  minAmount?: BN;
 }
 
 export type InitCashLinkParams = {
@@ -49,4 +51,5 @@ export type InitCashLinkParams = {
   mint?: PublicKey | null;
   distributionType: CashLinkDistributionType;
   maxNumRedemptions: number;
+  minAmount?: BN;
 };

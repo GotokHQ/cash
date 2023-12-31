@@ -269,6 +269,7 @@ export class CashLinkClient {
     const feeToRedeem = new BN(input.feeToRedeem ?? 0);
     const feeBps = input.feeBps ?? 0;
     const maxNumRedemptions = input.maxNumRedemptions;
+    const minAmount = input.minAmount ? new BN(input.minAmount) : undefined;
     const initParams: InitCashLinkParams = {
       mint,
       sender,
@@ -278,6 +279,7 @@ export class CashLinkClient {
       fixedFee,
       feeToRedeem,
       maxNumRedemptions,
+      minAmount,
       amount: amount,
       cashLinkReference: cashLinkReference,
       authority: this.authority.publicKey,

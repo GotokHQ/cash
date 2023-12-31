@@ -5,6 +5,7 @@ export interface InitializeCashLinkInput {
   mint?: string;
   cashLinkReference: string;
   amount: string;
+  minAmount?: string;
   feeBps?: number;
   fixedFee?: string;
   feeToRedeem?: string;

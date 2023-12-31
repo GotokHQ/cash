@@ -11,7 +11,7 @@ use super::AccountType;
 
 
 
-pub const CASH_LINK_DATA_SIZE: usize = 156;
+pub const CASH_LINK_DATA_SIZE: usize = 164;
 
 #[repr(C)]
 #[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq, Clone, Default)]
@@ -50,6 +50,7 @@ pub struct CashLink {
     pub mint: Option<Pubkey>,
     pub total_redemptions: u16,
     pub max_num_redemptions: u16,
+    pub min_amount: u64,
 }
 
 impl CashLink {

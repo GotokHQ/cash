@@ -23,6 +23,7 @@ pub struct InitCashLinkArgs {
     pub cash_link_bump: u8,
     pub distribution_type: DistributionType,
     pub max_num_redemptions: u16,
+    pub min_amount: Option<u64>
 }
 
 /// Initialize a redemption arguments
