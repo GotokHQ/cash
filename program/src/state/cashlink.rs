@@ -7,9 +7,9 @@ use solana_program::{
     pubkey::Pubkey,
 };
 
+use crate::error::CashError;
+
 use super::AccountType;
-
-
 
 pub const CASH_LINK_DATA_SIZE: usize = 164;
 
@@ -67,8 +67,20 @@ impl CashLink {
     pub fn initialized(&self) -> bool {
         self.state == CashLinkState::Initialized
     }
-    pub fn is_fully_redeemed(&self) -> bool {
-        self.total_redemptions == self.max_num_redemptions || self.remaining_amount == 0
+    pub fn is_fully_redeemed(&self) -> Result<bool, CashError> {
+        Ok(self.total_redemptions == self.max_num_redemptions
+            || self.remaining_amount == 0
+            || self.remaining_amount < self.min_total_required()?)
+    }
+
+    pub fn max_num_redemptions_remaining(&self) -> Result<u16, CashError> {
+        self.max_num_redemptions
+            .checked_sub(self.total_redemptions)
+            .ok_or(CashError::Overflow)
+    }
+
+    pub fn min_total_required(&self) -> Result<u64, CashError> {
+        Ok(self.min_amount * self.max_num_redemptions_remaining()? as u64)
     }
 }
 

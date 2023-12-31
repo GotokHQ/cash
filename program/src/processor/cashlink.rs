@@ -406,18 +406,15 @@ pub fn process_redemption(
                 let data = recent_slothashes_info.data.borrow();
                 let most_recent_slothash = array_ref![data, 8, 8];
                 let rand = get_random_value(most_recent_slothash, &cash_link, clock)?;
-                let max_num_redemptions_remaining = cash_link.max_num_redemptions
-                .checked_sub(cash_link.total_redemptions)
-                .ok_or(CashError::Overflow)?;
-                let min_total_required: u64 = cash_link.min_amount * max_num_redemptions_remaining as u64;
-
-                if cash_link.remaining_amount < min_total_required {
+                if cash_link.remaining_amount < cash_link.min_total_required()? {
                     return Err(CashError::Overflow.into());
                 }
 
-                let max_possible = (cash_link.remaining_amount - min_total_required)
+                let max_num_redemptions_remaining = cash_link.max_num_redemptions_remaining()? as u64;
+
+                let max_possible = (cash_link.remaining_amount - cash_link.min_total_required()?)
                 .checked_mul(2)
-                .and_then(|amount| amount.checked_div(max_num_redemptions_remaining as u64))
+                .and_then(|amount| amount.checked_div(max_num_redemptions_remaining))
                 .unwrap_or(1)
                 .checked_add(cash_link.min_amount)
                 .ok_or(CashError::Overflow)?;
@@ -503,7 +500,7 @@ pub fn process_redemption(
             .amount
             .checked_sub(total)
             .ok_or::<ProgramError>(CashError::Overflow.into())?;
-        if cash_link.is_fully_redeemed() {
+        if cash_link.is_fully_redeemed()? {
             let sender_token: TokenAccount = assert_initialized(sender_token_info)?;
             assert_token_owned_by(&sender_token, &cash_link.sender)?;
             if remaining > 0 {
@@ -551,7 +548,7 @@ pub fn process_redemption(
                 .ok_or(AmountOverflow)?;
         }
         let remaining = available_amount.checked_sub(total).ok_or(AmountOverflow)?;
-        if cash_link.is_fully_redeemed() && remaining > 0 {
+        if cash_link.is_fully_redeemed()? && remaining > 0 {
             let dest_starting_lamports = sender_token_info.lamports();
             **sender_token_info.lamports.borrow_mut() = dest_starting_lamports
                 .checked_add(remaining)
@@ -584,7 +581,7 @@ pub fn process_redemption(
     redemption.user = *user_info.key;
     redemption.amount = amount_to_redeem;
     Redemption::pack(redemption, &mut redemption_info.data.borrow_mut())?;
-    cash_link.state = if cash_link.is_fully_redeemed() {
+    cash_link.state = if cash_link.is_fully_redeemed()? {
         CashLinkState::Redeemed
     } else {
         CashLinkState::Redeeming
