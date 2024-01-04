@@ -316,7 +316,7 @@ export class CashLinkClient {
       cashLinkBump,
       distributionType,
       maxNumRedemptions,
-      minAmount,
+      //minAmount,
     });
     const keys = [
       {
