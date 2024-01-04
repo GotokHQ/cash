@@ -11,6 +11,7 @@ export type InitArgs = {
   cashLinkBump: number;
   distributionType: CashLinkDistributionType;
   maxNumRedemptions: number;
+  minAmount?: BN;
 };
 
 export class InitCashLinkArgs extends Borsh.Data<InitArgs> {

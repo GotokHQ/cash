@@ -306,6 +306,7 @@ export class CashLinkClient {
       cashLink,
       mint,
       maxNumRedemptions,
+      minAmount,
     } = params;
     const data = InitCashLinkArgs.serialize({
       amount,
@@ -315,6 +316,7 @@ export class CashLinkClient {
       cashLinkBump,
       distributionType,
       maxNumRedemptions,
+      minAmount,
     });
     const keys = [
       {
