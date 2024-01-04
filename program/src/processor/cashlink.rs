@@ -20,7 +20,6 @@ use crate::{
     },
 };
 
-use arrayref::array_ref;
 use solana_program::{
     account_info::{next_account_info, AccountInfo},
     entrypoint::ProgramResult,
@@ -403,27 +402,13 @@ pub fn process_redemption(
                  cash_link.remaining_amount
             } else {
                 // get slot hash
-                let data = recent_slothashes_info.data.borrow();
-                let most_recent_slothash = array_ref![data, 8, 8];
-                let rand = get_random_value(most_recent_slothash, &cash_link, clock)?;
-                if cash_link.remaining_amount < cash_link.min_total_required()? {
-                    return Err(CashError::Overflow.into());
-                }
-
-                let max_num_redemptions_remaining = cash_link.max_num_redemptions_remaining()? as u64;
-
-                let max_possible = (cash_link.remaining_amount - cash_link.min_total_required()?)
-                .checked_mul(2)
-                .and_then(|amount| amount.checked_div(max_num_redemptions_remaining))
-                .unwrap_or(1)
-                .checked_add(cash_link.min_amount)
-                .ok_or(CashError::Overflow)?;
-
-                let distributed_amount = (rand as u64 % (max_possible - cash_link.min_amount))
-                    .checked_add(cash_link.min_amount)
-                    .ok_or(CashError::Overflow)?;
-
-                distributed_amount
+                let rand = get_random_value(recent_slothashes_info, clock)?;
+                let max_possible  = cash_link.remaining_amount;
+                
+                rand
+                .checked_rem(max_possible - cash_link.min_amount)
+                .and_then(|amount| amount.checked_add(cash_link.min_amount))
+                .ok_or(CashError::Overflow)?
             }
         }
     };
