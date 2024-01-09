@@ -15,7 +15,7 @@ pub const REDEMPTION_SIZE: usize = 81;
 pub struct Redemption {
     pub account_type: AccountType,
     pub cash_link: Pubkey,
-    pub user: Pubkey,
+    pub wallet: Pubkey,
     pub redeemed_at: u64,
     pub amount: u64
 }

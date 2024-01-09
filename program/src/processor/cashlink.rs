@@ -334,7 +334,6 @@ pub fn process_redemption(
 
     assert_signer(authority_info)?;
 
-    let user_info = next_account_info(account_info_iter)?;
     let wallet_info = next_account_info(account_info_iter)?;
 
     assert_signer(wallet_info)?;
@@ -555,7 +554,7 @@ pub fn process_redemption(
         &[
             Redemption::PREFIX.as_bytes(),
             cash_link_info.key.as_ref(),
-            user_info.key.as_ref(),
+            args.reference.as_bytes(),
             &[args.redemption_bump],
         ],
     )?;
@@ -563,7 +562,7 @@ pub fn process_redemption(
     redemption.account_type = AccountType::Redemption;
     redemption.cash_link = *cash_link_info.key;
     redemption.redeemed_at = clock.unix_timestamp as u64;
-    redemption.user = *user_info.key;
+    redemption.wallet = *wallet_info.key;
     redemption.amount = amount_to_redeem;
     Redemption::pack(redemption, &mut redemption_info.data.borrow_mut())?;
     cash_link.state = if cash_link.is_fully_redeemed()? {

@@ -434,7 +434,7 @@ export class CashLinkClient {
   };
 
   redeemTransaction = async (input: RedeemCashLinkInput): Promise<Transaction> => {
-    const userReference = new PublicKey(input.userReference);
+    const reference = input.reference;
     const cashLinkReference = new PublicKey(input.cashLinkReference);
     const [cashLinkAddress, cashLinkBump] = await CashProgram.findCashLinkAccount(
       cashLinkReference,
@@ -485,16 +485,16 @@ export class CashLinkClient {
     }
     const [redemption, redemptionBump] = await CashProgram.findRedemptionAccount(
       cashLinkAddress,
-      userReference,
+      reference,
     );
     const redeemInstruction = await this.redeemInstruction({
       redemption,
-      userReference,
+      reference,
       cashLinkBump,
       cashLinkReference,
       redemptionBump: redemptionBump,
-      recipient: walletAddress,
-      recipientToken: accountKeys[0],
+      wallet: walletAddress,
+      walletToken: accountKeys[0],
       feeToken: accountKeys[1],
       senderToken: accountKeys[2],
       vaultToken,
@@ -510,8 +510,7 @@ export class CashLinkClient {
   redeemInstruction = async (params: RedeemCashLinkParams): Promise<TransactionInstruction> => {
     const keys = [
       { pubkey: params.authority, isSigner: true, isWritable: false },
-      { pubkey: params.userReference, isSigner: false, isWritable: false },
-      { pubkey: params.recipient, isSigner: true, isWritable: true },
+      { pubkey: params.wallet, isSigner: true, isWritable: true },
       { pubkey: params.feeToken, isSigner: false, isWritable: true },
       { pubkey: params.cashLink, isSigner: false, isWritable: true },
       { pubkey: params.cashLinkReference, isSigner: false, isWritable: false },
@@ -535,7 +534,7 @@ export class CashLinkClient {
       },
     ];
     if (params.vaultToken) {
-      keys.push({ pubkey: params.recipientToken, isSigner: false, isWritable: true });
+      keys.push({ pubkey: params.walletToken, isSigner: false, isWritable: true });
       keys.push({
         pubkey: params.vaultToken,
         isSigner: false,
@@ -560,6 +559,7 @@ export class CashLinkClient {
       data: RedeemCashLinkArgs.serialize({
         cashLinkBump: params.cashLinkBump,
         redemptionBump: params.redemptionBump,
+        reference: params.reference,
       }),
     });
   };

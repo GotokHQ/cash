@@ -4,6 +4,7 @@ import { PublicKey } from '@solana/web3.js';
 export type RedeemArgs = {
   redemptionBump: number;
   cashLinkBump: number;
+  reference: string;
 };
 
 export class RedeemCashLinkArgs extends Borsh.Data<RedeemArgs> {
@@ -11,17 +12,18 @@ export class RedeemCashLinkArgs extends Borsh.Data<RedeemArgs> {
     ['instruction', 'u8'],
     ['redemptionBump', 'u8'],
     ['cashLinkBump', 'u8'],
+    ['reference', 'string'],
   ]);
 
   instruction = 1;
 }
 
 export type RedeemCashLinkParams = {
-  recipient: PublicKey;
+  wallet: PublicKey;
   authority: PublicKey;
   cashLink: PublicKey;
   vaultToken?: PublicKey;
-  recipientToken: PublicKey;
+  walletToken: PublicKey;
   senderToken: PublicKey;
   feeToken: PublicKey;
   feePayer: PublicKey;
@@ -29,5 +31,5 @@ export type RedeemCashLinkParams = {
   redemption: PublicKey;
   cashLinkBump: number;
   cashLinkReference: PublicKey;
-  userReference: PublicKey;
+  reference: string;
 };

@@ -26,7 +26,7 @@ export interface CashLinkInput {
 }
 
 export interface RedeemCashLinkInput extends CashLinkInput {
-  userReference: string;
+  reference: string;
 }
 export interface SettleAndTransferInput {
   walletAddress: string;
