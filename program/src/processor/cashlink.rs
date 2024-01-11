@@ -554,7 +554,8 @@ pub fn process_redemption(
         &[
             Redemption::PREFIX.as_bytes(),
             cash_link_info.key.as_ref(),
-            args.reference.as_bytes(),
+            &bs58::decode(args.reference).into_vec()
+            .map_err(|_| CashError::InvalidReference)?,
             &[args.redemption_bump],
         ],
     )?;

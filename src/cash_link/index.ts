@@ -14,6 +14,7 @@ import {
 } from '@solana/web3.js';
 import * as spl from '@solana/spl-token';
 import BN from 'bn.js';
+import bs58 from 'bs58';
 import {
   InitializeCashLinkInput,
   ResultContext,
@@ -485,7 +486,7 @@ export class CashLinkClient {
     }
     const [redemption, redemptionBump] = await CashProgram.findRedemptionAccount(
       cashLinkAddress,
-      Uint8Array.from(Buffer.from(reference, 'hex')),
+      bs58.decode(reference),
     );
     const redeemInstruction = await this.redeemInstruction({
       redemption,
