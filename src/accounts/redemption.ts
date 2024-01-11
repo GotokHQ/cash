@@ -50,7 +50,7 @@ export class Redemption extends Account<RedemptionData> {
     }
   }
 
-  static async getPDA(cashLink: PublicKey, reference: Uint8Array) {
+  static async getPDA(cashLink: PublicKey, reference: string) {
     const [pubKey] = await CashProgram.findRedemptionAccount(cashLink, reference);
     return pubKey;
   }

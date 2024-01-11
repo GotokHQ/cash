@@ -2,6 +2,7 @@ import { PublicKey } from '@solana/web3.js';
 import { Program } from '@metaplex-foundation/mpl-core';
 import { CashLink } from './accounts';
 import { Redemption } from './accounts/redemption';
+import bs58 from 'bs58';
 
 export class CashProgram extends Program {
   static readonly PREFIX = 'cash';
@@ -16,10 +17,10 @@ export class CashProgram extends Program {
 
   static async findRedemptionAccount(
     cashLink: PublicKey,
-    reference: Uint8Array,
+    reference: string,
   ): Promise<[PublicKey, number]> {
     return PublicKey.findProgramAddress(
-      [Buffer.from(Redemption.PREFIX), cashLink.toBuffer(), reference],
+      [Buffer.from(Redemption.PREFIX), cashLink.toBuffer(), bs58.decode(reference)],
       CashProgram.PUBKEY,
     );
   }
