@@ -397,7 +397,7 @@ pub fn process_redemption(
             .checked_div(cash_link.max_num_redemptions as u64)
             .ok_or(CashError::Overflow)?,
         DistributionType::Random => {
-            if cash_link.max_num_redemptions == 1 {
+            if cash_link.max_num_redemptions == 1 || cash_link.total_redemptions == (cash_link.max_num_redemptions - 1) {
                  cash_link.remaining_amount
             } else {
                 // get slot hash
