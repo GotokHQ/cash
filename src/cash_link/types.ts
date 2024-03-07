@@ -12,6 +12,8 @@ export interface InitializeCashLinkInput {
   distributionType: CashLinkDistributionType;
   maxNumRedemptions: number;
   commitment?: Commitment;
+  computeUnitPrice?: number;
+  computeBudget?: number;
 }
 
 export interface ResultContext {
@@ -23,6 +25,8 @@ export interface CashLinkInput {
   walletAddress: string;
   cashLinkReference: string;
   commitment?: Commitment;
+  computeUnitPrice?: number;
+  computeBudget?: number;
 }
 
 export interface RedeemCashLinkInput extends CashLinkInput {

@@ -11,6 +11,7 @@ import {
   Commitment,
   RpcResponseAndContext,
   SignatureResult,
+  ComputeBudgetProgram,
 } from '@solana/web3.js';
 import * as spl from '@solana/spl-token';
 import BN from 'bn.js';
@@ -72,6 +73,20 @@ export class CashLinkClient {
       throw new Error(FAILED_TO_FIND_ACCOUNT);
     }
     const transaction = await this.cancelTransaction(cashLink, bump, input);
+    if (input.computeBudget) {
+      transaction.add(
+        ComputeBudgetProgram.setComputeUnitLimit({
+          units: input.computeBudget,
+        }),
+      );
+    }
+    if (input.computeUnitPrice) {
+      transaction.add(
+        ComputeBudgetProgram.setComputeUnitPrice({
+          microLamports: input.computeUnitPrice,
+        }),
+      );
+    }
     const { context, value } = await this.connection.getLatestBlockhashAndContext(input.commitment);
     transaction.recentBlockhash = value.blockhash;
     transaction.lastValidBlockHeight = value.lastValidBlockHeight;
@@ -98,6 +113,20 @@ export class CashLinkClient {
         feePayer: this.feePayer.publicKey,
       });
       transaction.add(closeInstruction);
+    }
+    if (input.computeBudget) {
+      transaction.add(
+        ComputeBudgetProgram.setComputeUnitLimit({
+          units: input.computeBudget,
+        }),
+      );
+    }
+    if (input.computeUnitPrice) {
+      transaction.add(
+        ComputeBudgetProgram.setComputeUnitPrice({
+          microLamports: input.computeUnitPrice,
+        }),
+      );
     }
     const { context, value } = await this.connection.getLatestBlockhashAndContext(input.commitment);
     transaction.recentBlockhash = value.blockhash;
@@ -211,6 +240,20 @@ export class CashLinkClient {
       feePayer: this.feePayer.publicKey,
     });
     const transaction = new Transaction().add(closeInstruction);
+    if (input.computeBudget) {
+      transaction.add(
+        ComputeBudgetProgram.setComputeUnitLimit({
+          units: input.computeBudget,
+        }),
+      );
+    }
+    if (input.computeUnitPrice) {
+      transaction.add(
+        ComputeBudgetProgram.setComputeUnitPrice({
+          microLamports: input.computeUnitPrice,
+        }),
+      );
+    }
     const { context, value } = await this.connection.getLatestBlockhashAndContext(input.commitment);
     transaction.recentBlockhash = value.blockhash;
     transaction.feePayer = this.feePayer.publicKey;
@@ -248,6 +291,20 @@ export class CashLinkClient {
     transaction.recentBlockhash = value.blockhash;
     transaction.lastValidBlockHeight = value.lastValidBlockHeight;
     transaction.feePayer = this.feePayer.publicKey;
+    if (input.computeBudget) {
+      transaction.add(
+        ComputeBudgetProgram.setComputeUnitLimit({
+          units: input.computeBudget,
+        }),
+      );
+    }
+    if (input.computeUnitPrice) {
+      transaction.add(
+        ComputeBudgetProgram.setComputeUnitPrice({
+          microLamports: input.computeUnitPrice,
+        }),
+      );
+    }
     transaction.partialSign(this.feePayer, this.authority);
     return {
       transaction: transaction
@@ -418,6 +475,20 @@ export class CashLinkClient {
 
   redeem = async (input: RedeemCashLinkInput): Promise<ResultContext> => {
     const transaction = await this.redeemTransaction(input);
+    if (input.computeBudget) {
+      transaction.add(
+        ComputeBudgetProgram.setComputeUnitLimit({
+          units: input.computeBudget,
+        }),
+      );
+    }
+    if (input.computeUnitPrice) {
+      transaction.add(
+        ComputeBudgetProgram.setComputeUnitPrice({
+          microLamports: input.computeUnitPrice,
+        }),
+      );
+    }
     const { context, value } = await this.connection.getLatestBlockhashAndContext(input.commitment);
     transaction.recentBlockhash = value.blockhash;
     transaction.lastValidBlockHeight = value.lastValidBlockHeight;
