@@ -40,10 +40,10 @@ export const FAILED_TO_FIND_ACCOUNT = 'Failed to find account';
 export const INVALID_ACCOUNT_OWNER = 'Invalid account owner';
 export const INVALID_AUTHORITY = 'Invalid authority';
 export const INVALID_PAYER_ADDRESS = 'Invalid payer address';
-export const ACCOUNT_ALREADY_CANCELED = 'Account already canceled';
+export const ACCOUNT_ALREADY_EXPIRED = 'Account already canceled';
 export const ACCOUNT_ALREADY_SETTLED = 'Account already settled';
 export const ACCOUNT_NOT_INITIALIZED_OR_SETTLED = 'Account not initialized or settled';
-export const ACCOUNT_NOT_CANCELED = 'Account not canceled';
+export const ACCOUNT_NOT_EXPIRED = 'Account not canceled';
 export const ACCOUNT_HAS_REDEMPTIONS = 'Account has redemptions';
 export const INVALID_SIGNATURE = 'Invalid signature';
 export const AMOUNT_MISMATCH = 'Amount mismatch';
@@ -144,8 +144,8 @@ export class CashLinkClient {
     cashLinkBump: number,
     input: CashLinkInput,
   ): Promise<Transaction> => {
-    if (cashLink.data?.state === CashLinkState.Canceled) {
-      throw new Error(ACCOUNT_ALREADY_CANCELED);
+    if (cashLink.data?.state === CashLinkState.Expired) {
+      throw new Error(ACCOUNT_ALREADY_EXPIRED);
     }
     if (cashLink.data?.state === CashLinkState.Redeemed) {
       throw new Error(ACCOUNT_ALREADY_SETTLED);
@@ -228,8 +228,8 @@ export class CashLinkClient {
     if (cashLink == null || !cashLink.data) {
       throw new Error(FAILED_TO_FIND_ACCOUNT);
     }
-    if (cashLink.data.state !== CashLinkState.Canceled) {
-      throw new Error(ACCOUNT_NOT_CANCELED);
+    if (cashLink.data.state !== CashLinkState.Expired) {
+      throw new Error(ACCOUNT_NOT_EXPIRED);
     }
     if (cashLink.data.totalRedemptions !== 0) {
       throw new Error(ACCOUNT_HAS_REDEMPTIONS);
