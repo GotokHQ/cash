@@ -11,14 +11,13 @@ import bs58 from 'bs58';
 import { CashProgram } from '../cash_program';
 import { AccountType } from './account';
 
-export const MAX_CASH_LINK_DATA_LEN = 163;
+export const MAX_CASH_LINK_DATA_LEN = 164;
 
 export enum CashLinkState {
-  Uninitialized = 0,
-  Initialized = 1,
-  Redeemed = 2,
-  Redeeming = 3,
-  Canceled = 4,
+  Initialized = 0,
+  Redeemed = 1,
+  Redeeming = 2,
+  Expired = 3,
 }
 
 export enum CashLinkDistributionType {
@@ -44,6 +43,7 @@ export type CashLinkDataArgs = {
   totalRedemptions: BN;
   maxNumRedemptions: BN;
   minAmount: BN;
+  fingerprintEnabled?: boolean;
 };
 
 export class CashLinkData extends Borsh.Data<CashLinkDataArgs> {
@@ -59,11 +59,12 @@ export class CashLinkData extends Borsh.Data<CashLinkDataArgs> {
     ['distributionType', 'u8'],
     ['sender', 'pubkeyAsString'],
     ['lastRedeemedAt', { kind: 'option', type: 'u64' }],
-    ['canceledAt', { kind: 'option', type: 'u64' }],
+    ['expiresAt', 'u64'],
     ['mint', { kind: 'option', type: 'pubkeyAsString' }],
     ['totalRedemptions', 'u16'],
     ['maxNumRedemptions', 'u16'],
     ['minAmount', 'u64'],
+    ['fingerprintEnabled', { kind: 'option', type: 'u8' }],
   ]);
   accountType: AccountType;
   authority: StringPublicKey;
@@ -77,11 +78,12 @@ export class CashLinkData extends Borsh.Data<CashLinkDataArgs> {
   distributionType: CashLinkDistributionType;
   sender: StringPublicKey;
   lastRedeemedAt: BN | null;
-  canceledAt: BN | null;
+  expiresAt: BN | null;
   mint?: StringPublicKey;
   totalRedemptions: number;
   maxNumRedemptions: number;
   minAmount: BN;
+  fingerprintEnabled?: boolean;
 
   constructor(args: CashLinkDataArgs) {
     super(args);

@@ -14,6 +14,8 @@ export interface InitializeCashLinkInput {
   commitment?: Commitment;
   computeUnitPrice?: number;
   computeBudget?: number;
+  fingerprintEnabled?: boolean;
+  numDaysToExpire?: number;
 }
 
 export interface ResultContext {
@@ -30,7 +32,7 @@ export interface CashLinkInput {
 }
 
 export interface RedeemCashLinkInput extends CashLinkInput {
-  reference: string;
+  fingerprint?: string;
 }
 export interface SettleAndTransferInput {
   walletAddress: string;

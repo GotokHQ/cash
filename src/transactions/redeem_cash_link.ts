@@ -4,7 +4,8 @@ import { PublicKey } from '@solana/web3.js';
 export type RedeemArgs = {
   redemptionBump: number;
   cashLinkBump: number;
-  reference: string;
+  fingerprint?: string;
+  fingerprintBump?: number;
 };
 
 export class RedeemCashLinkArgs extends Borsh.Data<RedeemArgs> {
@@ -12,7 +13,8 @@ export class RedeemCashLinkArgs extends Borsh.Data<RedeemArgs> {
     ['instruction', 'u8'],
     ['redemptionBump', 'u8'],
     ['cashLinkBump', 'u8'],
-    ['reference', 'string'],
+    ['fingerprint', { kind: 'option', type: 'string' }],
+    ['fingerprint_bump', { kind: 'option', type: 'u8' }],
   ]);
 
   instruction = 1;
@@ -31,5 +33,7 @@ export type RedeemCashLinkParams = {
   redemption: PublicKey;
   cashLinkBump: number;
   cashLinkReference: PublicKey;
-  reference: string;
+  fingerprintPda?: PublicKey;
+  fingerprint?: string;
+  fingerprintBump?: number;
 };

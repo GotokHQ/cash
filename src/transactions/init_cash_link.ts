@@ -12,6 +12,8 @@ export type InitArgs = {
   distributionType: CashLinkDistributionType;
   maxNumRedemptions: number;
   minAmount?: BN;
+  fingerprintEnabled?: boolean;
+  numDaysToExpire: number;
 };
 
 export class InitCashLinkArgs extends Borsh.Data<InitArgs> {
@@ -25,6 +27,8 @@ export class InitCashLinkArgs extends Borsh.Data<InitArgs> {
     ['distributionType', 'u8'],
     ['maxNumRedemptions', 'u16'],
     ['minAmount', { kind: 'option', type: 'u64' }],
+    ['fingerprint_enabled', { kind: 'option', type: 'u8' }],
+    ['num_days_to_expire', 'u8'],
   ]);
 
   instruction = 0;
@@ -36,6 +40,8 @@ export class InitCashLinkArgs extends Borsh.Data<InitArgs> {
   distributionType: CashLinkDistributionType;
   maxNumRedemptions: number;
   minAmount?: BN;
+  fingerprintEnabled?: boolean;
+  numDaysToExpire: number;
 }
 
 export type InitCashLinkParams = {
@@ -53,4 +59,6 @@ export type InitCashLinkParams = {
   distributionType: CashLinkDistributionType;
   maxNumRedemptions: number;
   minAmount?: BN;
+  fingerprintEnabled?: boolean;
+  numDaysToExpire: number;
 };

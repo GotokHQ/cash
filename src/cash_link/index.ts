@@ -50,7 +50,7 @@ export const AMOUNT_MISMATCH = 'Amount mismatch';
 export const INVALID_STATE = 'Invalid state';
 export const FEE_MISMATCH = 'Fee mismatch';
 export const TRANSACTION_SEND_ERROR = 'Transaction send error';
-export const MEMO_PROGRAM_ID = new PublicKey('Memo1UhkJRfHyvLMcVucJwxXeuD728EqVDDwQDxFMNo');
+export const FINGERPRINT_NOT_FOUND = 'Fingerprint required';
 
 export class CashLinkClient {
   private feePayer: Keypair;
@@ -342,6 +342,8 @@ export class CashLinkClient {
       authority: this.authority.publicKey,
       feePayer: this.feePayer.publicKey,
       distributionType: input.distributionType,
+      fingerprintEnabled: input.fingerprintEnabled,
+      numDaysToExpire: input.numDaysToExpire ?? 1,
     };
 
     const transaction = new Transaction();
@@ -364,6 +366,8 @@ export class CashLinkClient {
       mint,
       maxNumRedemptions,
       minAmount,
+      fingerprintEnabled,
+      numDaysToExpire,
     } = params;
     const data = InitCashLinkArgs.serialize({
       amount,
@@ -374,6 +378,8 @@ export class CashLinkClient {
       distributionType,
       maxNumRedemptions,
       minAmount,
+      fingerprintEnabled,
+      numDaysToExpire,
     });
     const keys = [
       {
@@ -408,6 +414,11 @@ export class CashLinkClient {
       },
       {
         pubkey: SystemProgram.programId,
+        isSigner: false,
+        isWritable: false,
+      },
+      {
+        pubkey: SYSVAR_CLOCK_PUBKEY,
         isSigner: false,
         isWritable: false,
       },
@@ -505,16 +516,28 @@ export class CashLinkClient {
   };
 
   redeemTransaction = async (input: RedeemCashLinkInput): Promise<Transaction> => {
-    const reference = input.reference;
     const cashLinkReference = new PublicKey(input.cashLinkReference);
     const [cashLinkAddress, cashLinkBump] = await CashProgram.findCashLinkAccount(
       cashLinkReference,
     );
-    const walletAddress = new PublicKey(input.walletAddress);
+
     const cashLink = await _getCashLinkAccount(this.connection, cashLinkAddress, input.commitment);
     if (cashLink == null) {
       throw new Error(FAILED_TO_FIND_ACCOUNT);
     }
+    const fingerprint = input.fingerprint;
+    let fingerprintPda: PublicKey | undefined;
+    let fingerprintBump: number | undefined;
+    if (cashLink.data.fingerprintEnabled) {
+      if (!fingerprint) {
+        throw new Error(FINGERPRINT_NOT_FOUND);
+      }
+      [fingerprintPda, fingerprintBump] = await CashProgram.findFingerprintAccount(
+        cashLinkAddress,
+        input.fingerprint,
+      );
+    }
+    const walletAddress = new PublicKey(input.walletAddress);
     const sender = new PublicKey(cashLink.data.sender);
     let accountKeys = [walletAddress, this.feeWallet, sender];
     let vaultToken: PublicKey | null = null;
@@ -552,11 +575,10 @@ export class CashLinkClient {
     }
     const [redemption, redemptionBump] = await CashProgram.findRedemptionAccount(
       cashLinkAddress,
-      reference,
+      walletAddress,
     );
     const redeemInstruction = await this.redeemInstruction({
       redemption,
-      reference,
       cashLinkBump,
       cashLinkReference,
       redemptionBump: redemptionBump,
@@ -568,6 +590,9 @@ export class CashLinkClient {
       authority: this.authority.publicKey,
       cashLink: cashLink.pubkey,
       feePayer: this.feePayer.publicKey,
+      fingerprint,
+      fingerprintBump,
+      fingerprintPda,
     });
     const transaction = new Transaction();
     transaction.add(redeemInstruction);
@@ -608,25 +633,31 @@ export class CashLinkClient {
         isWritable: true,
       });
     }
-    keys.push(
-      {
-        pubkey: SystemProgram.programId,
+    keys.push({
+      pubkey: SystemProgram.programId,
+      isSigner: false,
+      isWritable: false,
+    });
+    if (params.fingerprintPda) {
+      keys.push({
+        pubkey: params.fingerprintPda,
         isSigner: false,
-        isWritable: false,
-      },
-      {
-        pubkey: spl.TOKEN_PROGRAM_ID,
-        isSigner: false,
-        isWritable: false,
-      },
-    );
+        isWritable: true,
+      });
+    }
+    keys.push({
+      pubkey: spl.TOKEN_PROGRAM_ID,
+      isSigner: false,
+      isWritable: false,
+    });
     return new TransactionInstruction({
       keys,
       programId: CashProgram.PUBKEY,
       data: RedeemCashLinkArgs.serialize({
         cashLinkBump: params.cashLinkBump,
         redemptionBump: params.redemptionBump,
-        reference: params.reference,
+        fingerprintBump: params.fingerprintBump,
+        fingerprint: params.fingerprint,
       }),
     });
   };
@@ -635,18 +666,6 @@ export class CashLinkClient {
     transaction.feePayer = this.feePayer.publicKey;
     transaction.partialSign(this.feePayer);
     return transaction.serialize();
-  };
-
-  memoInstruction = (memo: string, signer?: PublicKey) => {
-    const keys: { pubkey: PublicKey; isSigner: boolean; isWritable: boolean }[] = [];
-    if (signer) {
-      keys.push({ pubkey: signer, isSigner: true, isWritable: false });
-    }
-    return new TransactionInstruction({
-      keys: keys,
-      data: Buffer.from(memo, 'utf-8'),
-      programId: MEMO_PROGRAM_ID,
-    });
   };
 
   getVault = async (

@@ -23,7 +23,9 @@ pub struct InitCashLinkArgs {
     pub cash_link_bump: u8,
     pub distribution_type: DistributionType,
     pub max_num_redemptions: u16,
-    pub min_amount: Option<u64>
+    pub min_amount: Option<u64>,
+    pub fingerprint_enabled: Option<bool>,
+    pub num_days_to_expire: u8,
 }
 
 /// Initialize a redemption arguments
@@ -33,7 +35,8 @@ pub struct InitCashLinkArgs {
 pub struct InitCashRedemptionArgs {
     pub redemption_bump: u8,
     pub cash_link_bump: u8,
-    pub reference: String,
+    pub fingerprint: Option<String>,
+    pub fingerprint_bump: Option<u8>,
 }
 
 /// Cancel a cash link
@@ -60,8 +63,9 @@ pub enum CashInstruction {
     /// 4. `[]` The cash_link reference key used for deriving the cash_link account pda
     /// 5. `[]` The rent sysvar
     /// 6. `[]` The system program
-    /// 7. `[]` The token mint (Optional)
-    /// 8. `[writable]` The associated token for the mint derived from the cash link account (Optional)
+    /// 7. `[]` The clock account
+    /// 8. `[]` The token mint (Optional)
+    /// 9. `[writable]` The associated token for the mint derived from the cash link account (Optional)
     /// 10. `[writable]` The sender token that must be passed if pay is true and mint is some Optional)
     /// 11. `[]` The token program
     InitCashLink (InitCashLinkArgs),
@@ -84,7 +88,8 @@ pub enum CashInstruction {
     /// 11. `[writable][Optional]` The vault token account to get tokens. This value is Optional. if the mint is set, then this must be set.
     /// 12. `[writable][Optional]` The recipient token account for the token they will receive should the trade go through
     /// 13. `[]` The system program
-    /// 14. `[]` The token program
+    /// 14. `[writable][Optional]` The fingerprint info
+    /// 15. `[]` The token program
     Redeem(InitCashRedemptionArgs),
     /// Cancel the cash_link
     ///
@@ -137,6 +142,7 @@ pub fn init_cash_link(
         AccountMeta::new_readonly(*cash_link_reference, false),
         AccountMeta::new_readonly(sysvar::rent::id(), false),
         AccountMeta::new_readonly(system_program::id(), false),
+        AccountMeta::new_readonly(sysvar::clock::id(), false),
     ];
     if let Some(key) = mint {
         let associated_token_account = get_associated_token_address(cash_link_pda, &key);
@@ -202,6 +208,7 @@ pub fn redeem_cash_link(
     redemption_pda: &Pubkey,
     sender_token: &Pubkey,
     fee_payer: &Pubkey,
+    fingerprint: Option<&Pubkey>,
     args: InitCashRedemptionArgs
 ) -> Instruction {
     let mut accounts = vec![
@@ -223,6 +230,9 @@ pub fn redeem_cash_link(
         accounts.push(AccountMeta::new(*key, false));
     }
     accounts.push(AccountMeta::new_readonly(system_program::id(), false));
+    if let Some(fingerprint_id) = fingerprint {
+        accounts.push(AccountMeta::new(*fingerprint_id, false));
+    }
     accounts.push(AccountMeta::new_readonly(spl_token::id(), false));
 
     Instruction::new_with_borsh(

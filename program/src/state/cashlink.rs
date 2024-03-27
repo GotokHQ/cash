@@ -17,11 +17,10 @@ pub const CASH_LINK_DATA_SIZE: usize = 164;
 #[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq, Clone, Default)]
 pub enum CashLinkState {
     #[default]
-    Uninitialized = 0,
-    Initialized,
+    Initialized = 0,
     Redeemed,
     Redeeming,
-    Canceled,
+    Expired,
 }
 
 #[repr(C)]
@@ -46,11 +45,12 @@ pub struct CashLink {
     pub distribution_type: DistributionType,
     pub sender: Pubkey,
     pub last_redeemed_at: Option<u64>,
-    pub canceled_at: Option<u64>,
+    pub expires_at: u64,
     pub mint: Option<Pubkey>,
     pub total_redemptions: u16,
     pub max_num_redemptions: u16,
     pub min_amount: u64,
+    pub fingerprint_enabled: bool,
 }
 
 impl CashLink {
@@ -61,8 +61,8 @@ impl CashLink {
     pub fn redeeming(&self) -> bool {
         self.state == CashLinkState::Redeeming
     }
-    pub fn canceled(&self) -> bool {
-        self.state == CashLinkState::Canceled
+    pub fn expired(&self) -> bool {
+        self.state == CashLinkState::Expired
     }
     pub fn initialized(&self) -> bool {
         self.state == CashLinkState::Initialized
@@ -86,7 +86,7 @@ impl CashLink {
 
 impl IsInitialized for CashLink {
     fn is_initialized(&self) -> bool {
-        self.state != CashLinkState::Uninitialized
+        self.initialized() || self.redeeming() || self.redeemed() || self.expired()
     }
 }
 

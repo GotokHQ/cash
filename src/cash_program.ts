@@ -6,6 +6,7 @@ import bs58 from 'bs58';
 
 export class CashProgram extends Program {
   static readonly PREFIX = 'cash';
+  static readonly FINGERPRINT_PREFIX = 'fingerprint';
   static readonly PUBKEY = new PublicKey('cashQKx31fVsquVKXQ9prKqVtSYf8SqcYt9Jyvg966q');
 
   static async findCashLinkAccount(reference: PublicKey): Promise<[PublicKey, number]> {
@@ -17,10 +18,20 @@ export class CashProgram extends Program {
 
   static async findRedemptionAccount(
     cashLink: PublicKey,
-    reference: string,
+    wallet: PublicKey,
   ): Promise<[PublicKey, number]> {
     return PublicKey.findProgramAddress(
-      [Buffer.from(Redemption.PREFIX), cashLink.toBuffer(), bs58.decode(reference)],
+      [Buffer.from(Redemption.PREFIX), cashLink.toBuffer(), wallet.toBuffer()],
+      CashProgram.PUBKEY,
+    );
+  }
+
+  static async findFingerprintAccount(
+    cashLink: PublicKey,
+    fingerprint: string,
+  ): Promise<[PublicKey, number]> {
+    return PublicKey.findProgramAddress(
+      [Buffer.from(CashProgram.FINGERPRINT_PREFIX), cashLink.toBuffer(), bs58.decode(fingerprint)],
       CashProgram.PUBKEY,
     );
   }
