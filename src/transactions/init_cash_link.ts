@@ -27,8 +27,8 @@ export class InitCashLinkArgs extends Borsh.Data<InitArgs> {
     ['distributionType', 'u8'],
     ['maxNumRedemptions', 'u16'],
     ['minAmount', { kind: 'option', type: 'u64' }],
-    ['fingerprint_enabled', { kind: 'option', type: 'u8' }],
-    ['num_days_to_expire', 'u8'],
+    ['fingerprintEnabled', { kind: 'option', type: 'u8' }],
+    ['numDaysToExpire', 'u8'],
   ]);
 
   instruction = 0;
