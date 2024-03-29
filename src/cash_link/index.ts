@@ -528,7 +528,6 @@ export class CashLinkClient {
     const fingerprint = input.fingerprint;
     let fingerprintPda: PublicKey | undefined;
     let fingerprintBump: number | undefined;
-    console.log('fingerprintEnabled', cashLink.data.fingerprintEnabled);
     if (cashLink.data.fingerprintEnabled) {
       if (!fingerprint) {
         throw new Error(FINGERPRINT_NOT_FOUND);
@@ -538,8 +537,6 @@ export class CashLinkClient {
         input.fingerprint,
       );
     }
-    console.log('fingerprintBump', fingerprintBump);
-    console.log('fingerprintPda', fingerprintPda?.toBase58());
     const walletAddress = new PublicKey(input.walletAddress);
     const sender = new PublicKey(cashLink.data.sender);
     let accountKeys = [walletAddress, this.feeWallet, sender];
