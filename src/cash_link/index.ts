@@ -538,6 +538,8 @@ export class CashLinkClient {
         input.fingerprint,
       );
     }
+    console.log('fingerprintBump', fingerprintBump);
+    console.log('fingerprintPda', fingerprintPda.toBase58());
     const walletAddress = new PublicKey(input.walletAddress);
     const sender = new PublicKey(cashLink.data.sender);
     let accountKeys = [walletAddress, this.feeWallet, sender];
