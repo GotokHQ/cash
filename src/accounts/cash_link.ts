@@ -64,7 +64,7 @@ export class CashLinkData extends Borsh.Data<CashLinkDataArgs> {
     ['totalRedemptions', 'u16'],
     ['maxNumRedemptions', 'u16'],
     ['minAmount', 'u64'],
-    ['fingerprintEnabled', { kind: 'option', type: 'u8' }],
+    ['fingerprintEnabled', 'u8'],
   ]);
   accountType: AccountType;
   authority: StringPublicKey;
