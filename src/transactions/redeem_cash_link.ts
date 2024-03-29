@@ -14,7 +14,7 @@ export class RedeemCashLinkArgs extends Borsh.Data<RedeemArgs> {
     ['redemptionBump', 'u8'],
     ['cashLinkBump', 'u8'],
     ['fingerprint', { kind: 'option', type: 'string' }],
-    ['fingerprint_bump', { kind: 'option', type: 'u8' }],
+    ['fingerprintBump', { kind: 'option', type: 'u8' }],
   ]);
 
   instruction = 1;

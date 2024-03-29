@@ -528,6 +528,7 @@ export class CashLinkClient {
     const fingerprint = input.fingerprint;
     let fingerprintPda: PublicKey | undefined;
     let fingerprintBump: number | undefined;
+    console.log('fingerprintEnabled', cashLink.data.fingerprintEnabled);
     if (cashLink.data.fingerprintEnabled) {
       if (!fingerprint) {
         throw new Error(FINGERPRINT_NOT_FOUND);
