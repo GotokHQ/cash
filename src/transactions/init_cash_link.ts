@@ -38,6 +38,7 @@ export class InitCashLinkArgs extends Borsh.Data<InitArgs> {
   feeBps: number;
   fixedFee: BN;
   feeToRedeem: BN;
+  cashLinkReference: string;
   cashLinkBump: number;
   distributionType: CashLinkDistributionType;
   maxNumRedemptions: number;

@@ -13,8 +13,8 @@ export class RedeemCashLinkArgs extends Borsh.Data<RedeemArgs> {
   static readonly SCHEMA = RedeemCashLinkArgs.struct([
     ['instruction', 'u8'],
     ['redemptionBump', 'u8'],
-    ['cashLinkBump', 'u8'],
     ['cashLinkReference', 'string'],
+    ['cashLinkBump', 'u8'],
     ['fingerprint', { kind: 'option', type: 'string' }],
     ['fingerprintBump', { kind: 'option', type: 'u8' }],
   ]);
@@ -33,8 +33,8 @@ export type RedeemCashLinkParams = {
   feePayer: PublicKey;
   redemptionBump: number;
   redemption: PublicKey;
-  cashLinkBump: number;
   cashLinkReference: string;
+  cashLinkBump: number;
   fingerprintPda?: PublicKey;
   fingerprint?: string;
   fingerprintBump?: number;
