@@ -100,7 +100,7 @@ export class CashLink extends Account<CashLinkData> {
     }
   }
 
-  static async getPDA(cashLinkReference: PublicKey) {
+  static async getPDA(cashLinkReference: string) {
     const [pubKey] = await CashProgram.findCashLinkAccount(cashLinkReference);
     return pubKey;
   }
