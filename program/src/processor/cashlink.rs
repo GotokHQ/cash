@@ -42,7 +42,6 @@ pub fn process_init_cash_link(
     let sender_info = next_account_info(account_info_iter)?;
     let fee_payer_info = next_account_info(account_info_iter)?;
     let cash_link_info = next_account_info(account_info_iter)?;
-    let cash_link_reference_info = next_account_info(account_info_iter)?;
     //let vault_token_info = next_account_info(account_info_iter)?;
     let rent_info = next_account_info(account_info_iter)?;
     let system_account_info = next_account_info(account_info_iter)?;
@@ -66,7 +65,9 @@ pub fn process_init_cash_link(
         system_account_info,
         &[
             CashLink::PREFIX.as_bytes(),
-            cash_link_reference_info.key.as_ref(),
+            &bs58::decode(args.cash_link_reference)
+            .into_vec()
+            .map_err(|_| CashError::InvalidCashLinkReference)?,
             &[args.cash_link_bump],
         ],
     )?;
@@ -244,7 +245,6 @@ pub fn process_cancel(
         &cash_link.authority,
         Some(CashError::InvalidAuthorityId),
     )?;
-    let cash_link_reference_info = next_account_info(account_info_iter)?;
 
     let sender_token_info = next_account_info(account_info_iter)?;
     let fee_payer_info = next_account_info(account_info_iter)?;
@@ -266,7 +266,9 @@ pub fn process_cancel(
 
     let signer_seeds = [
         CashLink::PREFIX.as_bytes(),
-        cash_link_reference_info.key.as_ref(),
+        &bs58::decode(args.cash_link_reference)
+        .into_vec()
+        .map_err(|_| CashError::InvalidCashLinkReference)?,
         &[args.cash_link_bump],
     ];
 
@@ -360,7 +362,6 @@ pub fn process_redemption(
     if cash_link.redeemed() {
         return Err(AccountAlreadyRedeemed.into());
     }
-    let cash_link_reference_info = next_account_info(account_info_iter)?;
 
     let redemption_info = next_account_info(account_info_iter)?;
     if redemption_info.lamports() > 0 && !redemption_info.data_is_empty() {
@@ -386,7 +387,9 @@ pub fn process_redemption(
 
     let signer_seeds = [
         CashLink::PREFIX.as_bytes(),
-        cash_link_reference_info.key.as_ref(),
+        &bs58::decode(args.cash_link_reference)
+        .into_vec()
+        .map_err(|_| CashError::InvalidCashLinkReference)?,
         &[args.cash_link_bump],
     ];
 

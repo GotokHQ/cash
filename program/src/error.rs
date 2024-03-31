@@ -95,6 +95,8 @@ pub enum CashError {
     FingerprintFound,
     #[error("Invalid fingerprint")]
     InvalidFingerprint,
+    #[error("Cashink reference must be a valid base58 character")]
+    InvalidCashLinkReference,
 }
 
 impl From<CashError> for ProgramError {

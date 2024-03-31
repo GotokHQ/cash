@@ -20,6 +20,7 @@ pub struct InitCashLinkArgs {
     pub fee_bps: u16,
     pub fixed_fee: u64,
     pub fee_to_redeem: u64,
+    pub cash_link_reference: String,
     pub cash_link_bump: u8,
     pub distribution_type: DistributionType,
     pub max_num_redemptions: u16,
@@ -34,6 +35,7 @@ pub struct InitCashLinkArgs {
 /// Initialize a cash_link params
 pub struct InitCashRedemptionArgs {
     pub redemption_bump: u8,
+    pub cash_link_reference: String,
     pub cash_link_bump: u8,
     pub fingerprint: Option<String>,
     pub fingerprint_bump: Option<u8>,
@@ -44,6 +46,7 @@ pub struct InitCashRedemptionArgs {
 #[derive(BorshSerialize, BorshDeserialize, PartialEq, Debug, Clone)]
 /// Cancel a cash_link params
 pub struct CancelCashRedemptionArgs {
+    pub cash_link_reference: String,
     pub cash_link_bump: u8,
 }
 
@@ -60,14 +63,13 @@ pub enum CashInstruction {
     /// 1. `[signer][writable]`The account of the wallet owner initializing the cashlink
     /// 2. `[signer]`   The fee payer
     /// 3. `[writable]` The cash link account, it will hold all necessary info about the trade.
-    /// 4. `[]` The cash_link reference key used for deriving the cash_link account pda
-    /// 5. `[]` The rent sysvar
-    /// 6. `[]` The system program
-    /// 7. `[]` The clock account
-    /// 8. `[]` The token mint (Optional)
-    /// 9. `[writable]` The associated token for the mint derived from the cash link account (Optional)
-    /// 10. `[writable]` The sender token that must be passed if pay is true and mint is some Optional)
-    /// 11. `[]` The token program
+    /// 4. `[]` The rent sysvar
+    /// 5. `[]` The system program
+    /// 6. `[]` The clock account
+    /// 7. `[]` The token mint (Optional)
+    /// 8. `[writable]` The associated token for the mint derived from the cash link account (Optional)
+    /// 9. `[writable]` The sender token that must be passed if pay is true and mint is some Optional)
+    /// 10. `[]` The token program
     InitCashLink (InitCashLinkArgs),
     /// Redeem the cashlink
     ///
@@ -78,18 +80,17 @@ pub enum CashInstruction {
     /// 1. `[signer]` The user wallet
     /// 2. `[writable]` The fee token account for the token they will receive should the trade go through
     /// 3. `[writable]` The cash_link account holding the cash_link info
-    /// 4. `[]` The cash_link reference key used for deriving the cash_link account pda
-    /// 5. `[writable]` The redemption account to flag a user has redeemed this cashlink
-    /// 6. `[writable]` The payer token account of the payer that initialized the cash_link  
-    /// 7. `[writable]` The fee payer token account to receive tokens from the vault
-    /// 8. `[]` The clock account
-    /// 9. `[]` The rent account
-    /// 10. `[]` The recent slot hash account
-    /// 11. `[writable][Optional]` The vault token account to get tokens. This value is Optional. if the mint is set, then this must be set.
-    /// 12. `[writable][Optional]` The recipient token account for the token they will receive should the trade go through
-    /// 13. `[]` The system program
-    /// 14. `[writable][Optional]` The fingerprint info
-    /// 15. `[]` The token program
+    /// 4. `[writable]` The redemption account to flag a user has redeemed this cashlink
+    /// 5. `[writable]` The payer token account of the payer that initialized the cash_link  
+    /// 6. `[writable]` The fee payer token account to receive tokens from the vault
+    /// 7. `[]` The clock account
+    /// 8. `[]` The rent account
+    /// 9. `[]` The recent slot hash account
+    /// 10. `[writable][Optional]` The vault token account to get tokens. This value is Optional. if the mint is set, then this must be set.
+    /// 11. `[writable][Optional]` The recipient token account for the token they will receive should the trade go through
+    /// 12. `[]` The system program
+    /// 13. `[writable][Optional]` The fingerprint info
+    /// 14. `[]` The token program
     Redeem(InitCashRedemptionArgs),
     /// Cancel the cash_link
     ///
@@ -98,14 +99,13 @@ pub enum CashInstruction {
     ///
     /// 0. `[signer]` The account of the authority
     /// 1. `[writable]` The cash_link account holding the cash_link info   
-    /// 2  `[]`         The cash_link reference key used for deriving the cash_link account pda
-    /// 3. `[writable]` The payer token account of the payer that initialized the cash_link  
-    /// 4. `[writable]` The fee payer token account to receive tokens from the vault
-    /// 5. `[]` The clock account
-    /// 6. `[]` The rent account
-    /// 7. `[writable]` The vault token account to get tokens from and eventually close. This value is Optional. if the mint is set, then this must be set.
-    /// 8. `[]` The token program
-    /// 9. `[]` The system program
+    /// 2. `[writable]` The payer token account of the payer that initialized the cash_link  
+    /// 3. `[writable]` The fee payer token account to receive tokens from the vault
+    /// 4. `[]` The clock account
+    /// 5. `[]` The rent account
+    /// 6. `[writable]` The vault token account to get tokens from and eventually close. This value is Optional. if the mint is set, then this must be set.
+    /// 7. `[]` The token program
+    /// 8. `[]` The system program
     Cancel(CancelCashRedemptionArgs),
     /// Close the cash_link
     ///
@@ -125,7 +125,6 @@ pub fn init_cash_link(
     sender: &Pubkey,
     fee_payer: &Pubkey,
     cash_link_pda: &Pubkey,
-    cash_link_reference: &Pubkey,
     mint: Option<&Pubkey>,
     args: InitCashLinkArgs,
 ) -> Instruction {
@@ -139,7 +138,6 @@ pub fn init_cash_link(
         sender_key,
         AccountMeta::new(*fee_payer, true),
         AccountMeta::new(*cash_link_pda, false),
-        AccountMeta::new_readonly(*cash_link_reference, false),
         AccountMeta::new_readonly(sysvar::rent::id(), false),
         AccountMeta::new_readonly(system_program::id(), false),
         AccountMeta::new_readonly(sysvar::clock::id(), false),
@@ -165,7 +163,6 @@ pub fn cancel_cash_link(
     program_id: &Pubkey,
     authority: &Pubkey,
     cash_link: &Pubkey,
-    cash_link_reference: &Pubkey,
     sender_token: &Pubkey,
     vault_token: Option<&Pubkey>,
     fee_payer: &Pubkey,
@@ -174,7 +171,6 @@ pub fn cancel_cash_link(
     let mut accounts = vec![
         AccountMeta::new_readonly(*authority, true),
         AccountMeta::new(*cash_link, false),
-        AccountMeta::new_readonly(*cash_link_reference, false),
         AccountMeta::new(*sender_token, false),
         AccountMeta::new(*fee_payer, false),
         AccountMeta::new_readonly(sysvar::clock::id(), false),
@@ -204,7 +200,6 @@ pub fn redeem_cash_link(
     collection_fee_token: &Pubkey,
     vault_token: Option<&Pubkey>,
     cash_link: &Pubkey,
-    cash_link_reference: &Pubkey,
     redemption_pda: &Pubkey,
     sender_token: &Pubkey,
     fee_payer: &Pubkey,
@@ -216,7 +211,6 @@ pub fn redeem_cash_link(
         AccountMeta::new_readonly(*wallet, true),
         AccountMeta::new(*collection_fee_token, false),
         AccountMeta::new(*cash_link, false),
-        AccountMeta::new_readonly(*cash_link_reference, false),
         AccountMeta::new(*redemption_pda, false),
         AccountMeta::new(*sender_token, false),
         AccountMeta::new(*fee_payer, true),

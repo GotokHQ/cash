@@ -9,9 +9,9 @@ export class CashProgram extends Program {
   static readonly FINGERPRINT_PREFIX = 'fingerprint';
   static readonly PUBKEY = new PublicKey('cashQKx31fVsquVKXQ9prKqVtSYf8SqcYt9Jyvg966q');
 
-  static async findCashLinkAccount(reference: PublicKey): Promise<[PublicKey, number]> {
+  static async findCashLinkAccount(reference: string): Promise<[PublicKey, number]> {
     return PublicKey.findProgramAddress(
-      [Buffer.from(CashLink.PREFIX), reference.toBuffer()],
+      [Buffer.from(CashLink.PREFIX), bs58.decode(reference)],
       CashProgram.PUBKEY,
     );
   }
