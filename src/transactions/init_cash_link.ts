@@ -8,7 +8,6 @@ export type InitArgs = {
   feeBps: number;
   fixedFee: BN;
   feeToRedeem: BN;
-  cashLinkReference: string;
   cashLinkBump: number;
   distributionType: CashLinkDistributionType;
   maxNumRedemptions: number;
@@ -24,7 +23,6 @@ export class InitCashLinkArgs extends Borsh.Data<InitArgs> {
     ['feeBps', 'u16'],
     ['fixedFee', 'u64'],
     ['feeToRedeem', 'u64'],
-    ['cashLinkReference', 'string'],
     ['cashLinkBump', 'u8'],
     ['distributionType', 'u8'],
     ['maxNumRedemptions', 'u16'],
@@ -38,7 +36,6 @@ export class InitCashLinkArgs extends Borsh.Data<InitArgs> {
   feeBps: number;
   fixedFee: BN;
   feeToRedeem: BN;
-  cashLinkReference: string;
   cashLinkBump: number;
   distributionType: CashLinkDistributionType;
   maxNumRedemptions: number;
@@ -57,7 +54,7 @@ export type InitCashLinkParams = {
   feePayer: PublicKey;
   sender: PublicKey;
   cashLink: PublicKey;
-  cashLinkReference: string;
+  passKey: PublicKey;
   mint?: PublicKey | null;
   distributionType: CashLinkDistributionType;
   maxNumRedemptions: number;

@@ -66,7 +66,9 @@ export class CashLinkClient {
   }
 
   cancel = async (input: CashLinkInput): Promise<ResultContext> => {
-    const [cashLinkAddress, bump] = await CashProgram.findCashLinkAccount(input.cashLinkReference);
+    const [cashLinkAddress, bump] = await CashProgram.findCashLinkAccount(
+      new PublicKey(input.passKey),
+    );
     const cashLink = await _getCashLinkAccount(this.connection, cashLinkAddress);
     if (cashLink == null) {
       throw new Error(FAILED_TO_FIND_ACCOUNT);
@@ -98,7 +100,9 @@ export class CashLinkClient {
   };
 
   cancelAndClose = async (input: CashLinkInput): Promise<ResultContext> => {
-    const [cashLinkAddress, bump] = await CashProgram.findCashLinkAccount(input.cashLinkReference);
+    const [cashLinkAddress, bump] = await CashProgram.findCashLinkAccount(
+      new PublicKey(input.passKey),
+    );
     const cashLink = await _getCashLinkAccount(this.connection, cashLinkAddress);
     if (cashLink == null) {
       throw new Error(FAILED_TO_FIND_ACCOUNT);
@@ -152,7 +156,7 @@ export class CashLinkClient {
     const cancelInstruction = await this.cancelInstruction({
       authority: this.authority.publicKey,
       cashLink: cashLink.pubkey,
-      senderToken: cashLink.data.mint
+      ownerToken: cashLink.data.mint
         ? (
             await spl.getOrCreateAssociatedTokenAccount(
               this.connection,
@@ -167,8 +171,8 @@ export class CashLinkClient {
         ? await _findAssociatedTokenAddress(cashLink.pubkey, new PublicKey(cashLink.data.mint))
         : null,
       feePayer: this.feePayer.publicKey,
+      passKey: new PublicKey(input.passKey),
       cashLinkBump,
-      cashLinkReference: input.cashLinkReference,
     });
     return new Transaction().add(cancelInstruction);
   };
@@ -177,7 +181,8 @@ export class CashLinkClient {
     const keys = [
       { pubkey: params.authority, isSigner: true, isWritable: false },
       { pubkey: params.cashLink, isSigner: false, isWritable: true },
-      { pubkey: params.senderToken, isSigner: false, isWritable: true },
+      { pubkey: params.passKey, isSigner: false, isWritable: false },
+      { pubkey: params.ownerToken, isSigner: false, isWritable: true },
       { pubkey: params.feePayer, isSigner: false, isWritable: true },
       {
         pubkey: SYSVAR_CLOCK_PUBKEY,
@@ -219,7 +224,7 @@ export class CashLinkClient {
   };
 
   close = async (input: CashLinkInput): Promise<ResultContext> => {
-    const [cashLinkAddress] = await CashProgram.findCashLinkAccount(input.cashLinkReference);
+    const [cashLinkAddress] = await CashProgram.findCashLinkAccount(new PublicKey(input.passKey));
     const cashLink = await _getCashLinkAccount(this.connection, cashLinkAddress);
     if (cashLink == null || !cashLink.data) {
       throw new Error(FAILED_TO_FIND_ACCOUNT);
@@ -315,7 +320,8 @@ export class CashLinkClient {
   initializeTransaction = async (input: InitializeCashLinkInput): Promise<Transaction> => {
     const sender = new PublicKey(input.wallet);
     const mint: PublicKey | null = input.mint ? new PublicKey(input.mint) : null;
-    const [cashLink, cashLinkBump] = await CashProgram.findCashLinkAccount(input.cashLinkReference);
+    const passKey = new PublicKey(input.passKey);
+    const [cashLink, cashLinkBump] = await CashProgram.findCashLinkAccount(passKey);
     const amount = new BN(input.amount);
     const fixedFee = new BN(input.fixedFee ?? 0);
     const feeToRedeem = new BN(input.feeToRedeem ?? 0);
@@ -332,8 +338,8 @@ export class CashLinkClient {
       feeToRedeem,
       maxNumRedemptions,
       minAmount,
+      passKey,
       amount: amount,
-      cashLinkReference: input.cashLinkReference,
       authority: this.authority.publicKey,
       feePayer: this.feePayer.publicKey,
       distributionType: input.distributionType,
@@ -352,7 +358,7 @@ export class CashLinkClient {
       feeBps,
       fixedFee,
       feeToRedeem,
-      cashLinkReference,
+      passKey,
       distributionType,
       sender,
       cashLinkBump,
@@ -375,7 +381,6 @@ export class CashLinkClient {
       minAmount,
       fingerprintEnabled,
       numDaysToExpire,
-      cashLinkReference,
     });
     const keys = [
       {
@@ -397,6 +402,11 @@ export class CashLinkClient {
         pubkey: cashLink,
         isSigner: false,
         isWritable: true,
+      },
+      {
+        pubkey: passKey,
+        isSigner: false,
+        isWritable: false,
       },
       {
         pubkey: SYSVAR_RENT_PUBKEY,
@@ -426,9 +436,9 @@ export class CashLinkClient {
         isSigner: false,
         isWritable: true,
       });
-      const senderToken = await _findAssociatedTokenAddress(sender, mint);
+      const ownerToken = await _findAssociatedTokenAddress(sender, mint);
       keys.push({
-        pubkey: senderToken,
+        pubkey: ownerToken,
         isSigner: false,
         isWritable: true,
       });
@@ -507,10 +517,8 @@ export class CashLinkClient {
   };
 
   redeemTransaction = async (input: RedeemCashLinkInput): Promise<Transaction> => {
-    const [cashLinkAddress, cashLinkBump] = await CashProgram.findCashLinkAccount(
-      input.cashLinkReference,
-    );
-
+    const passKey = new PublicKey(input.passKey);
+    const [cashLinkAddress, cashLinkBump] = await CashProgram.findCashLinkAccount(passKey);
     const cashLink = await _getCashLinkAccount(this.connection, cashLinkAddress, input.commitment);
     if (cashLink == null) {
       throw new Error(FAILED_TO_FIND_ACCOUNT);
@@ -570,12 +578,12 @@ export class CashLinkClient {
     const redeemInstruction = await this.redeemInstruction({
       redemption,
       cashLinkBump,
-      cashLinkReference: input.cashLinkReference,
+      passKey,
       redemptionBump: redemptionBump,
       wallet: walletAddress,
       walletToken: accountKeys[0],
       feeToken: accountKeys[1],
-      senderToken: accountKeys[2],
+      ownerToken: accountKeys[2],
       vaultToken,
       authority: this.authority.publicKey,
       cashLink: cashLink.pubkey,
@@ -595,8 +603,9 @@ export class CashLinkClient {
       { pubkey: params.wallet, isSigner: true, isWritable: true },
       { pubkey: params.feeToken, isSigner: false, isWritable: true },
       { pubkey: params.cashLink, isSigner: false, isWritable: true },
+      { pubkey: params.passKey, isSigner: true, isWritable: false },
       { pubkey: params.redemption, isSigner: false, isWritable: true },
-      { pubkey: params.senderToken, isSigner: false, isWritable: true },
+      { pubkey: params.ownerToken, isSigner: false, isWritable: true },
       { pubkey: params.feePayer, isSigner: true, isWritable: false },
       {
         pubkey: SYSVAR_CLOCK_PUBKEY,
@@ -645,7 +654,6 @@ export class CashLinkClient {
       data: RedeemCashLinkArgs.serialize({
         cashLinkBump: params.cashLinkBump,
         redemptionBump: params.redemptionBump,
-        cashLinkReference: params.cashLinkReference,
         fingerprintBump: params.fingerprintBump,
         fingerprint: params.fingerprint,
       }),

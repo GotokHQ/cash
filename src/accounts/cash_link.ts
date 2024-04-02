@@ -11,7 +11,7 @@ import bs58 from 'bs58';
 import { CashProgram } from '../cash_program';
 import { AccountType } from './account';
 
-export const MAX_CASH_LINK_DATA_LEN = 164;
+export const MAX_CASH_LINK_DATA_LEN = 196;
 
 export enum CashLinkState {
   Initialized = 0,
@@ -100,8 +100,8 @@ export class CashLink extends Account<CashLinkData> {
     }
   }
 
-  static async getPDA(cashLinkReference: string) {
-    const [pubKey] = await CashProgram.findCashLinkAccount(cashLinkReference);
+  static async getPDA(passKey: PublicKey) {
+    const [pubKey] = await CashProgram.findCashLinkAccount(passKey);
     return pubKey;
   }
 

@@ -8,7 +8,6 @@ export type InitCancelArgs = {
 export class CancelCashLinkArgs extends Borsh.Data<InitCancelArgs> {
   static readonly SCHEMA = CancelCashLinkArgs.struct([
     ['instruction', 'u8'],
-    ['cashLinkReference', 'string'],
     ['cashLinkBump', 'u8'],
   ]);
   instruction = 2;
@@ -19,9 +18,9 @@ export class CancelCashLinkArgs extends Borsh.Data<InitCancelArgs> {
 export type CancelCashLinkParams = {
   authority: PublicKey;
   cashLink: PublicKey;
-  senderToken: PublicKey;
+  ownerToken: PublicKey;
+  passKey: PublicKey;
   vaultToken?: PublicKey | null;
   feePayer: PublicKey;
-  cashLinkReference: string;
   cashLinkBump: number;
 };

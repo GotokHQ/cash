@@ -39,9 +39,10 @@ pub fn process_init_cash_link(
     let account_info_iter = &mut accounts.iter();
     let authority_info = next_account_info(account_info_iter)?;
     assert_signer(authority_info)?;
-    let sender_info = next_account_info(account_info_iter)?;
+    let owner_info = next_account_info(account_info_iter)?;
     let fee_payer_info = next_account_info(account_info_iter)?;
     let cash_link_info = next_account_info(account_info_iter)?;
+    let pass_info = next_account_info(account_info_iter)?;
     //let vault_token_info = next_account_info(account_info_iter)?;
     let rent_info = next_account_info(account_info_iter)?;
     let system_account_info = next_account_info(account_info_iter)?;
@@ -65,9 +66,7 @@ pub fn process_init_cash_link(
         system_account_info,
         &[
             CashLink::PREFIX.as_bytes(),
-            &bs58::decode(args.cash_link_reference)
-            .into_vec()
-            .map_err(|_| CashError::InvalidCashLinkReference)?,
+            pass_info.key.as_ref(),
             &[args.cash_link_bump],
         ],
     )?;
@@ -124,7 +123,8 @@ pub fn process_init_cash_link(
     cash_link.fee_to_redeem = args.fee_to_redeem;
     cash_link.remaining_amount = total_amount;
     cash_link.authority = *authority_info.key;
-    cash_link.sender = *sender_info.key;
+    cash_link.pass_key = *pass_info.key;
+    cash_link.owner = *owner_info.key;
     cash_link.distribution_type = args.distribution_type;
     cash_link.max_num_redemptions = args.max_num_redemptions;
     cash_link.fingerprint_enabled  = match args.fingerprint_enabled {
@@ -173,19 +173,20 @@ pub fn process_init_cash_link(
                     rent_info,
                 )?;
             }
-            let sender_token_info = next_account_info(account_info_iter)?;
-            assert_owned_by(sender_token_info, &spl_token::id())?;
-            let sender_token: TokenAccount = assert_initialized(sender_token_info)?;
-            assert_token_owned_by(&sender_token, sender_info.key)?;
-            spl_token_transfer(sender_token_info, vault_token_info, sender_info, total, &[])?;
-            //spl_token_transfer(sender_token_info, fee_token_info, sender_info, total_platform_fee, &[])?;
+            let owner_token_info = next_account_info(account_info_iter)?;
+            assert_owned_by(owner_token_info, &spl_token::id())?;
+            let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
+            assert_token_owned_by(&owner_token, owner_info.key)?;
+            spl_token_transfer(owner_token_info, vault_token_info, owner_info, total, &[])?;
+            //spl_token_transfer(owner_token_info, fee_token_info, owner_info, total_platform_fee, &[])?;
         }
         None => {
-            native_transfer(sender_info, cash_link_info, total, &[])?;
-            //native_transfer(sender_info, fee_token_info, total_platform_fee, &[])?;
+            native_transfer(owner_info, cash_link_info, total, &[])?;
+            //native_transfer(owner_info, fee_token_info, total_platform_fee, &[])?;
             cash_link.mint = None;
         }
     };
+
     CashLink::pack(cash_link, &mut cash_link_info.data.borrow_mut())?;
     Ok(())
 }
@@ -193,7 +194,7 @@ pub fn process_init_cash_link(
 fn create_cash_link<'a>(
     program_id: &Pubkey,
     cash_link_info: &AccountInfo<'a>,
-    sender_info: &AccountInfo<'a>,
+    owner_info: &AccountInfo<'a>,
     rent_sysvar_info: &AccountInfo<'a>,
     system_program_info: &AccountInfo<'a>,
     signer_seeds: &[&[u8]],
@@ -210,7 +211,7 @@ fn create_cash_link<'a>(
                 program_id,
                 cash_link_info,
                 rent_sysvar_info,
-                sender_info,
+                owner_info,
                 system_program_info,
                 CashLink::LEN,
                 signer_seeds,
@@ -238,6 +239,7 @@ pub fn process_cancel(
 
     let cash_link_info = next_account_info(account_info_iter)?;
     assert_owned_by(cash_link_info, program_id)?;
+    let pass_info = next_account_info(account_info_iter)?;
     let mut cash_link = CashLink::unpack(&cash_link_info.data.borrow())?;
 
     assert_account_key(
@@ -246,7 +248,13 @@ pub fn process_cancel(
         Some(CashError::InvalidAuthorityId),
     )?;
 
-    let sender_token_info = next_account_info(account_info_iter)?;
+    assert_account_key(
+        pass_info,
+        &cash_link.pass_key,
+        Some(CashError::InvalidPassKey),
+    )?;
+
+    let owner_token_info = next_account_info(account_info_iter)?;
     let fee_payer_info = next_account_info(account_info_iter)?;
 
     let clock_info = next_account_info(account_info_iter)?;
@@ -266,9 +274,7 @@ pub fn process_cancel(
 
     let signer_seeds = [
         CashLink::PREFIX.as_bytes(),
-        &bs58::decode(args.cash_link_reference)
-        .into_vec()
-        .map_err(|_| CashError::InvalidCashLinkReference)?,
+        pass_info.key.as_ref(),
         &[args.cash_link_bump],
     ];
 
@@ -283,11 +289,11 @@ pub fn process_cancel(
             Some(CashError::InvalidVaultTokenOwner),
         )?;
         if vault_token.amount > 0 {
-            let sender_token: TokenAccount = assert_initialized(sender_token_info)?;
-            assert_token_owned_by(&sender_token, &cash_link.sender)?;
+            let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
+            assert_token_owned_by(&owner_token, &cash_link.owner)?;
             spl_token_transfer(
                 vault_token_info,
-                sender_token_info,
+                owner_token_info,
                 cash_link_info,
                 vault_token.amount,
                 &[&signer_seeds],
@@ -316,8 +322,8 @@ pub fn process_cancel(
         if remaining_amount > 0 {
             **cash_link_info.lamports.borrow_mut() = min_lamports;
 
-            let dest_starting_lamports = sender_token_info.lamports();
-            **sender_token_info.lamports.borrow_mut() = dest_starting_lamports
+            let dest_starting_lamports = owner_token_info.lamports();
+            **owner_token_info.lamports.borrow_mut() = dest_starting_lamports
                 .checked_add(remaining_amount)
                 .ok_or(AmountOverflow)?;
         }
@@ -343,10 +349,11 @@ pub fn process_redemption(
 
     let wallet_info = next_account_info(account_info_iter)?;
 
-    assert_signer(wallet_info)?;
+
 
     let fee_token_info = next_account_info(account_info_iter)?;
     let cash_link_info = next_account_info(account_info_iter)?;
+    let pass_info = next_account_info(account_info_iter)?;
     assert_owned_by(cash_link_info, program_id)?;
     let mut cash_link = CashLink::unpack(&cash_link_info.data.borrow())?;
 
@@ -355,6 +362,14 @@ pub fn process_redemption(
         &cash_link.authority,
         Some(CashError::InvalidAuthorityId),
     )?;
+
+    assert_account_key(
+        pass_info,
+        &cash_link.pass_key,
+        Some(CashError::InvalidPassKey),
+    )?;
+
+    assert_signer(pass_info)?;
 
     if cash_link.expired() {
         return Err(AccountAlreadyExpired.into());
@@ -368,7 +383,7 @@ pub fn process_redemption(
         msg!("AccountAlreadyInitialized");
         return Err(ProgramError::AccountAlreadyInitialized);
     }
-    let sender_token_info = next_account_info(account_info_iter)?; //sender_token_info
+    let owner_token_info = next_account_info(account_info_iter)?; //owner_token_info
     let fee_payer_info = next_account_info(account_info_iter)?;
     let clock_info = next_account_info(account_info_iter)?;
     let clock = &Clock::from_account_info(clock_info)?;
@@ -387,9 +402,7 @@ pub fn process_redemption(
 
     let signer_seeds = [
         CashLink::PREFIX.as_bytes(),
-        &bs58::decode(args.cash_link_reference)
-        .into_vec()
-        .map_err(|_| CashError::InvalidCashLinkReference)?,
+        pass_info.key.as_ref(),
         &[args.cash_link_bump],
     ];
 
@@ -495,12 +508,12 @@ pub fn process_redemption(
             .checked_sub(total)
             .ok_or::<ProgramError>(CashError::Overflow.into())?;
         if cash_link.is_fully_redeemed()? {
-            let sender_token: TokenAccount = assert_initialized(sender_token_info)?;
-            assert_token_owned_by(&sender_token, &cash_link.sender)?;
+            let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
+            assert_token_owned_by(&owner_token, &cash_link.owner)?;
             if remaining > 0 {
                 spl_token_transfer(
                     vault_token_info,
-                    sender_token_info,
+                    owner_token_info,
                     cash_link_info,
                     remaining,
                     &[&signer_seeds],
@@ -543,8 +556,8 @@ pub fn process_redemption(
         }
         let remaining = available_amount.checked_sub(total).ok_or(AmountOverflow)?;
         if cash_link.is_fully_redeemed()? && remaining > 0 {
-            let dest_starting_lamports = sender_token_info.lamports();
-            **sender_token_info.lamports.borrow_mut() = dest_starting_lamports
+            let dest_starting_lamports = owner_token_info.lamports();
+            **owner_token_info.lamports.borrow_mut() = dest_starting_lamports
                 .checked_add(remaining)
                 .ok_or(AmountOverflow)?;
             source_starting_lamports = source_starting_lamports
