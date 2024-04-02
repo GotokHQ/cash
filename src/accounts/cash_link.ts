@@ -36,7 +36,7 @@ export type CashLinkDataArgs = {
   remainingAmount: BN;
   remainingFee: BN;
   distributionType: CashLinkDistributionType;
-  sender: number;
+  owner: number;
   lastRedeemedAt?: BN;
   canceledAt?: BN;
   mint?: StringPublicKey;
@@ -44,6 +44,7 @@ export type CashLinkDataArgs = {
   maxNumRedemptions: BN;
   minAmount: BN;
   fingerprintEnabled?: boolean;
+  passKey: StringPublicKey;
 };
 
 export class CashLinkData extends Borsh.Data<CashLinkDataArgs> {
@@ -57,7 +58,7 @@ export class CashLinkData extends Borsh.Data<CashLinkDataArgs> {
     ['feeToRedeem', 'u64'],
     ['remainingAmount', 'u64'],
     ['distributionType', 'u8'],
-    ['sender', 'pubkeyAsString'],
+    ['owner', 'pubkeyAsString'],
     ['lastRedeemedAt', { kind: 'option', type: 'u64' }],
     ['expiresAt', 'u64'],
     ['mint', { kind: 'option', type: 'pubkeyAsString' }],
@@ -65,6 +66,7 @@ export class CashLinkData extends Borsh.Data<CashLinkDataArgs> {
     ['maxNumRedemptions', 'u16'],
     ['minAmount', 'u64'],
     ['fingerprintEnabled', 'u8'],
+    ['passKey', 'pubkeyAsString'],
   ]);
   accountType: AccountType;
   authority: StringPublicKey;
@@ -76,7 +78,7 @@ export class CashLinkData extends Borsh.Data<CashLinkDataArgs> {
   remainingAmount: BN;
   remainingFee: BN;
   distributionType: CashLinkDistributionType;
-  sender: StringPublicKey;
+  owner: StringPublicKey;
   lastRedeemedAt: BN | null;
   expiresAt: BN | null;
   mint?: StringPublicKey;
@@ -84,6 +86,7 @@ export class CashLinkData extends Borsh.Data<CashLinkDataArgs> {
   maxNumRedemptions: number;
   minAmount: BN;
   fingerprintEnabled?: boolean;
+  passKey: StringPublicKey;
 
   constructor(args: CashLinkDataArgs) {
     super(args);

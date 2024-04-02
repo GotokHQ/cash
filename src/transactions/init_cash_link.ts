@@ -52,7 +52,7 @@ export type InitCashLinkParams = {
   cashLinkBump: number;
   authority: PublicKey;
   feePayer: PublicKey;
-  sender: PublicKey;
+  owner: PublicKey;
   cashLink: PublicKey;
   passKey: PublicKey;
   mint?: PublicKey | null;

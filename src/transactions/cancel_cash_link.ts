@@ -11,7 +11,6 @@ export class CancelCashLinkArgs extends Borsh.Data<InitCancelArgs> {
     ['cashLinkBump', 'u8'],
   ]);
   instruction = 2;
-  cashLinkReference: string;
   cashLinkBump: number;
 }
 

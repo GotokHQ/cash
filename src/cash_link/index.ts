@@ -152,7 +152,7 @@ export class CashLinkClient {
     if (cashLink.data?.state === CashLinkState.Redeemed) {
       throw new Error(ACCOUNT_ALREADY_SETTLED);
     }
-    const sender = new PublicKey(cashLink.data.sender);
+    const owner = new PublicKey(cashLink.data.owner);
     const cancelInstruction = await this.cancelInstruction({
       authority: this.authority.publicKey,
       cashLink: cashLink.pubkey,
@@ -162,11 +162,11 @@ export class CashLinkClient {
               this.connection,
               this.feePayer,
               new PublicKey(cashLink.data.mint),
-              sender,
+              owner,
               true,
             )
           ).address
-        : sender,
+        : owner,
       vaultToken: cashLink.data.mint
         ? await _findAssociatedTokenAddress(cashLink.pubkey, new PublicKey(cashLink.data.mint))
         : null,
@@ -318,7 +318,7 @@ export class CashLinkClient {
   };
 
   initializeTransaction = async (input: InitializeCashLinkInput): Promise<Transaction> => {
-    const sender = new PublicKey(input.wallet);
+    const owner = new PublicKey(input.wallet);
     const mint: PublicKey | null = input.mint ? new PublicKey(input.mint) : null;
     const passKey = new PublicKey(input.passKey);
     const [cashLink, cashLinkBump] = await CashProgram.findCashLinkAccount(passKey);
@@ -330,7 +330,7 @@ export class CashLinkClient {
     const minAmount = input.minAmount ? new BN(input.minAmount) : undefined;
     const initParams: InitCashLinkParams = {
       mint,
-      sender,
+      owner,
       cashLinkBump,
       cashLink,
       feeBps,
@@ -360,7 +360,7 @@ export class CashLinkClient {
       feeToRedeem,
       passKey,
       distributionType,
-      sender,
+      owner,
       cashLinkBump,
       authority,
       cashLink,
@@ -389,7 +389,7 @@ export class CashLinkClient {
         isWritable: false,
       },
       {
-        pubkey: sender,
+        pubkey: owner,
         isSigner: true,
         isWritable: !mint,
       },
@@ -436,7 +436,7 @@ export class CashLinkClient {
         isSigner: false,
         isWritable: true,
       });
-      const ownerToken = await _findAssociatedTokenAddress(sender, mint);
+      const ownerToken = await _findAssociatedTokenAddress(owner, mint);
       keys.push({
         pubkey: ownerToken,
         isSigner: false,
@@ -536,8 +536,8 @@ export class CashLinkClient {
       );
     }
     const walletAddress = new PublicKey(input.walletAddress);
-    const sender = new PublicKey(cashLink.data.sender);
-    let accountKeys = [walletAddress, this.feeWallet, sender];
+    const owner = new PublicKey(cashLink.data.owner);
+    let accountKeys = [walletAddress, this.feeWallet, owner];
     let vaultToken: PublicKey | null = null;
     if (cashLink.data.mint) {
       const mint = new PublicKey(cashLink.data.mint);
