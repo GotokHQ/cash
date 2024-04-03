@@ -600,7 +600,7 @@ export class CashLinkClient {
   redeemInstruction = async (params: RedeemCashLinkParams): Promise<TransactionInstruction> => {
     const keys = [
       { pubkey: params.authority, isSigner: true, isWritable: false },
-      { pubkey: params.wallet, isSigner: true, isWritable: true },
+      { pubkey: params.wallet, isSigner: false, isWritable: true },
       { pubkey: params.feeToken, isSigner: false, isWritable: true },
       { pubkey: params.cashLink, isSigner: false, isWritable: true },
       { pubkey: params.passKey, isSigner: true, isWritable: false },
