@@ -8,13 +8,12 @@ use solana_program::{
 
 use super::AccountType;
 
-pub const REDEMPTION_SIZE: usize = 49;
+pub const REDEMPTION_SIZE: usize = 17;
 
 #[repr(C)]
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Default)]
 pub struct Redemption {
     pub account_type: AccountType,
-    pub cash_link: Pubkey,
     pub redeemed_at: u64,
     pub amount: u64
 }

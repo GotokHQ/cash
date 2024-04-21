@@ -635,7 +635,6 @@ pub fn process_redemption(
     }
     let mut redemption = Redemption::unpack_unchecked(&redemption_info.data.borrow_mut())?;
     redemption.account_type = AccountType::Redemption;
-    redemption.cash_link = *cash_link_info.key;
     redemption.redeemed_at = clock.unix_timestamp as u64;
     redemption.amount = amount_to_redeem;
     Redemption::pack(redemption, &mut redemption_info.data.borrow_mut())?;
