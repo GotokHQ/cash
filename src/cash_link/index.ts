@@ -34,7 +34,7 @@ import {
   RedeemCashLinkParams,
 } from '../transactions';
 import { Account } from '@metaplex-foundation/mpl-core';
-import { Redemption } from 'src/accounts/redemption';
+import { Redemption } from '../accounts/redemption';
 
 export const FAILED_TO_FIND_ACCOUNT = 'Failed to find account';
 export const INVALID_ACCOUNT_OWNER = 'Invalid account owner';
