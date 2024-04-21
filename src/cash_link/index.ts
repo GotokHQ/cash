@@ -12,7 +12,6 @@ import {
   RpcResponseAndContext,
   SignatureResult,
   ComputeBudgetProgram,
-  AccountInfo,
 } from '@solana/web3.js';
 import * as spl from '@solana/spl-token';
 import BN from 'bn.js';
@@ -35,6 +34,7 @@ import {
   RedeemCashLinkParams,
 } from '../transactions';
 import { Account } from '@metaplex-foundation/mpl-core';
+import { Redemption } from 'src/accounts/redemption';
 
 export const FAILED_TO_FIND_ACCOUNT = 'Failed to find account';
 export const INVALID_ACCOUNT_OWNER = 'Invalid account owner';
@@ -702,7 +702,7 @@ export class CashLinkClient {
   getCashLinkRedemption = async (
     address: PublicKey,
     commitment?: Commitment,
-  ): Promise<AccountInfo<Buffer> | null> => {
+  ): Promise<Redemption | null> => {
     try {
       return await _getCashLinkRedemptionAccount(this.connection, address, commitment);
     } catch (error) {
@@ -736,15 +736,16 @@ const _getCashLinkAccount = async (
 
 const _getCashLinkRedemptionAccount = async (
   connection: Connection,
-  cashLinkAddress: PublicKey,
+  redemptionAddress: PublicKey,
   commitment?: Commitment,
-): Promise<AccountInfo<Buffer> | null> => {
+): Promise<Redemption | null> => {
   try {
-    const accountInfo = await connection.getAccountInfo(cashLinkAddress, commitment);
+    const accountInfo = await connection.getAccountInfo(redemptionAddress, commitment);
     if (accountInfo === null) {
       return null;
     }
-    return accountInfo;
+    const redemption = Redemption.from(new Account(redemptionAddress, accountInfo));
+    return redemption;
   } catch (error) {
     return null;
   }

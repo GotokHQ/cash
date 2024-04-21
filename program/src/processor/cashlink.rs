@@ -6,7 +6,7 @@ use crate::{
     instruction::{CancelCashRedemptionArgs, InitCashLinkArgs, InitCashRedemptionArgs},
     math::SafeMath,
     state::{
-        cashlink::{CashLink, CashLinkState, DistributionType}, REDEMPTION_PREFIX, AccountType, FINGERPRINT_PREFIX, FLAG_ACCOUNT_SIZE
+        cashlink::{CashLink, CashLinkState, DistributionType}, redemption::Redemption, AccountType, FINGERPRINT_PREFIX, FLAG_ACCOUNT_SIZE
     },
     utils::{
         assert_account_key, assert_initialized, assert_owned_by, assert_signer,
@@ -589,9 +589,9 @@ pub fn process_redemption(
         rent_info,
         fee_payer_info,
         system_account_info,
-        FLAG_ACCOUNT_SIZE,
+        Redemption::LEN,
         &[
-            REDEMPTION_PREFIX.as_bytes(),
+            Redemption::PREFIX.as_bytes(),
             cash_link_info.key.as_ref(),
             wallet_info.key.as_ref(),
             &[args.redemption_bump],
@@ -633,13 +633,12 @@ pub fn process_redemption(
             return Err(CashError::FingerprintBumpNotFound.into());
         }
     }
-    // let mut redemption = Redemption::unpack_unchecked(&redemption_info.data.borrow_mut())?;
-    // redemption.account_type = AccountType::Redemption;
-    // redemption.cash_link = *cash_link_info.key;
-    // redemption.redeemed_at = clock.unix_timestamp as u64;
-    // redemption.wallet = *wallet_info.key;
-    // redemption.amount = amount_to_redeem;
-    // Redemption::pack(redemption, &mut redemption_info.data.borrow_mut())?;
+    let mut redemption = Redemption::unpack_unchecked(&redemption_info.data.borrow_mut())?;
+    redemption.account_type = AccountType::Redemption;
+    redemption.cash_link = *cash_link_info.key;
+    redemption.redeemed_at = clock.unix_timestamp as u64;
+    redemption.amount = amount_to_redeem;
+    Redemption::pack(redemption, &mut redemption_info.data.borrow_mut())?;
     cash_link.state = if cash_link.is_fully_redeemed()? {
         CashLinkState::Redeemed
     } else {
