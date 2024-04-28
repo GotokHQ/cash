@@ -18,8 +18,8 @@ use crate::state::cashlink::DistributionType;
 pub struct InitCashLinkArgs {
     pub amount: u64,
     pub fee_bps: u16,
-    pub fixed_fee: u64,
-    pub fee_to_redeem: u64,
+    pub base_fee_to_redeem: u64,
+    pub rent_fee_to_redeem: u64,
     pub cash_link_bump: u8,
     pub distribution_type: DistributionType,
     pub max_num_redemptions: u16,

@@ -323,8 +323,8 @@ export class CashLinkClient {
     const passKey = new PublicKey(input.passKey);
     const [cashLink, cashLinkBump] = await CashProgram.findCashLinkAccount(passKey);
     const amount = new BN(input.amount);
-    const fixedFee = new BN(input.fixedFee ?? 0);
-    const feeToRedeem = new BN(input.feeToRedeem ?? 0);
+    const rentFeeToRedeem = new BN(input.rentFeeToRedeem ?? 0);
+    const baseFeeToRedeem = new BN(input.baseFeeToRedeem ?? 0);
     const feeBps = input.feeBps ?? 0;
     const maxNumRedemptions = input.maxNumRedemptions;
     const minAmount = input.minAmount ? new BN(input.minAmount) : undefined;
@@ -334,8 +334,8 @@ export class CashLinkClient {
       cashLinkBump,
       cashLink,
       feeBps,
-      fixedFee,
-      feeToRedeem,
+      rentFeeToRedeem,
+      baseFeeToRedeem,
       maxNumRedemptions,
       minAmount,
       passKey,
@@ -356,8 +356,8 @@ export class CashLinkClient {
     const {
       amount,
       feeBps,
-      fixedFee,
-      feeToRedeem,
+      rentFeeToRedeem,
+      baseFeeToRedeem,
       passKey,
       distributionType,
       owner,
@@ -370,12 +370,11 @@ export class CashLinkClient {
       fingerprintEnabled,
       numDaysToExpire,
     } = params;
-    console.log('numDaysToExpire', numDaysToExpire);
     const data = InitCashLinkArgs.serialize({
       amount,
       feeBps,
-      fixedFee,
-      feeToRedeem,
+      rentFeeToRedeem,
+      baseFeeToRedeem,
       cashLinkBump,
       distributionType,
       maxNumRedemptions,

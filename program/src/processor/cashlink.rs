@@ -1,12 +1,14 @@
 use crate::{
     error::CashError::{
-        self, AccountAlreadyExpired, AccountAlreadyRedeemed, AccountNotExpired,
-        AmountOverflow, InsufficientSettlementFunds,
+        self, AccountAlreadyExpired, AccountAlreadyRedeemed, AccountNotExpired, AmountOverflow,
+        InsufficientSettlementFunds,
     },
     instruction::{CancelCashRedemptionArgs, InitCashLinkArgs, InitCashRedemptionArgs},
     math::SafeMath,
     state::{
-        cashlink::{CashLink, CashLinkState, DistributionType}, redemption::Redemption, AccountType, FINGERPRINT_PREFIX, FLAG_ACCOUNT_SIZE
+        cashlink::{CashLink, CashLinkState, DistributionType},
+        redemption::Redemption,
+        AccountType, FINGERPRINT_PREFIX, FLAG_ACCOUNT_SIZE,
     },
     utils::{
         assert_account_key, assert_initialized, assert_owned_by, assert_signer,
@@ -76,15 +78,19 @@ pub fn process_init_cash_link(
     if args.max_num_redemptions == 0 {
         return Err(CashError::InvalidNumberOfRedemptions.into());
     }
-    let fee_from_bps = calculate_fee(args.amount, args.fee_bps as u64)?;
-    let total_platform_fee = fee_from_bps
-        .checked_add(args.fixed_fee)
-        .ok_or::<ProgramError>(CashError::Overflow.into())?;
+    let total_platform_fee = calculate_fee(args.amount, args.fee_bps as u64)?;
 
-    let total_redemption_fee = args
-        .fee_to_redeem
-        .checked_mul(args.max_num_redemptions as u64)
-        .ok_or::<ProgramError>(CashError::Overflow.into())?;
+    let total_redemption_fee = if mint_info.is_some() {
+        args.base_fee_to_redeem
+            .checked_add(args.rent_fee_to_redeem)
+            .ok_or::<ProgramError>(CashError::Overflow.into())?
+            .checked_mul(args.max_num_redemptions as u64)
+            .ok_or::<ProgramError>(CashError::Overflow.into())?
+    } else {
+        args.base_fee_to_redeem
+            .checked_mul(args.max_num_redemptions as u64)
+            .ok_or::<ProgramError>(CashError::Overflow.into())?
+    };
 
     let total_amount = match args.distribution_type {
         DistributionType::Fixed => {
@@ -119,16 +125,16 @@ pub fn process_init_cash_link(
     cash_link.state = CashLinkState::Initialized;
     cash_link.amount = total_amount;
     cash_link.fee_bps = args.fee_bps;
-    cash_link.fixed_fee = args.fixed_fee;
-    cash_link.fee_to_redeem = args.fee_to_redeem;
+    cash_link.base_fee_to_redeem = args.base_fee_to_redeem;
+    cash_link.rent_fee_to_redeem = args.rent_fee_to_redeem;
     cash_link.remaining_amount = total_amount;
     cash_link.authority = *authority_info.key;
     cash_link.pass_key = *pass_info.key;
     cash_link.owner = *owner_info.key;
     cash_link.distribution_type = args.distribution_type;
     cash_link.max_num_redemptions = args.max_num_redemptions;
-    cash_link.fingerprint_enabled  = match args.fingerprint_enabled {
-        Some(enabled)  => enabled,
+    cash_link.fingerprint_enabled = match args.fingerprint_enabled {
+        Some(enabled) => enabled,
         None => false,
     };
     cash_link.expires_at = now + (args.num_days_to_expire as u64 * 86400);
@@ -432,7 +438,7 @@ pub fn process_redemption(
         }
     };
 
-    let fee_to_redeem = cash_link.fee_to_redeem;
+    let fee_to_redeem = cash_link.max_fee_to_redeem()?;
 
     cash_link.remaining_amount = cash_link
         .remaining_amount
@@ -445,11 +451,9 @@ pub fn process_redemption(
         .checked_div(cash_link.max_num_redemptions as u64)
         .ok_or(CashError::Overflow)?;
 
-    let total_fee_to_redeem = if cash_link.total_redemptions == 1 {
+    let mut total_fee_to_redeem = if cash_link.total_redemptions == 1 {
         platform_fee_per_redeem
             .checked_add(fee_to_redeem)
-            .ok_or::<ProgramError>(CashError::Overflow.into())?
-            .checked_add(cash_link.fixed_fee)
             .ok_or::<ProgramError>(CashError::Overflow.into())?
     } else {
         platform_fee_per_redeem
@@ -457,7 +461,7 @@ pub fn process_redemption(
             .ok_or::<ProgramError>(CashError::Overflow.into())?
     };
 
-    let total = amount_to_redeem
+    let mut total = amount_to_redeem
         .checked_add(total_fee_to_redeem)
         .ok_or::<ProgramError>(CashError::Overflow.into())?;
 
@@ -481,6 +485,12 @@ pub fn process_redemption(
             assert_token_owned_by(&recipient_token, &wallet_info.key)?;
             assert_owned_by(recipient_token_info, &spl_token::id())?;
             //subtract rent_fee
+            total_fee_to_redeem = total_fee_to_redeem
+                .checked_sub(cash_link.rent_fee_to_redeem)
+                .ok_or::<ProgramError>(CashError::Overflow.into())?;
+            total = amount_to_redeem
+                .checked_add(total_fee_to_redeem)
+                .ok_or::<ProgramError>(CashError::Overflow.into())?;
         } else {
             msg!("Cash link has a mint. Create an associated token account for the recipient");
             create_associated_token_account_raw(
@@ -577,9 +587,7 @@ pub fn process_redemption(
         **cash_link_info.lamports.borrow_mut() = source_starting_lamports;
     }
     let system_account_info = next_account_info(account_info_iter)?;
-    if redemption_info.lamports() > 0
-    && !redemption_info.data_is_empty()
-    {
+    if redemption_info.lamports() > 0 && !redemption_info.data_is_empty() {
         msg!("Redemption AccountAlreadyInitialized");
         return Err(ProgramError::AccountAlreadyInitialized);
     }
@@ -637,13 +645,14 @@ pub fn process_redemption(
     redemption.account_type = AccountType::Redemption;
     redemption.redeemed_at = clock.unix_timestamp as u64;
     redemption.amount = amount_to_redeem;
+    redemption.wallet = *wallet_info.key;
+    redemption.cash_link = *cash_link_info.key;
     Redemption::pack(redemption, &mut redemption_info.data.borrow_mut())?;
     cash_link.state = if cash_link.is_fully_redeemed()? {
         CashLinkState::Redeemed
     } else {
         CashLinkState::Redeeming
     };
-    cash_link.last_redeemed_at = Some(clock.unix_timestamp as u64);
     CashLink::pack(cash_link, &mut cash_link_info.data.borrow_mut())?;
     Ok(())
 }

@@ -3,17 +3,19 @@ use solana_program::{
     borsh0_10::try_from_slice_unchecked,
     msg,
     program_error::ProgramError,
-    program_pack::{Pack, Sealed},
+    program_pack::{Pack, Sealed}, pubkey::Pubkey,
 };
 
 use super::AccountType;
 
-pub const REDEMPTION_SIZE: usize = 17;
+pub const REDEMPTION_SIZE: usize = 81;
 
 #[repr(C)]
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Default)]
 pub struct Redemption {
     pub account_type: AccountType,
+    pub cash_link: Pubkey,
+    pub wallet: Pubkey,
     pub redeemed_at: u64,
     pub amount: u64
 }
