@@ -153,7 +153,7 @@ pub fn init_cash_link(
         let owner_token_account = get_associated_token_address(owner, &key);
         accounts.push(AccountMeta::new(owner_token_account, false));
         accounts.push(AccountMeta::new_readonly(spl_associated_token_account::id(), false),);
-        accounts.push(AccountMeta::new(spl_token::id(), false));
+        accounts.push(AccountMeta::new_readonly(spl_token::id(), false));
     }
     Instruction::new_with_borsh(
         *program_id,

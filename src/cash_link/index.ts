@@ -451,12 +451,12 @@ export class CashLinkClient {
         isSigner: false,
         isWritable: false,
       });
+      keys.push({
+        pubkey: spl.TOKEN_PROGRAM_ID,
+        isSigner: false,
+        isWritable: false,
+      });
     }
-    keys.push({
-      pubkey: spl.TOKEN_PROGRAM_ID,
-      isSigner: false,
-      isWritable: false,
-    });
     return new TransactionInstruction({
       keys,
       data,
