@@ -38,7 +38,6 @@ export type CashLinkDataArgs = {
   remainingFee: BN;
   distributionType: CashLinkDistributionType;
   owner: number;
-  lastRedeemedAt?: BN;
   expiresAt: BN;
   mint?: StringPublicKey;
   totalRedemptions: BN;
@@ -61,7 +60,6 @@ export class CashLinkData extends Borsh.Data<CashLinkDataArgs> {
     ['remainingAmount', 'u64'],
     ['distributionType', 'u8'],
     ['owner', 'pubkeyAsString'],
-    ['lastRedeemedAt', { kind: 'option', type: 'u64' }],
     ['expiresAt', 'u64'],
     ['mint', { kind: 'option', type: 'pubkeyAsString' }],
     ['totalRedemptions', 'u16'],
