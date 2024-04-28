@@ -544,6 +544,7 @@ export class CashLinkClient {
     let accountKeys = [walletAddress, this.feeWallet, owner];
     let vaultToken: PublicKey | null = null;
     let mint: PublicKey | null = null;
+    console.log('mint', cashLink.data.mint);
     if (cashLink.data.mint) {
       mint = new PublicKey(cashLink.data.mint);
       vaultToken = await _findAssociatedTokenAddress(cashLinkAddress, mint);
