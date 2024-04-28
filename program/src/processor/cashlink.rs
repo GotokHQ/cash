@@ -78,8 +78,12 @@ pub fn process_init_cash_link(
     if args.max_num_redemptions == 0 {
         return Err(CashError::InvalidNumberOfRedemptions.into());
     }
-    let total_platform_fee = calculate_fee(args.amount, args.fee_bps as u64)?;
+    let fee_from_bps = calculate_fee(args.amount, args.fee_bps as u64)?;
 
+    let total_platform_fee = fee_from_bps
+        .checked_add(args.fixed_fee)
+        .ok_or::<ProgramError>(CashError::Overflow.into())?;
+    
     let total_redemption_fee = if mint_info.is_some() {
         args.base_fee_to_redeem
             .checked_add(args.rent_fee_to_redeem)
@@ -453,8 +457,10 @@ pub fn process_redemption(
 
     let mut total_fee_to_redeem = if cash_link.total_redemptions == 1 {
         platform_fee_per_redeem
-            .checked_add(fee_to_redeem)
-            .ok_or::<ProgramError>(CashError::Overflow.into())?
+        .checked_add(fee_to_redeem)
+        .ok_or::<ProgramError>(CashError::Overflow.into())?
+        .checked_add(cash_link.fixed_fee)
+        .ok_or::<ProgramError>(CashError::Overflow.into())?
     } else {
         platform_fee_per_redeem
             .checked_add(fee_to_redeem)
@@ -663,7 +669,7 @@ pub fn process_close(accounts: &[AccountInfo], program_id: &Pubkey) -> ProgramRe
     let authority_info = next_account_info(account_info_iter)?;
     assert_signer(authority_info)?;
     let cash_link_info = next_account_info(account_info_iter)?;
-    let fee_payer_info = next_account_info(account_info_iter)?;
+    let destination_info = next_account_info(account_info_iter)?;
     assert_owned_by(cash_link_info, program_id)?;
 
     let cash_link = CashLink::unpack(&cash_link_info.data.borrow())?;
@@ -679,6 +685,6 @@ pub fn process_close(accounts: &[AccountInfo], program_id: &Pubkey) -> ProgramRe
         return Err(AccountAlreadyRedeemed.into());
     }
     msg!("Closing the cash_link account...");
-    empty_account_balance(cash_link_info, fee_payer_info)?;
+    empty_account_balance(cash_link_info, destination_info)?;
     Ok(())
 }

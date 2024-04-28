@@ -18,6 +18,7 @@ use crate::state::cashlink::DistributionType;
 pub struct InitCashLinkArgs {
     pub amount: u64,
     pub fee_bps: u16,
+    pub fixed_fee: u64,
     pub base_fee_to_redeem: u64,
     pub rent_fee_to_redeem: u64,
     pub cash_link_bump: u8,
@@ -115,7 +116,7 @@ pub enum CashInstruction {
     ///
     /// 0. `[signer]` The account of the authority
     /// 1. `[writable]` The cash_link account holding the cash_link info     
-    /// 2. `[writable]` The fee payer's main account to send their rent fees to
+    /// 2. `[writable]` The destination account to send their rent fees to
     Close,
 }
 
@@ -250,12 +251,12 @@ pub fn close_cash_link(
     program_id: &Pubkey,
     authority: &Pubkey,
     cash_link: &Pubkey,
-    fee_payer: &Pubkey,
+    destination: &Pubkey,
 ) -> Instruction {
     let accounts = vec![
         AccountMeta::new_readonly(*authority, true),
         AccountMeta::new(*cash_link, false),
-        AccountMeta::new(*fee_payer, false),
+        AccountMeta::new(*destination, false),
         AccountMeta::new_readonly(system_program::id(), false),
     ];
 

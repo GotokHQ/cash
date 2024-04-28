@@ -7,6 +7,7 @@ export interface InitializeCashLinkInput {
   amount: string;
   minAmount?: string;
   feeBps?: number;
+  fixedFee?: string;
   baseFeeToRedeem?: string;
   rentFeeToRedeem?: string;
   distributionType: CashLinkDistributionType;

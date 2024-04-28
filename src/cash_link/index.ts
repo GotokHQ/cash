@@ -112,7 +112,7 @@ export class CashLinkClient {
       const closeInstruction = this.closeInstruction({
         cashLink: cashLinkAddress,
         authority: this.authority.publicKey,
-        feePayer: this.feePayer.publicKey,
+        destinationWallet: this.feePayer.publicKey,
       });
       transaction.add(closeInstruction);
     }
@@ -238,7 +238,7 @@ export class CashLinkClient {
     const closeInstruction = this.closeInstruction({
       cashLink: cashLinkAddress,
       authority: this.authority.publicKey,
-      feePayer: this.feePayer.publicKey,
+      destinationWallet: this.feePayer.publicKey,
     });
     const transaction = new Transaction().add(closeInstruction);
     if (input.computeBudget) {
@@ -276,7 +276,7 @@ export class CashLinkClient {
           isSigner: false,
           isWritable: true,
         },
-        { pubkey: params.feePayer, isSigner: false, isWritable: true },
+        { pubkey: params.destinationWallet, isSigner: false, isWritable: true },
         {
           pubkey: SystemProgram.programId,
           isSigner: false,
@@ -323,6 +323,7 @@ export class CashLinkClient {
     const passKey = new PublicKey(input.passKey);
     const [cashLink, cashLinkBump] = await CashProgram.findCashLinkAccount(passKey);
     const amount = new BN(input.amount);
+    const fixedFee = new BN(input.fixedFee ?? 0);
     const rentFeeToRedeem = new BN(input.rentFeeToRedeem ?? 0);
     const baseFeeToRedeem = new BN(input.baseFeeToRedeem ?? 0);
     const feeBps = input.feeBps ?? 0;
@@ -334,6 +335,7 @@ export class CashLinkClient {
       cashLinkBump,
       cashLink,
       feeBps,
+      fixedFee,
       rentFeeToRedeem,
       baseFeeToRedeem,
       maxNumRedemptions,
@@ -356,6 +358,7 @@ export class CashLinkClient {
     const {
       amount,
       feeBps,
+      fixedFee,
       rentFeeToRedeem,
       baseFeeToRedeem,
       passKey,
@@ -373,6 +376,7 @@ export class CashLinkClient {
     const data = InitCashLinkArgs.serialize({
       amount,
       feeBps,
+      fixedFee,
       rentFeeToRedeem,
       baseFeeToRedeem,
       cashLinkBump,

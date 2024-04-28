@@ -6,6 +6,7 @@ import { CashLinkDistributionType } from 'src/accounts';
 export type InitArgs = {
   amount: BN;
   feeBps: number;
+  fixedFee: BN;
   baseFeeToRedeem: BN;
   rentFeeToRedeem: BN;
   cashLinkBump: number;
@@ -21,6 +22,7 @@ export class InitCashLinkArgs extends Borsh.Data<InitArgs> {
     ['instruction', 'u8'],
     ['amount', 'u64'],
     ['feeBps', 'u16'],
+    ['fixedFee', 'u64'],
     ['baseFeeToRedeem', 'u64'],
     ['rentFeeToRedeem', 'u64'],
     ['cashLinkBump', 'u8'],
@@ -34,6 +36,7 @@ export class InitCashLinkArgs extends Borsh.Data<InitArgs> {
   instruction = 0;
   amount: BN;
   feeBps: number;
+  fixedFee: BN;
   baseFeeToRedeem: BN;
   rentFeeToRedeem: BN;
   cashLinkBump: number;
@@ -47,6 +50,7 @@ export class InitCashLinkArgs extends Borsh.Data<InitArgs> {
 export type InitCashLinkParams = {
   amount: BN;
   feeBps: number;
+  fixedFee: BN;
   baseFeeToRedeem: BN;
   rentFeeToRedeem: BN;
   cashLinkBump: number;
