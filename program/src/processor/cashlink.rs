@@ -131,6 +131,7 @@ pub fn process_init_cash_link(
     cash_link.fee_bps = args.fee_bps;
     cash_link.base_fee_to_redeem = args.base_fee_to_redeem;
     cash_link.rent_fee_to_redeem = args.rent_fee_to_redeem;
+    cash_link.fixed_fee = args.fixed_fee;
     cash_link.remaining_amount = total_amount;
     cash_link.authority = *authority_info.key;
     cash_link.pass_key = *pass_info.key;
