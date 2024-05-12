@@ -608,7 +608,7 @@ export class CashLinkClient {
       { pubkey: params.passKey, isSigner: true, isWritable: false },
       { pubkey: params.redemption, isSigner: false, isWritable: true },
       { pubkey: params.ownerToken, isSigner: false, isWritable: true },
-      { pubkey: params.feePayer, isSigner: true, isWritable: false },
+      { pubkey: params.feePayer, isSigner: true, isWritable: true },
       {
         pubkey: SYSVAR_CLOCK_PUBKEY,
         isSigner: false,

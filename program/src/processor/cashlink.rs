@@ -612,6 +612,7 @@ pub fn process_redemption(
         ],
     )?;
     if cash_link.fingerprint_enabled {
+        msg!("Cash Link Fingerprint Enabled");
         if let Some(bump) = args.fingerprint_bump {
             if let Some(fingerprint) = args.fingerprint {
                 let fingerprint_account_info = next_account_info(account_info_iter)?;
@@ -641,9 +642,6 @@ pub fn process_redemption(
                 return Err(CashError::FingerprintFound.into());
             }
         } else {
-            return Err(CashError::FingerprintBumpNotFound.into());
-        }
-        if args.fingerprint_bump.is_none() {
             return Err(CashError::FingerprintBumpNotFound.into());
         }
     }
