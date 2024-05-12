@@ -475,7 +475,6 @@ pub fn process_redemption(
     if let Some(mint) = cash_link.mint {
         assert_owned_by(fee_token_info, &spl_token::id())?;
         let recipient_token_info = next_account_info(account_info_iter)?;
-        assert_owned_by(recipient_token_info, &spl_token::id())?;
         let vault_token_info = next_account_info(account_info_iter)?;
         assert_owned_by(vault_token_info, &spl_token::id())?;
         let associated_token_account = get_associated_token_address(&cash_link_info.key, &mint);

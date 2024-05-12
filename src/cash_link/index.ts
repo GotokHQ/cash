@@ -655,6 +655,11 @@ export class CashLinkClient {
       isSigner: false,
       isWritable: false,
     });
+    keys.push({
+      pubkey: spl.ASSOCIATED_TOKEN_PROGRAM_ID,
+      isSigner: false,
+      isWritable: false,
+    });
     return new TransactionInstruction({
       keys,
       programId: CashProgram.PUBKEY,

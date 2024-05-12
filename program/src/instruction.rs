@@ -92,6 +92,7 @@ pub enum CashInstruction {
     /// 14. `[]` The system program
     /// 15. `[writable][Optional]` The fingerprint info
     /// 16. `[]` The token program
+    /// 17. `[]` The associated program
     Redeem(InitCashRedemptionArgs),
     /// Cancel the cash_link
     ///
@@ -238,6 +239,7 @@ pub fn redeem_cash_link(
         accounts.push(AccountMeta::new(*fingerprint_id, false));
     }
     accounts.push(AccountMeta::new_readonly(spl_token::id(), false));
+    accounts.push(AccountMeta::new_readonly(spl_associated_token_account::id(), false));
 
     Instruction::new_with_borsh(
         *program_id,
