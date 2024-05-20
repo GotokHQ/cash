@@ -185,24 +185,15 @@ export class CashLinkClient {
       { pubkey: params.ownerToken, isSigner: false, isWritable: true },
       { pubkey: params.feePayer, isSigner: false, isWritable: true },
       {
+        pubkey: params.vaultToken,
+        isSigner: false,
+        isWritable: true,
+      },
+      {
         pubkey: SYSVAR_CLOCK_PUBKEY,
         isSigner: false,
         isWritable: false,
       },
-      {
-        pubkey: SYSVAR_RENT_PUBKEY,
-        isSigner: false,
-        isWritable: false,
-      },
-    ];
-    if (params.vaultToken) {
-      keys.push({
-        pubkey: params.vaultToken,
-        isSigner: false,
-        isWritable: true,
-      });
-    }
-    keys.push(
       {
         pubkey: spl.TOKEN_PROGRAM_ID,
         isSigner: false,
@@ -213,7 +204,7 @@ export class CashLinkClient {
         isSigner: false,
         isWritable: false,
       },
-    );
+    ];
     return new TransactionInstruction({
       keys,
       programId: CashProgram.PUBKEY,
@@ -413,6 +404,21 @@ export class CashLinkClient {
         isWritable: false,
       },
       {
+        pubkey: mint,
+        isSigner: false,
+        isWritable: false,
+      },
+      {
+        pubkey: spl.getAssociatedTokenAddressSync(mint, cashLink),
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        pubkey: spl.getAssociatedTokenAddressSync(mint, owner),
+        isSigner: false,
+        isWritable: true,
+      },
+      {
         pubkey: SYSVAR_RENT_PUBKEY,
         isSigner: false,
         isWritable: false,
@@ -427,36 +433,17 @@ export class CashLinkClient {
         isSigner: false,
         isWritable: false,
       },
-    ];
-    if (mint) {
-      keys.push({
-        pubkey: mint,
-        isSigner: false,
-        isWritable: false,
-      });
-      const vaultToken = await _findAssociatedTokenAddress(cashLink, mint);
-      keys.push({
-        pubkey: vaultToken,
-        isSigner: false,
-        isWritable: true,
-      });
-      const ownerToken = await _findAssociatedTokenAddress(owner, mint);
-      keys.push({
-        pubkey: ownerToken,
-        isSigner: false,
-        isWritable: true,
-      });
-      keys.push({
-        pubkey: spl.ASSOCIATED_TOKEN_PROGRAM_ID,
-        isSigner: false,
-        isWritable: false,
-      });
-      keys.push({
+      {
         pubkey: spl.TOKEN_PROGRAM_ID,
         isSigner: false,
         isWritable: false,
-      });
-    }
+      },
+      {
+        pubkey: spl.ASSOCIATED_TOKEN_PROGRAM_ID,
+        isSigner: false,
+        isWritable: false,
+      },
+    ];
     return new TransactionInstruction({
       keys,
       data,
@@ -541,46 +528,42 @@ export class CashLinkClient {
     }
     const walletAddress = new PublicKey(input.walletAddress);
     const owner = new PublicKey(cashLink.data.owner);
-    let accountKeys = [walletAddress, this.feeWallet, owner, null];
-    let vaultToken: PublicKey | null = null;
-    let mint: PublicKey | null = null;
-    if (cashLink.data.mint) {
-      mint = new PublicKey(cashLink.data.mint);
-      vaultToken = await _findAssociatedTokenAddress(cashLinkAddress, mint);
-      accountKeys = await Promise.all([
-        _findAssociatedTokenAddress(walletAddress, mint),
-        spl
-          .getOrCreateAssociatedTokenAccount(
-            this.connection,
-            this.feePayer,
-            new PublicKey(cashLink.data.mint),
-            accountKeys[1],
-            true,
-            input.commitment,
-          )
-          .then((acc) => acc.address),
-        spl
-          .getOrCreateAssociatedTokenAccount(
-            this.connection,
-            this.feePayer,
-            new PublicKey(cashLink.data.mint),
-            accountKeys[2],
-            true,
-            input.commitment,
-          )
-          .then((acc) => acc.address),
-        spl
-          .getOrCreateAssociatedTokenAccount(
-            this.connection,
-            this.feePayer,
-            new PublicKey(cashLink.data.mint),
-            accountKeys[3],
-            true,
-            input.commitment,
-          )
-          .then((acc) => acc.address),
-      ]);
-    }
+    let accountKeys = [walletAddress, this.feeWallet, owner, this.feePayer.publicKey];
+    const mint = new PublicKey(cashLink.data.mint);
+    const vaultToken = await _findAssociatedTokenAddress(cashLinkAddress, mint);
+    accountKeys = await Promise.all([
+      spl.getAssociatedTokenAddressSync(mint, walletAddress),
+      spl
+        .getOrCreateAssociatedTokenAccount(
+          this.connection,
+          this.feePayer,
+          new PublicKey(cashLink.data.mint),
+          accountKeys[1],
+          true,
+          input.commitment,
+        )
+        .then((acc) => acc.address),
+      spl
+        .getOrCreateAssociatedTokenAccount(
+          this.connection,
+          this.feePayer,
+          new PublicKey(cashLink.data.mint),
+          accountKeys[2],
+          true,
+          input.commitment,
+        )
+        .then((acc) => acc.address),
+      spl
+        .getOrCreateAssociatedTokenAccount(
+          this.connection,
+          this.feePayer,
+          new PublicKey(cashLink.data.mint),
+          accountKeys[3],
+          true,
+          input.commitment,
+        )
+        .then((acc) => acc.address),
+    ]);
     const [redemption, redemptionBump] = await CashProgram.findRedemptionAccount(
       cashLinkAddress,
       walletAddress,
@@ -619,6 +602,18 @@ export class CashLinkClient {
       { pubkey: params.redemption, isSigner: false, isWritable: true },
       { pubkey: params.ownerToken, isSigner: false, isWritable: true },
       { pubkey: params.feePayer, isSigner: true, isWritable: true },
+      { pubkey: params.feePayerToken, isSigner: false, isWritable: true },
+      {
+        pubkey: params.vaultToken,
+        isSigner: false,
+        isWritable: true,
+      },
+      { pubkey: params.walletToken, isSigner: false, isWritable: true },
+      {
+        pubkey: params.mint,
+        isSigner: false,
+        isWritable: false,
+      },
       {
         pubkey: SYSVAR_CLOCK_PUBKEY,
         isSigner: false,
@@ -634,26 +629,12 @@ export class CashLinkClient {
         isSigner: false,
         isWritable: false,
       },
-    ];
-    if (params.vaultToken) {
-      keys.push({ pubkey: params.walletToken, isSigner: false, isWritable: true });
-      keys.push({
-        pubkey: params.vaultToken,
-        isSigner: false,
-        isWritable: true,
-      });
-      keys.push({
-        pubkey: params.mint,
+      {
+        pubkey: SystemProgram.programId,
         isSigner: false,
         isWritable: false,
-      });
-      keys.push({ pubkey: params.feePayerToken, isSigner: false, isWritable: true });
-    }
-    keys.push({
-      pubkey: SystemProgram.programId,
-      isSigner: false,
-      isWritable: false,
-    });
+      },
+    ];
     if (params.fingerprintPda) {
       keys.push({
         pubkey: params.fingerprintPda,

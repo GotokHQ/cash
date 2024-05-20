@@ -59,7 +59,7 @@ export type InitCashLinkParams = {
   owner: PublicKey;
   cashLink: PublicKey;
   passKey: PublicKey;
-  mint?: PublicKey | null;
+  mint: PublicKey;
   distributionType: CashLinkDistributionType;
   maxNumRedemptions: number;
   minAmount?: BN;
