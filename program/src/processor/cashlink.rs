@@ -348,6 +348,7 @@ pub fn process_redemption(
     }
     let owner_token_info = next_account_info(account_info_iter)?; //owner_token_info
     let fee_payer_info = next_account_info(account_info_iter)?;
+    let fee_payer_token_info = next_account_info(account_info_iter)?;
     let vault_token_info = next_account_info(account_info_iter)?;
     let recipient_token_info = next_account_info(account_info_iter)?;
     let mint_info = next_account_info(account_info_iter)?;
@@ -439,7 +440,6 @@ pub fn process_redemption(
         Some(CashError::InvalidVaultTokenOwner),
     )?;
     let vault_token: TokenAccount = assert_initialized(vault_token_info)?;
-    let fee_payer_token_info = next_account_info(account_info_iter)?;
     let fee_payer_token: TokenAccount = assert_initialized(fee_payer_token_info)?;
     assert_token_owned_by(&fee_payer_token, &fee_payer_info.key)?;
     assert_owned_by(fee_payer_token_info, &spl_token::id())?;
