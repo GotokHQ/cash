@@ -393,7 +393,6 @@ pub fn process_redemption(
     }
     let owner_token_info = next_account_info(account_info_iter)?; //owner_token_info
     let fee_payer_info = next_account_info(account_info_iter)?;
-    let fee_payer_token_info = next_account_info(account_info_iter)?;
     let clock_info = next_account_info(account_info_iter)?;
     let clock = &Clock::from_account_info(clock_info)?;
     let rent_info = next_account_info(account_info_iter)?;
@@ -474,6 +473,7 @@ pub fn process_redemption(
         .ok_or::<ProgramError>(CashError::Overflow.into())?;
 
     if let Some(mint) = cash_link.mint {
+        let _: TokenAccount = assert_initialized(fee_token_info)?;
         assert_owned_by(fee_token_info, &spl_token::id())?;
         let recipient_token_info = next_account_info(account_info_iter)?;
         let vault_token_info = next_account_info(account_info_iter)?;
@@ -486,6 +486,10 @@ pub fn process_redemption(
         )?;
         let vault_token: TokenAccount = assert_initialized(vault_token_info)?;
         let mint_info = next_account_info(account_info_iter)?;
+        let fee_payer_token_info = next_account_info(account_info_iter)?;
+        let fee_payer_token: TokenAccount = assert_initialized(fee_payer_token_info)?;
+        assert_token_owned_by(&fee_payer_token, &fee_payer_info.key)?;
+        assert_owned_by(fee_payer_token_info, &spl_token::id())?;
         if exists(recipient_token_info)? {
             msg!("Cash link has a mint and an existing recipient token. Validate the recipient token");
             let recipient_token: TokenAccount = assert_initialized(recipient_token_info)?;
@@ -511,8 +515,6 @@ pub fn process_redemption(
         if vault_token.amount < total {
             return Err(InsufficientSettlementFunds.into());
         }
-        let _: TokenAccount = assert_initialized(fee_token_info)?;
-        let _: TokenAccount = assert_initialized(fee_payer_token_info)?;
         if amount_to_redeem > 0 {
             spl_token_transfer(
                 vault_token_info,
@@ -596,8 +598,8 @@ pub fn process_redemption(
         let total_network_fee = total_fee_to_redeem.checked_sub(platform_fee_per_redeem)
         .ok_or::<ProgramError>(CashError::Overflow.into())?;
         if total_network_fee > 0 {
-            let dest_starting_lamports = fee_payer_token_info.lamports();
-            **fee_payer_token_info.lamports.borrow_mut() = dest_starting_lamports
+            let dest_starting_lamports = fee_payer_info.lamports();
+            **fee_payer_info.lamports.borrow_mut() = dest_starting_lamports
                 .checked_add(total_network_fee)
                 .ok_or(AmountOverflow)?;
             source_starting_lamports = source_starting_lamports

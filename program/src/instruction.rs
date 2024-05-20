@@ -226,7 +226,6 @@ pub fn redeem_cash_link(
         AccountMeta::new(*redemption_pda, false),
         AccountMeta::new(*owner_token, false),
         AccountMeta::new(*fee_payer, true),
-        AccountMeta::new(*fee_payer_token, true),
         AccountMeta::new_readonly(sysvar::clock::id(), false),
         AccountMeta::new_readonly(sysvar::rent::id(), false),
         AccountMeta::new_readonly(sysvar::slot_hashes::id(), false),
@@ -235,7 +234,8 @@ pub fn redeem_cash_link(
     if let Some(key) = vault_token {
         accounts.push(AccountMeta::new(*wallet_token, false));
         accounts.push(AccountMeta::new(*key, false));
-        AccountMeta::new_readonly(*mint, false);
+        accounts.push(AccountMeta::new_readonly(*mint, false));
+        accounts.push(AccountMeta::new(*fee_payer_token, false));
     }
     accounts.push(AccountMeta::new_readonly(system_program::id(), false));
     if let Some(fingerprint_id) = fingerprint {

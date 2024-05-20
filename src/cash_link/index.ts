@@ -541,7 +541,7 @@ export class CashLinkClient {
     }
     const walletAddress = new PublicKey(input.walletAddress);
     const owner = new PublicKey(cashLink.data.owner);
-    let accountKeys = [walletAddress, this.feeWallet, owner, this.feePayer.publicKey];
+    let accountKeys = [walletAddress, this.feeWallet, owner, null];
     let vaultToken: PublicKey | null = null;
     let mint: PublicKey | null = null;
     if (cashLink.data.mint) {
@@ -619,7 +619,6 @@ export class CashLinkClient {
       { pubkey: params.redemption, isSigner: false, isWritable: true },
       { pubkey: params.ownerToken, isSigner: false, isWritable: true },
       { pubkey: params.feePayer, isSigner: true, isWritable: true },
-      { pubkey: params.feePayerToken, isSigner: false, isWritable: true },
       {
         pubkey: SYSVAR_CLOCK_PUBKEY,
         isSigner: false,
@@ -648,6 +647,7 @@ export class CashLinkClient {
         isSigner: false,
         isWritable: false,
       });
+      keys.push({ pubkey: params.feePayerToken, isSigner: false, isWritable: true });
     }
     keys.push({
       pubkey: SystemProgram.programId,
