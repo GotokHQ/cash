@@ -22,7 +22,7 @@ pub enum CashError {
     #[error("Account already settled")]
     AccountAlreadyRedeemed,
     #[error("Account already canceled")]
-    AccountAlreadyCanceled,
+    AccountAlreadyExpired,
     #[error("Fee overflow")]
     FeeOverflow,
     #[error("Account not redeemed or initialized")]
@@ -30,7 +30,7 @@ pub enum CashError {
     #[error("Account not redeemed or canceled")]
     AccountNotRedeemedOrCanceled,
     #[error("Account not canceled")]
-    AccountNotCanceled,
+    AccountNotExpired,
     #[error("Account not initialized")]
     AccountNotInitialized,
     #[error("Invalid deposit key")]
@@ -61,8 +61,6 @@ pub enum CashError {
     AccountInvalidState,
     #[error("Insufficient funds for settlement")]
     InsufficientSettlementFunds,
-    #[error("Invalid reference")]
-    InvalidReference,
     /// Overflow
     #[error("Overflow")]
     Overflow,
@@ -80,7 +78,27 @@ pub enum CashError {
     #[error("InvalidAmount")]
     InvalidAmount,
     #[error("InvalidNumberOfRedemptions")]
-    InvalidNumberOfRedemptions
+    InvalidNumberOfRedemptions,
+    #[error("Minimum amount must be set for random distribution")]
+    MinAmountNotSet,
+    #[error("Minimum amount must be less than amount")]
+    MinAmountMustBeLessThanAmount,
+    #[error("Number of days must be greater than 0")]
+    InvalidExpiryInDays,
+    #[error("Cash link has expired")]
+    CashlinkExpired,
+    #[error("Cash link has not expired")]
+    CashlinkNotExpired,
+    #[error("Fingerprint bump cannot be null")]
+    FingerprintBumpNotFound,
+    #[error("Required Fingerprint was not found")]
+    FingerprintFound,
+    #[error("Invalid fingerprint")]
+    InvalidFingerprint,
+    #[error("Cashink reference must be a valid base58 character")]
+    InvalidCashLinkReference,
+    #[error("Pass Key is invalid")]
+    InvalidPassKey,
 }
 
 impl From<CashError> for ProgramError {

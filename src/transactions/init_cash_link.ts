@@ -6,12 +6,15 @@ import { CashLinkDistributionType } from 'src/accounts';
 export type InitArgs = {
   amount: BN;
   feeBps: number;
-  fixedFee: BN;
-  feeToRedeem: BN;
-  bump: number;
-  reference: string;
+  networkFee: BN;
+  baseFeeToRedeem: BN;
+  rentFeeToRedeem: BN;
+  cashLinkBump: number;
   distributionType: CashLinkDistributionType;
   maxNumRedemptions: number;
+  minAmount?: BN;
+  fingerprintEnabled?: boolean;
+  numDaysToExpire: number;
 };
 
 export class InitCashLinkArgs extends Borsh.Data<InitArgs> {
@@ -19,37 +22,47 @@ export class InitCashLinkArgs extends Borsh.Data<InitArgs> {
     ['instruction', 'u8'],
     ['amount', 'u64'],
     ['feeBps', 'u16'],
-    ['fixedFee', 'u64'],
-    ['feeToRedeem', 'u64'],
-    ['bump', 'u8'],
-    ['reference', 'string'],
+    ['networkFee', 'u64'],
+    ['baseFeeToRedeem', 'u64'],
+    ['rentFeeToRedeem', 'u64'],
+    ['cashLinkBump', 'u8'],
     ['distributionType', 'u8'],
     ['maxNumRedemptions', 'u16'],
+    ['minAmount', { kind: 'option', type: 'u64' }],
+    ['fingerprintEnabled', { kind: 'option', type: 'u8' }],
+    ['numDaysToExpire', 'u8'],
   ]);
 
   instruction = 0;
   amount: BN;
   feeBps: number;
-  fixedFee: BN;
-  feeToRedeem: BN;
-  bump: number;
-  reference: string;
+  networkFee: BN;
+  baseFeeToRedeem: BN;
+  rentFeeToRedeem: BN;
+  cashLinkBump: number;
   distributionType: CashLinkDistributionType;
   maxNumRedemptions: number;
+  minAmount?: BN;
+  fingerprintEnabled?: boolean;
+  numDaysToExpire: number;
 }
 
 export type InitCashLinkParams = {
   amount: BN;
   feeBps: number;
-  fixedFee: BN;
-  feeToRedeem: BN;
+  networkFee: BN;
+  baseFeeToRedeem: BN;
+  rentFeeToRedeem: BN;
   cashLinkBump: number;
   authority: PublicKey;
   feePayer: PublicKey;
-  sender: PublicKey;
+  owner: PublicKey;
   cashLink: PublicKey;
-  reference: string;
+  passKey: PublicKey;
   mint?: PublicKey | null;
   distributionType: CashLinkDistributionType;
   maxNumRedemptions: number;
+  minAmount?: BN;
+  fingerprintEnabled?: boolean;
+  numDaysToExpire: number;
 };

@@ -3,14 +3,20 @@ import { CashLinkDistributionType } from 'src/accounts';
 export interface InitializeCashLinkInput {
   wallet: string;
   mint?: string;
-  reference: string;
+  passKey: string;
   amount: string;
+  minAmount?: string;
   feeBps?: number;
-  fixedFee?: string;
-  feeToRedeem?: string;
+  networkFee?: string;
+  baseFeeToRedeem?: string;
+  rentFeeToRedeem?: string;
   distributionType: CashLinkDistributionType;
   maxNumRedemptions: number;
   commitment?: Commitment;
+  computeUnitPrice?: number;
+  computeBudget?: number;
+  fingerprintEnabled?: boolean;
+  numDaysToExpire?: number;
 }
 
 export interface ResultContext {
@@ -20,14 +26,15 @@ export interface ResultContext {
 
 export interface CashLinkInput {
   walletAddress: string;
-  cashLinkReference: string;
+  passKey: string;
   commitment?: Commitment;
+  computeUnitPrice?: number;
+  computeBudget?: number;
 }
 
 export interface RedeemCashLinkInput extends CashLinkInput {
-  redemptionReference: string;
+  fingerprint?: string;
 }
-
 export interface SettleAndTransferInput {
   walletAddress: string;
   transferTokenMintAddress: string;

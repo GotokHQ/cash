@@ -7,19 +7,20 @@ use solana_program::{
     pubkey::Pubkey,
 };
 
+use crate::error::CashError;
 
+use super::AccountType;
 
-pub const CASH_LINK_DATA_SIZE: usize = 122;
+pub const CASH_LINK_DATA_SIZE: usize = 195;
 
 #[repr(C)]
 #[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq, Clone, Default)]
 pub enum CashLinkState {
     #[default]
-    Uninitialized = 0,
-    Initialized,
+    Initialized = 0,
     Redeemed,
     Redeeming,
-    Canceled,
+    Expired,
 }
 
 #[repr(C)]
@@ -33,20 +34,24 @@ pub enum DistributionType {
 #[repr(C)]
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Default)]
 pub struct CashLink {
+    pub account_type: AccountType,
+    pub authority: Pubkey,
     pub state: CashLinkState,
     pub amount: u64,
     pub fee_bps: u16,
-    pub fixed_fee: u64,
-    pub fee_to_redeem: u64,
+    pub network_fee: u64,
+    pub base_fee_to_redeem: u64,
+    pub rent_fee_to_redeem: u64,
     pub remaining_amount: u64,
-    pub distribution_type: DistributionType,
-    pub sender: Pubkey,
-    pub last_redeemed_at: Option<u64>,
-    pub canceled_at: Option<u64>,
+    pub distribution_type: DistributionType,//77
+    pub owner: Pubkey,
+    pub expires_at: u64,
     pub mint: Option<Pubkey>,
-    pub authority: Pubkey,
     pub total_redemptions: u16,
     pub max_num_redemptions: u16,
+    pub min_amount: u64,
+    pub fingerprint_enabled: bool,
+    pub pass_key: Pubkey,//118
 }
 
 impl CashLink {
@@ -57,20 +62,38 @@ impl CashLink {
     pub fn redeeming(&self) -> bool {
         self.state == CashLinkState::Redeeming
     }
-    pub fn canceled(&self) -> bool {
-        self.state == CashLinkState::Canceled
+    pub fn expired(&self) -> bool {
+        self.state == CashLinkState::Expired
     }
     pub fn initialized(&self) -> bool {
         self.state == CashLinkState::Initialized
     }
-    pub fn is_fully_redeemed(&self) -> bool {
-        self.total_redemptions == self.max_num_redemptions || self.remaining_amount == 0
+    pub fn is_fully_redeemed(&self) -> Result<bool, CashError> {
+        Ok(self.total_redemptions == self.max_num_redemptions
+            || self.remaining_amount == 0
+            || self.remaining_amount < self.min_total_required()?)
+    }
+    pub fn max_fee_to_redeem(&self) -> Result<u64, CashError> {
+        if self.mint.is_some() {
+            self.base_fee_to_redeem.checked_add(self.rent_fee_to_redeem).ok_or(CashError::Overflow)
+        } else {
+            Ok(self.base_fee_to_redeem)
+        }
+    }
+    pub fn max_num_redemptions_remaining(&self) -> Result<u16, CashError> {
+        self.max_num_redemptions
+            .checked_sub(self.total_redemptions)
+            .ok_or(CashError::Overflow)
+    }
+
+    pub fn min_total_required(&self) -> Result<u64, CashError> {
+        Ok(self.min_amount * self.max_num_redemptions_remaining()? as u64)
     }
 }
 
 impl IsInitialized for CashLink {
     fn is_initialized(&self) -> bool {
-        self.state != CashLinkState::Uninitialized
+        self.initialized() || self.redeeming() || self.redeemed() || self.expired()
     }
 }
 

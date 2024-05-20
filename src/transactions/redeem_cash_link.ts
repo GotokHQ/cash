@@ -3,35 +3,39 @@ import { PublicKey } from '@solana/web3.js';
 
 export type RedeemArgs = {
   redemptionBump: number;
-  redemptionReference: string;
   cashLinkBump: number;
-  cashLinkReference: string;
+  fingerprint?: string;
+  fingerprintBump?: number;
 };
 
 export class RedeemCashLinkArgs extends Borsh.Data<RedeemArgs> {
   static readonly SCHEMA = RedeemCashLinkArgs.struct([
     ['instruction', 'u8'],
     ['redemptionBump', 'u8'],
-    ['redemptionReference', 'string'],
     ['cashLinkBump', 'u8'],
-    ['cashLinkReference', 'string'],
+    ['fingerprint', { kind: 'option', type: 'string' }],
+    ['fingerprintBump', { kind: 'option', type: 'u8' }],
   ]);
 
   instruction = 1;
 }
 
 export type RedeemCashLinkParams = {
-  recipient: PublicKey;
+  wallet: PublicKey;
   authority: PublicKey;
   cashLink: PublicKey;
   vaultToken?: PublicKey;
-  recipientToken: PublicKey;
-  senderToken: PublicKey;
-  feeToken: PublicKey;
-  feePayer: PublicKey;
+  walletToken: PublicKey;
+  ownerToken: PublicKey;
+  platformFeeToken: PublicKey;
+  feePayer?: PublicKey | null;
+  feePayerToken: PublicKey;
   redemptionBump: number;
-  redemptionReference: string;
   redemption: PublicKey;
   cashLinkBump: number;
-  cashLinkReference: string;
+  passKey: PublicKey;
+  fingerprintPda?: PublicKey;
+  fingerprint?: string;
+  fingerprintBump?: number;
+  mint?: PublicKey;
 };

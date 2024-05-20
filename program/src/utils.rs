@@ -2,9 +2,8 @@
 
 use std::convert::TryInto;
 
-use crate::{error::CashError, state::cashlink::CashLink};
+use crate::error::CashError;
 
-use borsh::BorshSerialize;
 use solana_program::{
     account_info::AccountInfo,
     entrypoint::ProgramResult,
@@ -20,8 +19,8 @@ use solana_program::{
 };
 use spl_token::state::Account;
 use spl_associated_token_account::instruction::create_associated_token_account;
-use std::collections::hash_map::DefaultHasher;
-use std::hash::Hasher;
+
+use arrayref::array_ref;
 
 /// Assert uninitialized
 pub fn assert_uninitialized<T: IsInitialized>(account: &T) -> ProgramResult {
@@ -295,25 +294,14 @@ pub fn exists(account: &AccountInfo) -> Result<bool, ProgramError> {
 }
 
 /// get random value
-pub fn get_random_value(
-    recent_slothash: &[u8],
-    cash_link: &CashLink,
+pub fn get_random_value<'a>(
+    recent_slothashes: &AccountInfo<'a>,
     clock: &Clock,
-) -> Result<u16, ProgramError> {
-    // Hash slot, current timestamp and value from last slothash and proving process data and receive new random u16
-    let mut hasher = DefaultHasher::new();
-
-    // recent slothash
-    hasher.write(recent_slothash);
-    // slot
-    hasher.write_u64(clock.slot);
-    // timestamp
-    hasher.write_i64(clock.unix_timestamp);
-    // ProvingProcess(to make hash different for each instruction in the same slot)
-    hasher.write(cash_link.try_to_vec()?.as_ref());
-
-    let mut random_value: [u8; 2] = [0u8; 2];
-    random_value.copy_from_slice(&hasher.finish().to_le_bytes()[..2]);
-
-    Ok(u16::from_le_bytes(random_value))
+) -> Result<u64, ProgramError> {
+    let data = recent_slothashes.data.borrow();
+    let most_recent = array_ref![data, 12, 8];
+    //Ok(u16::from_le_bytes(random_value))
+    let mut bytes = [0u8; 8];
+    bytes.copy_from_slice(most_recent);
+    Ok(u64::from_le_bytes(bytes).saturating_sub(clock.unix_timestamp as u64))
 }

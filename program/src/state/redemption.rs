@@ -6,13 +6,17 @@ use solana_program::{
     program_pack::{Pack, Sealed}, pubkey::Pubkey,
 };
 
-pub const REDEMPTION_SIZE: usize = 48;
+use super::AccountType;
+
+pub const REDEMPTION_SIZE: usize = 81;
 
 #[repr(C)]
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Default)]
 pub struct Redemption {
-    pub redeemed_at: u64,
+    pub account_type: AccountType,
+    pub cash_link: Pubkey,
     pub wallet: Pubkey,
+    pub redeemed_at: u64,
     pub amount: u64
 }
 
