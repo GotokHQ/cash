@@ -11,7 +11,7 @@ use crate::error::CashError;
 
 use super::AccountType;
 
-pub const CASH_LINK_DATA_SIZE: usize = 195;
+pub const CASH_LINK_DATA_SIZE: usize = 194;
 
 #[repr(C)]
 #[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq, Clone, Default)]
@@ -46,7 +46,7 @@ pub struct CashLink {
     pub distribution_type: DistributionType,//77
     pub owner: Pubkey,
     pub expires_at: u64,
-    pub mint: Option<Pubkey>,
+    pub mint: Pubkey,
     pub total_redemptions: u16,
     pub max_num_redemptions: u16,
     pub min_amount: u64,
@@ -74,11 +74,7 @@ impl CashLink {
             || self.remaining_amount < self.min_total_required()?)
     }
     pub fn max_fee_to_redeem(&self) -> Result<u64, CashError> {
-        if self.mint.is_some() {
-            self.base_fee_to_redeem.checked_add(self.rent_fee_to_redeem).ok_or(CashError::Overflow)
-        } else {
-            Ok(self.base_fee_to_redeem)
-        }
+        self.base_fee_to_redeem.checked_add(self.rent_fee_to_redeem).ok_or(CashError::Overflow)
     }
     pub fn max_num_redemptions_remaining(&self) -> Result<u16, CashError> {
         self.max_num_redemptions

@@ -62,13 +62,14 @@ pub enum CashInstruction {
     /// 2. `[signer]`   The fee payer
     /// 3. `[writable]` The cash link account, it will hold all necessary info about the trade.
     /// 4. `[]` The pass key required to unlock the cash link for redemption
-    /// 5. `[]` The rent sysvar
-    /// 6. `[]` The system program
-    /// 7. `[]` The clock account
-    /// 8. `[]` The token mint (Optional)
-    /// 9. `[writable]` The associated token for the mint derived from the cash link account (Optional)
-    /// 10. `[writable]` The owner token that must be passed if pay is true and mint is some Optional)
+    /// 5. `[]` The token mint
+    /// 6. `[writable]` The associated token for the mint derived from the cash link account
+    /// 7. `[writable]` The owner token that must be passed if pay is true and mint is some
+    /// 8. `[]` The rent sysvar
+    /// 9. `[]` The system program
+    /// 10. `[]` The clock account
     /// 11. `[]` The token program
+    /// 12. `[]` The associated token program
     InitCashLink (InitCashLinkArgs),
     /// Redeem the cashlink
     ///
@@ -84,12 +85,12 @@ pub enum CashInstruction {
     /// 6. `[writable]` The payer token account of the payer that initialized the cash_link  
     /// 7. `[writable]` The fee payer account that pays network and rent fees
     /// 8. `[writable]` The fee payer's associated token account that collects the rent or network fees
-    /// 9. `[]` The clock account
-    /// 10. `[]` The rent account
-    /// 11. `[]` The recent slot hash account
-    /// 12. `[writable][Optional]` The vault token account to get tokens. This value is Optional. if the mint is set, then this must be set.
-    /// 13. `[writable][Optional]` The recipient token account for the token they will receive should the trade go through
-    /// 14. `[][Optional]` The mint account for the token
+    /// 9. `[writable]` The vault token account to get tokens. This value is Optional. if the mint is set, then this must be set.
+    /// 10. `[writable]` The recipient token account for the token they will receive should the trade go through
+    /// 11. `[]` The mint account for the token
+    /// 12. `[]` The clock account
+    /// 13. `[]` The rent account
+    /// 14. `[]` The recent slot hash account
     /// 15. `[]` The system program
     /// 16. `[writable][Optional]` The fingerprint info
     /// 17. `[]` The token program
@@ -130,33 +131,25 @@ pub fn init_cash_link(
     fee_payer: &Pubkey,
     cash_link_pda: &Pubkey,
     pass_key: &Pubkey,
-    mint: Option<&Pubkey>,
+    mint: &Pubkey,
     args: InitCashLinkArgs,
 ) -> Instruction {
-    let owner_key = if mint.is_some() {
-        AccountMeta::new_readonly(*owner, true)
-    } else {
-        AccountMeta::new(*owner, true)
-    };
-    let mut accounts = vec![
+    let accounts = vec![
         AccountMeta::new_readonly(*authority, true),
-        owner_key,
+        AccountMeta::new_readonly(*owner, true),
         AccountMeta::new(*fee_payer, true),
         AccountMeta::new(*cash_link_pda, false),
         AccountMeta::new_readonly(*pass_key, false),
+        AccountMeta::new_readonly(*mint, false),
         AccountMeta::new_readonly(sysvar::rent::id(), false),
         AccountMeta::new_readonly(system_program::id(), false),
         AccountMeta::new_readonly(sysvar::clock::id(), false),
+        AccountMeta::new(get_associated_token_address(cash_link_pda, &mint), false),
+        AccountMeta::new(get_associated_token_address(owner, &mint), false),        
+        AccountMeta::new_readonly(spl_token::id(), false),
+        AccountMeta::new_readonly(spl_associated_token_account::id(), false),
     ];
-    if let Some(key) = mint {
-        let associated_token_account = get_associated_token_address(cash_link_pda, &key);
-        accounts.push(AccountMeta::new_readonly(*key, false));
-        accounts.push(AccountMeta::new(associated_token_account, false));
-        let owner_token_account = get_associated_token_address(owner, &key);
-        accounts.push(AccountMeta::new(owner_token_account, false));
-        accounts.push(AccountMeta::new_readonly(spl_associated_token_account::id(), false),);
-        accounts.push(AccountMeta::new_readonly(spl_token::id(), false));
-    }
+
     Instruction::new_with_borsh(
         *program_id,
         &CashInstruction::InitCashLink(args),
@@ -171,26 +164,21 @@ pub fn cancel_cash_link(
     cash_link: &Pubkey,
     pass_key: &Pubkey,
     owner_token: &Pubkey,
-    vault_token: Option<&Pubkey>,
+    vault_token: &Pubkey,
     fee_payer: &Pubkey,
     args: CancelCashRedemptionArgs,
 ) -> Instruction {
-    let mut accounts = vec![
+    let accounts = vec![
         AccountMeta::new_readonly(*authority, true),
         AccountMeta::new(*cash_link, false),
         AccountMeta::new_readonly(*pass_key, false),
         AccountMeta::new(*owner_token, false),
         AccountMeta::new(*fee_payer, false),
+        AccountMeta::new(*vault_token, false),
         AccountMeta::new_readonly(sysvar::clock::id(), false),
-        AccountMeta::new_readonly(sysvar::rent::id(), false),
+        AccountMeta::new_readonly(spl_token::id(), false),
+        AccountMeta::new_readonly(system_program::id(), false)
     ];
-
-    if let Some(key) = vault_token {
-        accounts.push(AccountMeta::new(*key, false));
-    }
-
-    accounts.push(AccountMeta::new_readonly(spl_token::id(), false));
-    accounts.push(AccountMeta::new_readonly(system_program::id(), false));
 
     Instruction::new_with_borsh(
         *program_id,
@@ -206,7 +194,7 @@ pub fn redeem_cash_link(
     wallet: &Pubkey,
     wallet_token: &Pubkey,
     collection_fee_token: &Pubkey,
-    vault_token: Option<&Pubkey>,
+    vault_token: &Pubkey,
     cash_link: &Pubkey,
     pass_key: &Pubkey,
     redemption_pda: &Pubkey,
@@ -226,18 +214,15 @@ pub fn redeem_cash_link(
         AccountMeta::new(*redemption_pda, false),
         AccountMeta::new(*owner_token, false),
         AccountMeta::new(*fee_payer, true),
+        AccountMeta::new(*fee_payer_token, false),
+        AccountMeta::new(*vault_token, false),
+        AccountMeta::new(*wallet_token, false),
+        AccountMeta::new_readonly(*mint, false),
         AccountMeta::new_readonly(sysvar::clock::id(), false),
         AccountMeta::new_readonly(sysvar::rent::id(), false),
         AccountMeta::new_readonly(sysvar::slot_hashes::id(), false),
+        AccountMeta::new_readonly(system_program::id(), false),
     ];
-
-    if let Some(key) = vault_token {
-        accounts.push(AccountMeta::new(*wallet_token, false));
-        accounts.push(AccountMeta::new(*key, false));
-        accounts.push(AccountMeta::new_readonly(*mint, false));
-        accounts.push(AccountMeta::new(*fee_payer_token, false));
-    }
-    accounts.push(AccountMeta::new_readonly(system_program::id(), false));
     if let Some(fingerprint_id) = fingerprint {
         accounts.push(AccountMeta::new(*fingerprint_id, false));
     }

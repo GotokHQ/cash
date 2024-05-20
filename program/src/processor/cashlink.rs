@@ -1,6 +1,6 @@
 use crate::{
     error::CashError::{
-        self, AccountAlreadyExpired, AccountAlreadyRedeemed, AccountNotExpired, AmountOverflow,
+        self, AccountAlreadyExpired, AccountAlreadyRedeemed, AccountNotExpired,
         InsufficientSettlementFunds,
     },
     instruction::{CancelCashRedemptionArgs, InitCashLinkArgs, InitCashRedemptionArgs},
@@ -13,7 +13,7 @@ use crate::{
     utils::{
         assert_account_key, assert_initialized, assert_owned_by, assert_signer,
         assert_token_owned_by, calculate_fee, create_associated_token_account_raw,
-        create_new_account_raw, empty_account_balance, exists, get_random_value, native_transfer,
+        create_new_account_raw, empty_account_balance, exists, get_random_value,
         spl_token_close, spl_token_transfer,
     },
 };
@@ -25,7 +25,6 @@ use solana_program::{
     program_error::ProgramError,
     program_pack::Pack,
     pubkey::Pubkey,
-    rent::Rent,
     sysvar::{clock::Clock, slot_hashes, Sysvar},
 };
 use spl_associated_token_account::get_associated_token_address;
@@ -45,6 +44,9 @@ pub fn process_init_cash_link(
     let fee_payer_info = next_account_info(account_info_iter)?;
     let cash_link_info = next_account_info(account_info_iter)?;
     let pass_info = next_account_info(account_info_iter)?;
+    let mint_info = next_account_info(account_info_iter)?;
+    let vault_token_info = next_account_info(account_info_iter)?;
+    let owner_token_info = next_account_info(account_info_iter)?;
     //let vault_token_info = next_account_info(account_info_iter)?;
     let rent_info = next_account_info(account_info_iter)?;
     let system_account_info = next_account_info(account_info_iter)?;
@@ -53,13 +55,6 @@ pub fn process_init_cash_link(
     let clock = &Clock::from_account_info(clock_info)?;
 
     msg!("Start to read the mint info for the cashlink");
-    let mint_info = if account_info_iter.len() > 1 {
-        msg!("Read the mint info for the cashlink");
-        Some(next_account_info(account_info_iter)?)
-    } else {
-        None
-    };
-
     let mut cash_link = create_cash_link(
         program_id,
         cash_link_info,
@@ -83,18 +78,13 @@ pub fn process_init_cash_link(
     let total_platform_fee = fee_from_bps
         .checked_add(args.network_fee)
         .ok_or::<ProgramError>(CashError::Overflow.into())?;
-    
-    let total_redemption_fee = if mint_info.is_some() {
-        args.base_fee_to_redeem
-            .checked_add(args.rent_fee_to_redeem)
-            .ok_or::<ProgramError>(CashError::Overflow.into())?
-            .checked_mul(args.max_num_redemptions as u64)
-            .ok_or::<ProgramError>(CashError::Overflow.into())?
-    } else {
-        args.base_fee_to_redeem
-            .checked_mul(args.max_num_redemptions as u64)
-            .ok_or::<ProgramError>(CashError::Overflow.into())?
-    };
+
+    let total_redemption_fee = args
+        .base_fee_to_redeem
+        .checked_add(args.rent_fee_to_redeem)
+        .ok_or::<ProgramError>(CashError::Overflow.into())?
+        .checked_mul(args.max_num_redemptions as u64)
+        .ok_or::<ProgramError>(CashError::Overflow.into())?;
 
     let total_amount = match args.distribution_type {
         DistributionType::Fixed => {
@@ -150,54 +140,37 @@ pub fn process_init_cash_link(
         Some(amount) => amount,
         None => 1,
     };
-    if cash_link.distribution_type == DistributionType::Fixed {
-        msg!("Got Fixed Distribution");
+    cash_link.mint = *mint_info.key;
+    let associated_token_account =
+        get_associated_token_address(&cash_link_info.key, &mint_info.key);
+    // let vault_token: TokenAccount = assert_initialized(associated_token_account)?;
+    // assert_token_owned_by(&vault_token, cash_link_info.key)?;
+    assert_account_key(
+        vault_token_info,
+        &associated_token_account,
+        Some(CashError::InvalidVaultTokenOwner),
+    )?;
+    if exists(vault_token_info)? {
+        msg!("Cash link has a mint and an existing vault token. Validate the vault token");
+        let vault_token: TokenAccount = assert_initialized(vault_token_info)?;
+        assert_owned_by(vault_token_info, &spl_token::id())?;
+        assert_token_owned_by(&vault_token, cash_link_info.key)?;
+        assert_account_key(mint_info, &vault_token.mint, Some(CashError::InvalidMint))?;
     } else {
-        msg!("Got Random Distribution");
+        msg!("Cash link has a mint. Create an associated token account for the value");
+        create_associated_token_account_raw(
+            fee_payer_info,
+            vault_token_info,
+            cash_link_info,
+            mint_info,
+            rent_info,
+        )?;
     }
-    match mint_info {
-        Some(info) => {
-            cash_link.mint = Some(*info.key);
-            let vault_token_info = next_account_info(account_info_iter)?;
-            let associated_token_account =
-                get_associated_token_address(&cash_link_info.key, &info.key);
-            // let vault_token: TokenAccount = assert_initialized(associated_token_account)?;
-            // assert_token_owned_by(&vault_token, cash_link_info.key)?;
-            assert_account_key(
-                vault_token_info,
-                &associated_token_account,
-                Some(CashError::InvalidVaultTokenOwner),
-            )?;
-            if exists(vault_token_info)? {
-                msg!("Cash link has a mint and an existing vault token. Validate the vault token");
-                let vault_token: TokenAccount = assert_initialized(vault_token_info)?;
-                assert_owned_by(vault_token_info, &spl_token::id())?;
-                assert_token_owned_by(&vault_token, cash_link_info.key)?;
-                assert_account_key(info, &vault_token.mint, Some(CashError::InvalidMint))?;
-            } else {
-                msg!("Cash link has a mint. Create an associated token account for the value");
-                create_associated_token_account_raw(
-                    fee_payer_info,
-                    vault_token_info,
-                    cash_link_info,
-                    info,
-                    rent_info,
-                )?;
-            }
-            let owner_token_info = next_account_info(account_info_iter)?;
-            assert_owned_by(owner_token_info, &spl_token::id())?;
-            let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
-            assert_token_owned_by(&owner_token, owner_info.key)?;
-            spl_token_transfer(owner_token_info, vault_token_info, owner_info, total, &[])?;
-            //spl_token_transfer(owner_token_info, fee_token_info, owner_info, total_platform_fee, &[])?;
-        }
-        None => {
-            native_transfer(owner_info, cash_link_info, total, &[])?;
-            //native_transfer(owner_info, fee_token_info, total_platform_fee, &[])?;
-            cash_link.mint = None;
-        }
-    };
-
+    assert_owned_by(owner_token_info, &spl_token::id())?;
+    let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
+    assert_token_owned_by(&owner_token, owner_info.key)?;
+    spl_token_transfer(owner_token_info, vault_token_info, owner_info, total, &[])?;
+    //spl_token_transfer(owner_token_info, fee_token_info, owner_info, total_platform_fee, &[])?;
     CashLink::pack(cash_link, &mut cash_link_info.data.borrow_mut())?;
     Ok(())
 }
@@ -267,10 +240,10 @@ pub fn process_cancel(
 
     let owner_token_info = next_account_info(account_info_iter)?;
     let fee_payer_info = next_account_info(account_info_iter)?;
+    let vault_token_info = next_account_info(account_info_iter)?;
 
     let clock_info = next_account_info(account_info_iter)?;
     let clock = &Clock::from_account_info(clock_info)?;
-    let rent_info = next_account_info(account_info_iter)?;
 
     if cash_link.expired() {
         return Err(AccountAlreadyExpired.into());
@@ -289,57 +262,39 @@ pub fn process_cancel(
         &[args.cash_link_bump],
     ];
 
-    if let Some(mint) = cash_link.mint {
-        let vault_token_info = next_account_info(account_info_iter)?;
-        let vault_token: TokenAccount = assert_initialized(vault_token_info)?;
-        // assert_account_key(vault_token.mint, mint, Some(CashError::InvalidMint))?;
-        let associated_token_account = get_associated_token_address(&cash_link_info.key, &mint);
-        assert_account_key(
+    let vault_token: TokenAccount = assert_initialized(vault_token_info)?;
+    // assert_account_key(vault_token.mint, mint, Some(CashError::InvalidMint))?;
+    let associated_token_account =
+        get_associated_token_address(&cash_link_info.key, &cash_link.mint);
+    assert_account_key(
+        vault_token_info,
+        &associated_token_account,
+        Some(CashError::InvalidVaultTokenOwner),
+    )?;
+    if vault_token.amount > 0 {
+        let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
+        assert_token_owned_by(&owner_token, &cash_link.owner)?;
+        spl_token_transfer(
             vault_token_info,
-            &associated_token_account,
-            Some(CashError::InvalidVaultTokenOwner),
+            owner_token_info,
+            cash_link_info,
+            vault_token.amount,
+            &[&signer_seeds],
         )?;
-        if vault_token.amount > 0 {
-            let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
-            assert_token_owned_by(&owner_token, &cash_link.owner)?;
-            spl_token_transfer(
-                vault_token_info,
-                owner_token_info,
-                cash_link_info,
-                vault_token.amount,
-                &[&signer_seeds],
-            )?;
-            spl_token_close(
-                vault_token_info,
-                fee_payer_info,
-                cash_link_info,
-                &[&signer_seeds],
-            )?;
-        } else {
-            spl_token_close(
-                vault_token_info,
-                fee_payer_info,
-                cash_link_info,
-                &[&signer_seeds],
-            )?;
-        }
+        spl_token_close(
+            vault_token_info,
+            fee_payer_info,
+            cash_link_info,
+            &[&signer_seeds],
+        )?;
     } else {
-        let rent = &Rent::from_account_info(rent_info)?;
-        let min_lamports = rent.minimum_balance(CashLink::LEN);
-        let source_starting_lamports = cash_link_info.lamports();
-        let remaining_amount = source_starting_lamports
-            .checked_sub(min_lamports)
-            .ok_or(AmountOverflow)?;
-        if remaining_amount > 0 {
-            **cash_link_info.lamports.borrow_mut() = min_lamports;
-
-            let dest_starting_lamports = owner_token_info.lamports();
-            **owner_token_info.lamports.borrow_mut() = dest_starting_lamports
-                .checked_add(remaining_amount)
-                .ok_or(AmountOverflow)?;
-        }
+        spl_token_close(
+            vault_token_info,
+            fee_payer_info,
+            cash_link_info,
+            &[&signer_seeds],
+        )?;
     }
-
     msg!("Mark the cash_link account as expired...");
     cash_link.state = CashLinkState::Expired;
     CashLink::pack(cash_link, &mut cash_link_info.data.borrow_mut())?;
@@ -393,11 +348,13 @@ pub fn process_redemption(
     }
     let owner_token_info = next_account_info(account_info_iter)?; //owner_token_info
     let fee_payer_info = next_account_info(account_info_iter)?;
+    let vault_token_info = next_account_info(account_info_iter)?;
+    let recipient_token_info = next_account_info(account_info_iter)?;
+    let mint_info = next_account_info(account_info_iter)?;
     let clock_info = next_account_info(account_info_iter)?;
     let clock = &Clock::from_account_info(clock_info)?;
     let rent_info = next_account_info(account_info_iter)?;
     let recent_slothashes_info = next_account_info(account_info_iter)?;
-
     if clock.unix_timestamp as u64 > cash_link.expires_at {
         return Err(CashError::CashlinkExpired.into());
     }
@@ -458,10 +415,10 @@ pub fn process_redemption(
 
     let mut total_fee_to_redeem = if cash_link.total_redemptions == 1 {
         platform_fee_per_redeem
-        .checked_add(fee_to_redeem)
-        .ok_or::<ProgramError>(CashError::Overflow.into())?
-        .checked_add(cash_link.network_fee)
-        .ok_or::<ProgramError>(CashError::Overflow.into())?
+            .checked_add(fee_to_redeem)
+            .ok_or::<ProgramError>(CashError::Overflow.into())?
+            .checked_add(cash_link.network_fee)
+            .ok_or::<ProgramError>(CashError::Overflow.into())?
     } else {
         platform_fee_per_redeem
             .checked_add(fee_to_redeem)
@@ -472,151 +429,97 @@ pub fn process_redemption(
         .checked_add(total_fee_to_redeem)
         .ok_or::<ProgramError>(CashError::Overflow.into())?;
 
-    if let Some(mint) = cash_link.mint {
-        let _: TokenAccount = assert_initialized(fee_token_info)?;
-        assert_owned_by(fee_token_info, &spl_token::id())?;
-        let recipient_token_info = next_account_info(account_info_iter)?;
-        let vault_token_info = next_account_info(account_info_iter)?;
-        assert_owned_by(vault_token_info, &spl_token::id())?;
-        let associated_token_account = get_associated_token_address(&cash_link_info.key, &mint);
-        assert_account_key(
-            vault_token_info,
-            &associated_token_account,
-            Some(CashError::InvalidVaultTokenOwner),
-        )?;
-        let vault_token: TokenAccount = assert_initialized(vault_token_info)?;
-        let mint_info = next_account_info(account_info_iter)?;
-        let fee_payer_token_info = next_account_info(account_info_iter)?;
-        let fee_payer_token: TokenAccount = assert_initialized(fee_payer_token_info)?;
-        assert_token_owned_by(&fee_payer_token, &fee_payer_info.key)?;
-        assert_owned_by(fee_payer_token_info, &spl_token::id())?;
-        if exists(recipient_token_info)? {
-            msg!("Cash link has a mint and an existing recipient token. Validate the recipient token");
-            let recipient_token: TokenAccount = assert_initialized(recipient_token_info)?;
-            assert_token_owned_by(&recipient_token, &wallet_info.key)?;
-            assert_owned_by(recipient_token_info, &spl_token::id())?;
-            //subtract rent_fee
-            total_fee_to_redeem = total_fee_to_redeem
-                .checked_sub(cash_link.rent_fee_to_redeem)
-                .ok_or::<ProgramError>(CashError::Overflow.into())?;
-            total = amount_to_redeem
-                .checked_add(total_fee_to_redeem)
-                .ok_or::<ProgramError>(CashError::Overflow.into())?;
-        } else {
-            msg!("Cash link has a mint. Create an associated token account for the recipient");
-            create_associated_token_account_raw(
-                fee_payer_info,
-                recipient_token_info,
-                wallet_info,
-                mint_info,
-                rent_info,
-            )?;
-        }
-        if vault_token.amount < total {
-            return Err(InsufficientSettlementFunds.into());
-        }
-        if amount_to_redeem > 0 {
-            spl_token_transfer(
-                vault_token_info,
-                recipient_token_info,
-                cash_link_info,
-                amount_to_redeem,
-                &[&signer_seeds],
-            )?;
-        }
-        if platform_fee_per_redeem > 0 {
-            spl_token_transfer(
-                vault_token_info,
-                fee_token_info,
-                cash_link_info,
-                platform_fee_per_redeem,
-                &[&signer_seeds],
-            )?;
-        }
-        let total_network_fee = total_fee_to_redeem.checked_sub(platform_fee_per_redeem)
-        .ok_or::<ProgramError>(CashError::Overflow.into())?;
-        if total_network_fee > 0 {
-            spl_token_transfer(
-                vault_token_info,
-                fee_payer_token_info,
-                cash_link_info,
-                total_network_fee,
-                &[&signer_seeds],
-            )?;
-        }
-        let remaining = vault_token
-            .amount
-            .checked_sub(total)
+    let _: TokenAccount = assert_initialized(fee_token_info)?;
+    assert_owned_by(fee_token_info, &spl_token::id())?;
+    assert_owned_by(vault_token_info, &spl_token::id())?;
+    let associated_token_account = get_associated_token_address(&cash_link_info.key, &cash_link.mint);
+    assert_account_key(
+        vault_token_info,
+        &associated_token_account,
+        Some(CashError::InvalidVaultTokenOwner),
+    )?;
+    let vault_token: TokenAccount = assert_initialized(vault_token_info)?;
+    let fee_payer_token_info = next_account_info(account_info_iter)?;
+    let fee_payer_token: TokenAccount = assert_initialized(fee_payer_token_info)?;
+    assert_token_owned_by(&fee_payer_token, &fee_payer_info.key)?;
+    assert_owned_by(fee_payer_token_info, &spl_token::id())?;
+    if exists(recipient_token_info)? {
+        msg!("Cash link has a mint and an existing recipient token. Validate the recipient token");
+        let recipient_token: TokenAccount = assert_initialized(recipient_token_info)?;
+        assert_token_owned_by(&recipient_token, &wallet_info.key)?;
+        assert_owned_by(recipient_token_info, &spl_token::id())?;
+        //subtract rent_fee
+        total_fee_to_redeem = total_fee_to_redeem
+            .checked_sub(cash_link.rent_fee_to_redeem)
             .ok_or::<ProgramError>(CashError::Overflow.into())?;
-        if cash_link.is_fully_redeemed()? {
-            let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
-            assert_token_owned_by(&owner_token, &cash_link.owner)?;
-            if remaining > 0 {
-                spl_token_transfer(
-                    vault_token_info,
-                    owner_token_info,
-                    cash_link_info,
-                    remaining,
-                    &[&signer_seeds],
-                )?;
-            }
-            spl_token_close(
+        total = amount_to_redeem
+            .checked_add(total_fee_to_redeem)
+            .ok_or::<ProgramError>(CashError::Overflow.into())?;
+    } else {
+        msg!("Cash link has a mint. Create an associated token account for the recipient");
+        create_associated_token_account_raw(
+            fee_payer_info,
+            recipient_token_info,
+            wallet_info,
+            mint_info,
+            rent_info,
+        )?;
+    }
+    if vault_token.amount < total {
+        return Err(InsufficientSettlementFunds.into());
+    }
+    if amount_to_redeem > 0 {
+        spl_token_transfer(
+            vault_token_info,
+            recipient_token_info,
+            cash_link_info,
+            amount_to_redeem,
+            &[&signer_seeds],
+        )?;
+    }
+    if platform_fee_per_redeem > 0 {
+        spl_token_transfer(
+            vault_token_info,
+            fee_token_info,
+            cash_link_info,
+            platform_fee_per_redeem,
+            &[&signer_seeds],
+        )?;
+    }
+    let total_network_fee = total_fee_to_redeem
+        .checked_sub(platform_fee_per_redeem)
+        .ok_or::<ProgramError>(CashError::Overflow.into())?;
+    if total_network_fee > 0 {
+        spl_token_transfer(
+            vault_token_info,
+            fee_payer_token_info,
+            cash_link_info,
+            total_network_fee,
+            &[&signer_seeds],
+        )?;
+    }
+    let remaining = vault_token
+        .amount
+        .checked_sub(total)
+        .ok_or::<ProgramError>(CashError::Overflow.into())?;
+    if cash_link.is_fully_redeemed()? {
+        let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
+        assert_token_owned_by(&owner_token, &cash_link.owner)?;
+        if remaining > 0 {
+            spl_token_transfer(
                 vault_token_info,
-                fee_payer_info,
+                owner_token_info,
                 cash_link_info,
+                remaining,
                 &[&signer_seeds],
             )?;
         }
-    } else {
-        let rent = &Rent::from_account_info(rent_info)?;
-        let min_lamports = rent.minimum_balance(CashLink::LEN);
-        let mut source_starting_lamports = cash_link_info.lamports();
-        let available_amount = source_starting_lamports
-            .checked_sub(min_lamports)
-            .ok_or(AmountOverflow)?;
-        if available_amount < total {
-            return Err(InsufficientSettlementFunds.into());
-        }
-        if amount_to_redeem > 0 {
-            let dest_starting_lamports = wallet_info.lamports();
-            **wallet_info.lamports.borrow_mut() = dest_starting_lamports
-                .checked_add(amount_to_redeem)
-                .ok_or(AmountOverflow)?;
-            source_starting_lamports = source_starting_lamports
-                .checked_sub(amount_to_redeem)
-                .ok_or(AmountOverflow)?;
-        }
-        if platform_fee_per_redeem > 0 {
-            let dest_starting_lamports = fee_token_info.lamports();
-            **fee_token_info.lamports.borrow_mut() = dest_starting_lamports
-                .checked_add(platform_fee_per_redeem)
-                .ok_or(AmountOverflow)?;
-            source_starting_lamports = source_starting_lamports
-                .checked_sub(platform_fee_per_redeem)
-                .ok_or(AmountOverflow)?;
-        }
-        let total_network_fee = total_fee_to_redeem.checked_sub(platform_fee_per_redeem)
-        .ok_or::<ProgramError>(CashError::Overflow.into())?;
-        if total_network_fee > 0 {
-            let dest_starting_lamports = fee_payer_info.lamports();
-            **fee_payer_info.lamports.borrow_mut() = dest_starting_lamports
-                .checked_add(total_network_fee)
-                .ok_or(AmountOverflow)?;
-            source_starting_lamports = source_starting_lamports
-                .checked_sub(total_network_fee)
-                .ok_or(AmountOverflow)?;
-        }
-        let remaining = available_amount.checked_sub(total).ok_or(AmountOverflow)?;
-        if cash_link.is_fully_redeemed()? && remaining > 0 {
-            let dest_starting_lamports = owner_token_info.lamports();
-            **owner_token_info.lamports.borrow_mut() = dest_starting_lamports
-                .checked_add(remaining)
-                .ok_or(AmountOverflow)?;
-            source_starting_lamports = source_starting_lamports
-                .checked_sub(remaining)
-                .ok_or(AmountOverflow)?;
-        }
-        **cash_link_info.lamports.borrow_mut() = source_starting_lamports;
+        spl_token_close(
+            vault_token_info,
+            fee_payer_info,
+            cash_link_info,
+            &[&signer_seeds],
+        )?;
     }
     let system_account_info = next_account_info(account_info_iter)?;
     if redemption_info.lamports() > 0 && !redemption_info.data_is_empty() {
