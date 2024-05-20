@@ -323,7 +323,7 @@ export class CashLinkClient {
     const passKey = new PublicKey(input.passKey);
     const [cashLink, cashLinkBump] = await CashProgram.findCashLinkAccount(passKey);
     const amount = new BN(input.amount);
-    const fixedFee = new BN(input.fixedFee ?? 0);
+    const networkFee = new BN(input.networkFee ?? 0);
     const rentFeeToRedeem = new BN(input.rentFeeToRedeem ?? 0);
     const baseFeeToRedeem = new BN(input.baseFeeToRedeem ?? 0);
     const feeBps = input.feeBps ?? 0;
@@ -335,7 +335,7 @@ export class CashLinkClient {
       cashLinkBump,
       cashLink,
       feeBps,
-      fixedFee,
+      networkFee,
       rentFeeToRedeem,
       baseFeeToRedeem,
       maxNumRedemptions,
@@ -358,7 +358,7 @@ export class CashLinkClient {
     const {
       amount,
       feeBps,
-      fixedFee,
+      networkFee,
       rentFeeToRedeem,
       baseFeeToRedeem,
       passKey,
@@ -376,7 +376,7 @@ export class CashLinkClient {
     const data = InitCashLinkArgs.serialize({
       amount,
       feeBps,
-      fixedFee,
+      networkFee,
       rentFeeToRedeem,
       baseFeeToRedeem,
       cashLinkBump,
@@ -541,7 +541,7 @@ export class CashLinkClient {
     }
     const walletAddress = new PublicKey(input.walletAddress);
     const owner = new PublicKey(cashLink.data.owner);
-    let accountKeys = [walletAddress, this.feeWallet, owner];
+    let accountKeys = [walletAddress, this.feeWallet, owner, this.feePayer.publicKey];
     let vaultToken: PublicKey | null = null;
     let mint: PublicKey | null = null;
     if (cashLink.data.mint) {
@@ -569,6 +569,16 @@ export class CashLinkClient {
             input.commitment,
           )
           .then((acc) => acc.address),
+        spl
+          .getOrCreateAssociatedTokenAccount(
+            this.connection,
+            this.feePayer,
+            new PublicKey(cashLink.data.mint),
+            accountKeys[3],
+            true,
+            input.commitment,
+          )
+          .then((acc) => acc.address),
       ]);
     }
     const [redemption, redemptionBump] = await CashProgram.findRedemptionAccount(
@@ -583,8 +593,9 @@ export class CashLinkClient {
       redemptionBump: redemptionBump,
       wallet: walletAddress,
       walletToken: accountKeys[0],
-      feeToken: accountKeys[1],
+      platformFeeToken: accountKeys[1],
       ownerToken: accountKeys[2],
+      feePayerToken: accountKeys[3],
       vaultToken,
       authority: this.authority.publicKey,
       cashLink: cashLink.pubkey,
@@ -602,12 +613,13 @@ export class CashLinkClient {
     const keys = [
       { pubkey: params.authority, isSigner: true, isWritable: false },
       { pubkey: params.wallet, isSigner: false, isWritable: true },
-      { pubkey: params.feeToken, isSigner: false, isWritable: true },
+      { pubkey: params.platformFeeToken, isSigner: false, isWritable: true },
       { pubkey: params.cashLink, isSigner: false, isWritable: true },
       { pubkey: params.passKey, isSigner: true, isWritable: false },
       { pubkey: params.redemption, isSigner: false, isWritable: true },
       { pubkey: params.ownerToken, isSigner: false, isWritable: true },
       { pubkey: params.feePayer, isSigner: true, isWritable: true },
+      { pubkey: params.feePayerToken, isSigner: false, isWritable: true },
       {
         pubkey: SYSVAR_CLOCK_PUBKEY,
         isSigner: false,
