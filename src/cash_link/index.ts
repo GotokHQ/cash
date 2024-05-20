@@ -168,7 +168,11 @@ export class CashLinkClient {
           ).address
         : owner,
       vaultToken: cashLink.data.mint
-        ? await _findAssociatedTokenAddress(cashLink.pubkey, new PublicKey(cashLink.data.mint))
+        ? spl.getAssociatedTokenAddressSync(
+            new PublicKey(cashLink.data.mint),
+            cashLink.pubkey,
+            true,
+          )
         : null,
       feePayer: this.feePayer.publicKey,
       passKey: new PublicKey(input.passKey),
@@ -409,12 +413,12 @@ export class CashLinkClient {
         isWritable: false,
       },
       {
-        pubkey: spl.getAssociatedTokenAddressSync(mint, cashLink),
+        pubkey: spl.getAssociatedTokenAddressSync(mint, cashLink, true),
         isSigner: false,
         isWritable: true,
       },
       {
-        pubkey: spl.getAssociatedTokenAddressSync(mint, owner),
+        pubkey: spl.getAssociatedTokenAddressSync(mint, owner, true),
         isSigner: false,
         isWritable: true,
       },
@@ -530,9 +534,9 @@ export class CashLinkClient {
     const owner = new PublicKey(cashLink.data.owner);
     let accountKeys = [walletAddress, this.feeWallet, owner, this.feePayer.publicKey];
     const mint = new PublicKey(cashLink.data.mint);
-    const vaultToken = await _findAssociatedTokenAddress(cashLinkAddress, mint);
+    const vaultToken = spl.getAssociatedTokenAddressSync(mint, cashLinkAddress, true);
     accountKeys = await Promise.all([
-      spl.getAssociatedTokenAddressSync(mint, walletAddress),
+      spl.getAssociatedTokenAddressSync(mint, walletAddress, true),
       spl
         .getOrCreateAssociatedTokenAccount(
           this.connection,
@@ -676,7 +680,7 @@ export class CashLinkClient {
     commitment?: Commitment,
   ): Promise<spl.Account | null> => {
     try {
-      const vault = await _findAssociatedTokenAddress(cashLink, mint);
+      const vault = spl.getAssociatedTokenAddressSync(mint, cashLink, true);
       return await spl.getAccount(this.connection, vault, commitment);
     } catch (error: unknown) {
       if (
@@ -714,9 +718,6 @@ export class CashLinkClient {
     }
   };
 }
-
-const _findAssociatedTokenAddress = (walletAddress: PublicKey, tokenMintAddress: PublicKey) =>
-  spl.getAssociatedTokenAddressSync(tokenMintAddress, walletAddress, true);
 
 const _getCashLinkAccount = async (
   connection: Connection,
