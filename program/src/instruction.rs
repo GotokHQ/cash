@@ -18,7 +18,7 @@ use crate::state::cashlink::DistributionType;
 pub struct InitCashLinkArgs {
     pub amount: u64,
     pub fee_bps: u16,
-    pub fixed_fee: u64,
+    pub network_fee: u64,
     pub base_fee_to_redeem: u64,
     pub rent_fee_to_redeem: u64,
     pub cash_link_bump: u8,
@@ -77,22 +77,23 @@ pub enum CashInstruction {
     ///
     /// 0. `[signer]` The account of the authority
     /// 1. `[signer]` The user wallet
-    /// 2. `[writable]` The fee token account for the token they will receive should the trade go through
+    /// 2. `[writable]` The platform fee account for the token they will receive should the trade go through
     /// 3. `[writable]` The cash_link account holding the cash_link info
     /// 4. `[]` The pass key required to unlock the cash link for redemption
     /// 5. `[writable]` The redemption account to flag a user has redeemed this cashlink
     /// 6. `[writable]` The payer token account of the payer that initialized the cash_link  
-    /// 7. `[writable]` The fee payer token account to receive tokens from the vault
-    /// 8. `[]` The clock account
-    /// 9. `[]` The rent account
-    /// 10. `[]` The recent slot hash account
-    /// 11. `[writable][Optional]` The vault token account to get tokens. This value is Optional. if the mint is set, then this must be set.
-    /// 12. `[writable][Optional]` The recipient token account for the token they will receive should the trade go through
-    /// 13. `[][Optional]` The mint account for the token
-    /// 14. `[]` The system program
-    /// 15. `[writable][Optional]` The fingerprint info
-    /// 16. `[]` The token program
-    /// 17. `[]` The associated program
+    /// 7. `[writable]` The fee payer account that pays network and rent fees
+    /// 8. `[writable]` The fee payer's associated token account that collects the rent or network fees
+    /// 9. `[]` The clock account
+    /// 10. `[]` The rent account
+    /// 11. `[]` The recent slot hash account
+    /// 12. `[writable][Optional]` The vault token account to get tokens. This value is Optional. if the mint is set, then this must be set.
+    /// 13. `[writable][Optional]` The recipient token account for the token they will receive should the trade go through
+    /// 14. `[][Optional]` The mint account for the token
+    /// 15. `[]` The system program
+    /// 16. `[writable][Optional]` The fingerprint info
+    /// 17. `[]` The token program
+    /// 18. `[]` The associated program
     Redeem(InitCashRedemptionArgs),
     /// Cancel the cash_link
     ///
@@ -211,6 +212,7 @@ pub fn redeem_cash_link(
     redemption_pda: &Pubkey,
     owner_token: &Pubkey,
     fee_payer: &Pubkey,
+    fee_payer_token: &Pubkey,
     fingerprint: Option<&Pubkey>,
     mint: &Pubkey,
     args: InitCashRedemptionArgs
@@ -224,6 +226,7 @@ pub fn redeem_cash_link(
         AccountMeta::new(*redemption_pda, false),
         AccountMeta::new(*owner_token, false),
         AccountMeta::new(*fee_payer, true),
+        AccountMeta::new(*fee_payer_token, true),
         AccountMeta::new_readonly(sysvar::clock::id(), false),
         AccountMeta::new_readonly(sysvar::rent::id(), false),
         AccountMeta::new_readonly(sysvar::slot_hashes::id(), false),

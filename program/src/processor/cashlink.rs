@@ -81,7 +81,7 @@ pub fn process_init_cash_link(
     let fee_from_bps = calculate_fee(args.amount, args.fee_bps as u64)?;
 
     let total_platform_fee = fee_from_bps
-        .checked_add(args.fixed_fee)
+        .checked_add(args.network_fee)
         .ok_or::<ProgramError>(CashError::Overflow.into())?;
     
     let total_redemption_fee = if mint_info.is_some() {
@@ -131,7 +131,7 @@ pub fn process_init_cash_link(
     cash_link.fee_bps = args.fee_bps;
     cash_link.base_fee_to_redeem = args.base_fee_to_redeem;
     cash_link.rent_fee_to_redeem = args.rent_fee_to_redeem;
-    cash_link.fixed_fee = args.fixed_fee;
+    cash_link.network_fee = args.network_fee;
     cash_link.remaining_amount = total_amount;
     cash_link.authority = *authority_info.key;
     cash_link.pass_key = *pass_info.key;
@@ -393,6 +393,7 @@ pub fn process_redemption(
     }
     let owner_token_info = next_account_info(account_info_iter)?; //owner_token_info
     let fee_payer_info = next_account_info(account_info_iter)?;
+    let fee_payer_token_info = next_account_info(account_info_iter)?;
     let clock_info = next_account_info(account_info_iter)?;
     let clock = &Clock::from_account_info(clock_info)?;
     let rent_info = next_account_info(account_info_iter)?;
@@ -460,7 +461,7 @@ pub fn process_redemption(
         platform_fee_per_redeem
         .checked_add(fee_to_redeem)
         .ok_or::<ProgramError>(CashError::Overflow.into())?
-        .checked_add(cash_link.fixed_fee)
+        .checked_add(cash_link.network_fee)
         .ok_or::<ProgramError>(CashError::Overflow.into())?
     } else {
         platform_fee_per_redeem
@@ -511,6 +512,7 @@ pub fn process_redemption(
             return Err(InsufficientSettlementFunds.into());
         }
         let _: TokenAccount = assert_initialized(fee_token_info)?;
+        let _: TokenAccount = assert_initialized(fee_payer_token_info)?;
         if amount_to_redeem > 0 {
             spl_token_transfer(
                 vault_token_info,
@@ -520,12 +522,23 @@ pub fn process_redemption(
                 &[&signer_seeds],
             )?;
         }
-        if total_fee_to_redeem > 0 {
+        if platform_fee_per_redeem > 0 {
             spl_token_transfer(
                 vault_token_info,
                 fee_token_info,
                 cash_link_info,
-                total_fee_to_redeem,
+                platform_fee_per_redeem,
+                &[&signer_seeds],
+            )?;
+        }
+        let total_network_fee = total_fee_to_redeem.checked_sub(platform_fee_per_redeem)
+        .ok_or::<ProgramError>(CashError::Overflow.into())?;
+        if total_network_fee > 0 {
+            spl_token_transfer(
+                vault_token_info,
+                fee_payer_token_info,
+                cash_link_info,
+                total_network_fee,
                 &[&signer_seeds],
             )?;
         }
@@ -571,13 +584,24 @@ pub fn process_redemption(
                 .checked_sub(amount_to_redeem)
                 .ok_or(AmountOverflow)?;
         }
-        if total_fee_to_redeem > 0 {
+        if platform_fee_per_redeem > 0 {
             let dest_starting_lamports = fee_token_info.lamports();
             **fee_token_info.lamports.borrow_mut() = dest_starting_lamports
-                .checked_add(total_fee_to_redeem)
+                .checked_add(platform_fee_per_redeem)
                 .ok_or(AmountOverflow)?;
             source_starting_lamports = source_starting_lamports
-                .checked_sub(total_fee_to_redeem)
+                .checked_sub(platform_fee_per_redeem)
+                .ok_or(AmountOverflow)?;
+        }
+        let total_network_fee = total_fee_to_redeem.checked_sub(platform_fee_per_redeem)
+        .ok_or::<ProgramError>(CashError::Overflow.into())?;
+        if total_network_fee > 0 {
+            let dest_starting_lamports = fee_payer_token_info.lamports();
+            **fee_payer_token_info.lamports.borrow_mut() = dest_starting_lamports
+                .checked_add(total_network_fee)
+                .ok_or(AmountOverflow)?;
+            source_starting_lamports = source_starting_lamports
+                .checked_sub(total_network_fee)
                 .ok_or(AmountOverflow)?;
         }
         let remaining = available_amount.checked_sub(total).ok_or(AmountOverflow)?;

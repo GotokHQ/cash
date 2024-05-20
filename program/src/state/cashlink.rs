@@ -39,7 +39,7 @@ pub struct CashLink {
     pub state: CashLinkState,
     pub amount: u64,
     pub fee_bps: u16,
-    pub fixed_fee: u64,
+    pub network_fee: u64,
     pub base_fee_to_redeem: u64,
     pub rent_fee_to_redeem: u64,
     pub remaining_amount: u64,
