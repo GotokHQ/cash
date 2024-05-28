@@ -153,27 +153,13 @@ export class CashLinkClient {
       throw new Error(ACCOUNT_ALREADY_SETTLED);
     }
     const owner = new PublicKey(cashLink.data.owner);
+    const mint = new PublicKey(cashLink.data.mint);
     const cancelInstruction = await this.cancelInstruction({
+      owner,
       authority: this.authority.publicKey,
       cashLink: cashLink.pubkey,
-      ownerToken: cashLink.data.mint
-        ? (
-            await spl.getOrCreateAssociatedTokenAccount(
-              this.connection,
-              this.feePayer,
-              new PublicKey(cashLink.data.mint),
-              owner,
-              true,
-            )
-          ).address
-        : owner,
-      vaultToken: cashLink.data.mint
-        ? spl.getAssociatedTokenAddressSync(
-            new PublicKey(cashLink.data.mint),
-            cashLink.pubkey,
-            true,
-          )
-        : null,
+      ownerToken: spl.getAssociatedTokenAddressSync(mint, owner),
+      vaultToken: spl.getAssociatedTokenAddressSync(mint, cashLink.pubkey),
       feePayer: this.feePayer.publicKey,
       passKey: new PublicKey(input.passKey),
       cashLinkBump,
@@ -186,6 +172,7 @@ export class CashLinkClient {
       { pubkey: params.authority, isSigner: true, isWritable: false },
       { pubkey: params.cashLink, isSigner: false, isWritable: true },
       { pubkey: params.passKey, isSigner: false, isWritable: false },
+      { pubkey: params.owner, isSigner: false, isWritable: false },
       { pubkey: params.ownerToken, isSigner: false, isWritable: true },
       { pubkey: params.feePayer, isSigner: false, isWritable: true },
       {

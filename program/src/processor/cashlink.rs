@@ -132,7 +132,7 @@ pub fn process_init_cash_link(
         Some(enabled) => enabled,
         None => false,
     };
-    cash_link.expires_at = now + (args.num_days_to_expire as u64 * 86400);
+    cash_link.expires_at = now ;//+ (args.num_days_to_expire as u64 * 86400);
     cash_link.min_amount = match args.min_amount {
         Some(amount) if amount > total_amount => {
             return Err(CashError::MinAmountMustBeLessThanAmount.into())
@@ -237,7 +237,12 @@ pub fn process_cancel(
         &cash_link.pass_key,
         Some(CashError::InvalidPassKey),
     )?;
-
+    let owner_info = next_account_info(account_info_iter)?;
+    assert_account_key(
+        owner_info,
+        &cash_link.owner,
+        Some(CashError::InvalidOwner),
+    )?;
     let owner_token_info = next_account_info(account_info_iter)?;
     let fee_payer_info = next_account_info(account_info_iter)?;
     let vault_token_info = next_account_info(account_info_iter)?;
