@@ -132,7 +132,7 @@ pub fn process_init_cash_link(
         Some(enabled) => enabled,
         None => false,
     };
-    cash_link.expires_at = now ;//+ (args.num_days_to_expire as u64 * 86400);
+    cash_link.expires_at = now + (args.num_days_to_expire as u64 * 86400);
     cash_link.min_amount = match args.min_amount {
         Some(amount) if amount > total_amount => {
             return Err(CashError::MinAmountMustBeLessThanAmount.into())
