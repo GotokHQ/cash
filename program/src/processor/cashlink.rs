@@ -29,7 +29,6 @@ use solana_program::{
 };
 use spl_associated_token_account::get_associated_token_address;
 use spl_token::state::Account as TokenAccount;
-
 pub struct Processor;
 
 pub fn process_init_cash_link(
@@ -150,10 +149,15 @@ pub fn process_init_cash_link(
         &associated_token_account,
         Some(CashError::InvalidVaultTokenOwner),
     )?;
+    let  token_program = if  args.is_token_2022 {
+        &spl_token_2022::id()
+    } else {
+        &spl_token::id()
+    };
     if exists(vault_token_info)? {
         msg!("Cash link has a mint and an existing vault token. Validate the vault token");
         let vault_token: TokenAccount = assert_initialized(vault_token_info)?;
-        assert_owned_by(vault_token_info, &spl_token::id())?;
+        assert_owned_by(vault_token_info, token_program)?;
         assert_token_owned_by(&vault_token, cash_link_info.key)?;
         assert_account_key(mint_info, &vault_token.mint, Some(CashError::InvalidMint))?;
     } else {
@@ -164,12 +168,13 @@ pub fn process_init_cash_link(
             cash_link_info,
             mint_info,
             rent_info,
+            token_program
         )?;
     }
-    assert_owned_by(owner_token_info, &spl_token::id())?;
+    assert_owned_by(owner_token_info, token_program)?;
     let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
     assert_token_owned_by(&owner_token, owner_info.key)?;
-    spl_token_transfer(owner_token_info, vault_token_info, owner_info, total, &[])?;
+    spl_token_transfer(owner_token_info, vault_token_info, owner_info, total,  token_program, &[])?;
     //spl_token_transfer(owner_token_info, fee_token_info, owner_info, total_platform_fee, &[])?;
     CashLink::pack(cash_link, &mut cash_link_info.data.borrow_mut())?;
     Ok(())
@@ -396,9 +401,8 @@ pub fn process_redemption(
                 cash_link.remaining_amount
             } else {
                 // get slot hash
-                let rand = get_random_value(recent_slothashes_info, clock)?;
+                let rand: u64 = get_random_value(recent_slothashes_info, clock)?;
                 let max_possible = cash_link.remaining_amount;
-
                 rand.checked_rem(max_possible - cash_link.min_amount)
                     .and_then(|amount| amount.checked_add(cash_link.min_amount))
                     .ok_or(CashError::Overflow)?

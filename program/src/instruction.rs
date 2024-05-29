@@ -27,6 +27,7 @@ pub struct InitCashLinkArgs {
     pub min_amount: Option<u64>,
     pub fingerprint_enabled: Option<bool>,
     pub num_days_to_expire: u8,
+    pub is_token_2022: bool,
 }
 
 /// Initialize a redemption arguments

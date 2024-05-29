@@ -1,6 +1,6 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::{
-    borsh0_10::try_from_slice_unchecked,
+    borsh1::try_from_slice_unchecked,
     msg,
     program_error::ProgramError,
     program_pack::{Pack, Sealed}, pubkey::Pubkey,

@@ -5,17 +5,7 @@ use std::convert::TryInto;
 use crate::error::CashError;
 
 use solana_program::{
-    account_info::AccountInfo,
-    entrypoint::ProgramResult,
-    msg,
-    program::{invoke, invoke_signed},
-    program_error::ProgramError,
-    program_memory::sol_memcmp,
-    program_pack::{IsInitialized, Pack},
-    pubkey::{Pubkey, PUBKEY_BYTES},
-    system_instruction,
-    sysvar::{rent::Rent, Sysvar},
-    clock::Clock,
+    account_info::AccountInfo, address_lookup_table::program::id, clock::Clock, entrypoint::ProgramResult, msg, program::{invoke, invoke_signed}, program_error::ProgramError, program_memory::sol_memcmp, program_pack::{IsInitialized, Pack}, pubkey::{Pubkey, PUBKEY_BYTES}, system_instruction, sysvar::{rent::Rent, Sysvar}
 };
 use spl_token::state::Account;
 use spl_associated_token_account::instruction::create_associated_token_account;
@@ -107,26 +97,6 @@ pub fn empty_account_balance(
     Ok(())
 }
 
-pub fn transfer<'a>(
-    is_native: bool,
-    source_account_info: &AccountInfo<'a>,
-    destination_account_info: &AccountInfo<'a>,
-    owner_account_info: &AccountInfo<'a>,
-    amount: u64,
-    signers_seeds: &[&[&[u8]]],
-) -> Result<(), ProgramError> {
-    if is_native {
-        native_transfer(source_account_info, destination_account_info, amount, signers_seeds)
-    } else {
-        spl_token_transfer(
-            source_account_info,
-            destination_account_info,
-            owner_account_info,
-            amount,
-            signers_seeds,
-        )
-    }
-}
 
 /// SPL transfer instruction.
 pub fn spl_token_transfer<'a>(
@@ -134,16 +104,28 @@ pub fn spl_token_transfer<'a>(
     destination: &AccountInfo<'a>,
     authority: &AccountInfo<'a>,
     amount: u64,
+    token_program_id: &Pubkey,
     signers_seeds: &[&[&[u8]]],
 ) -> Result<(), ProgramError> {
-    let ix = spl_token::instruction::transfer(
-        &spl_token::id(),
-        source.key,
-        destination.key,
-        authority.key,
-        &[],
-        amount,
-    )?;
+    let ix = if cmp_pubkeys(token_program_id, &spl_token::id()) {
+        spl_token::instruction::transfer(
+            token_program_id,
+            source.key,
+            destination.key,
+            authority.key,
+            &[],
+            amount,
+        )
+    } else {
+        spl_token_2022::instruction::transfer(
+            token_program_id,
+            source.key,
+            destination.key,
+            authority.key,
+            &[],
+            amount,
+        )
+    }?;
 
     invoke_signed(
         &ix,
@@ -270,9 +252,10 @@ pub fn create_associated_token_account_raw<'a>(
     wallet_info: &AccountInfo<'a>,
     mint_info: &AccountInfo<'a>,
     rent_sysvar_info: &AccountInfo<'a>,
+    token_program_id: &Pubkey,
 ) -> ProgramResult {
     invoke(
-        &create_associated_token_account(payer_info.key, wallet_info.key, mint_info.key, &spl_token::id()),
+        &create_associated_token_account(payer_info.key, wallet_info.key, mint_info.key, token_program_id),
         &[
             payer_info.clone(),
             vault_token_info.clone(),
