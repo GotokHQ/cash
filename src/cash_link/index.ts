@@ -22,7 +22,7 @@ import {
   RedeemCashLinkInput,
 } from './types';
 import { CashProgram } from '../cash_program';
-import { CashLink, CashLinkDistributionType, CashLinkState } from '../accounts/cash_link';
+import { CashLink, CashLinkState } from '../accounts/cash_link';
 import {
   CancelCashLinkArgs,
   CancelCashLinkParams,
@@ -364,13 +364,7 @@ export class CashLinkClient {
     const networkFee = new BN(input.networkFee ?? 0);
     const rentFeeToRedeem = new BN(input.rentFeeToRedeem ?? 0);
     const baseFeeToRedeem = new BN(input.baseFeeToRedeem ?? 0);
-    const totalRedemptionFee = rentFeeToRedeem
-      .add(baseFeeToRedeem)
-      .mul(new BN(input.maxNumRedemptions));
-    const totalAmount =
-      input.distributionType === CashLinkDistributionType.Fixed
-        ? amount.mul(new BN(input.maxNumRedemptions)).add(totalRedemptionFee)
-        : amount.add(totalRedemptionFee);
+    const totalAmount = new BN(input.totalAmount);
     const feeBps = input.feeBps ?? 0;
     const maxNumRedemptions = input.maxNumRedemptions;
     const minAmount = input.minAmount ? new BN(input.minAmount) : undefined;
