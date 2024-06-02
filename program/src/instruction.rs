@@ -103,15 +103,14 @@ pub enum CashInstruction {
     ///
     /// 0. `[signer]` The account of the authority
     /// 1. `[writable]` The cash_link account holding the cash_link info   
-    /// 2. `[]` The pass key required to unlock the cash link for redemption    
-    /// 3. `[writable]` The owner or wallet that created the cash link
-    /// 4. `[writable]` The owner associated token account of the owner
-    /// 5. `[writable]` The fee payer token account to receive tokens from the vault
-    /// 6. `[]` The clock account
-    /// 7. `[]` The rent account
-    /// 8. `[writable]` The vault token account to get tokens from and eventually close. This value is Optional. if the mint is set, then this must be set.
-    /// 9. `[]` The token program
-    /// 10. `[]` The system program
+    /// 2. `[]` The pass key required to unlock the cash link for redemption   
+    /// 3. `[writable]` The owner associated token account of the owner if it's not a native mint
+    /// 4. `[writable]` The fee payer token account to receive tokens from the vault
+    /// 5. `[]` The clock account
+    /// 6. `[]` The rent account
+    /// 7. `[writable]` The vault token account to get tokens from and eventually close. This value is Optional. if the mint is set, then this must be set.
+    /// 8. `[]` The token program
+    /// 9. `[]` The system program
     Cancel(CancelCashRedemptionArgs),
     /// Close the cash_link
     ///
@@ -164,7 +163,6 @@ pub fn cancel_cash_link(
     authority: &Pubkey,
     cash_link: &Pubkey,
     pass_key: &Pubkey,
-    owner: &Pubkey,
     owner_token: &Pubkey,
     vault_token: &Pubkey,
     fee_payer: &Pubkey,
@@ -174,7 +172,6 @@ pub fn cancel_cash_link(
         AccountMeta::new_readonly(*authority, true),
         AccountMeta::new(*cash_link, false),
         AccountMeta::new_readonly(*pass_key, false),
-        AccountMeta::new_readonly(*owner, false),
         AccountMeta::new(*owner_token, false),
         AccountMeta::new(*fee_payer, false),
         AccountMeta::new(*vault_token, false),

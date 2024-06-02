@@ -17,9 +17,7 @@ export class CancelCashLinkArgs extends Borsh.Data<InitCancelArgs> {
 export type CancelCashLinkParams = {
   authority: PublicKey;
   cashLink: PublicKey;
-  owner: PublicKey;
   ownerToken: PublicKey;
-  ownerTokenIsSigner: boolean;
   passKey: PublicKey;
   vaultToken?: PublicKey | null;
   feePayer: PublicKey;

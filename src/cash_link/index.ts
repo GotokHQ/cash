@@ -195,50 +195,26 @@ export class CashLinkClient {
     }
     const owner = new PublicKey(cashLink.data.owner);
     const mint = new PublicKey(cashLink.data.mint);
-    let ownerTokenKeyPair: Keypair | undefined;
     let ownerTokenAccount: PublicKey | undefined;
     if (mint.equals(spl.NATIVE_MINT)) {
-      ownerTokenKeyPair = Keypair.generate();
-      ownerTokenAccount = ownerTokenKeyPair.publicKey;
+      ownerTokenAccount = owner;
     } else {
       ownerTokenAccount = spl.getAssociatedTokenAddressSync(mint, owner, true);
     }
     const instructions = [];
-    if (ownerTokenKeyPair) {
-      instructions.push(
-        SystemProgram.createAccount({
-          fromPubkey: this.feePayer,
-          newAccountPubkey: ownerTokenAccount,
-          lamports: kTokenProgramRent,
-          space: spl.AccountLayout.span,
-          programId: spl.TOKEN_PROGRAM_ID,
-        }),
-        spl.createInitializeAccount3Instruction(
-          ownerTokenAccount,
-          spl.NATIVE_MINT,
-          owner,
-          spl.TOKEN_PROGRAM_ID,
-        ),
-      );
-    }
     const cancelInstruction = await this.cancelInstruction({
-      owner,
       authority: this.authority,
       cashLink: cashLink.pubkey,
-      ownerToken: spl.getAssociatedTokenAddressSync(mint, owner, true),
-      ownerTokenIsSigner: !!ownerTokenKeyPair,
+      ownerToken: ownerTokenAccount,
       vaultToken: spl.getAssociatedTokenAddressSync(mint, cashLink.pubkey, true),
       feePayer: this.feePayer,
       passKey: new PublicKey(input.passKey),
       cashLinkBump,
     });
     instructions.push(cancelInstruction);
-    if (ownerTokenKeyPair) {
-      instructions.push(...this.unWrapSol(owner, ownerTokenAccount));
-    }
     return {
       instructions,
-      signers: ownerTokenKeyPair ? [ownerTokenKeyPair] : undefined,
+      signers: [],
     };
   };
 
@@ -247,8 +223,7 @@ export class CashLinkClient {
       { pubkey: params.authority, isSigner: true, isWritable: false },
       { pubkey: params.cashLink, isSigner: false, isWritable: true },
       { pubkey: params.passKey, isSigner: false, isWritable: false },
-      { pubkey: params.owner, isSigner: false, isWritable: false },
-      { pubkey: params.ownerToken, isSigner: params.ownerTokenIsSigner, isWritable: true },
+      { pubkey: params.ownerToken, isSigner: false, isWritable: true },
       { pubkey: params.feePayer, isSigner: false, isWritable: true },
       {
         pubkey: params.vaultToken,

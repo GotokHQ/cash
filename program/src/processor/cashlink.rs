@@ -11,7 +11,10 @@ use crate::{
         AccountType, FINGERPRINT_PREFIX, FLAG_ACCOUNT_SIZE,
     },
     utils::{
-        assert_account_key, assert_initialized, assert_owned_by, assert_signer, assert_token_owned_by, calculate_fee, cmp_pubkeys, create_associated_token_account_raw, create_new_account_raw, empty_account_balance, exists, get_random_value, native_transfer, spl_token_close, spl_token_transfer
+        assert_account_key, assert_initialized, assert_owned_by, assert_signer,
+        assert_token_owned_by, calculate_fee, cmp_pubkeys, create_associated_token_account_raw,
+        create_new_account_raw, empty_account_balance, exists, get_random_value, native_transfer,
+        spl_token_close, spl_token_transfer,
     },
 };
 
@@ -234,12 +237,6 @@ pub fn process_cancel(
         &cash_link.pass_key,
         Some(CashError::InvalidPassKey),
     )?;
-    let owner_info = next_account_info(account_info_iter)?;
-    assert_account_key(
-        owner_info,
-        &cash_link.owner,
-        Some(CashError::InvalidOwner),
-    )?;
     let owner_token_info = next_account_info(account_info_iter)?;
     let fee_payer_info = next_account_info(account_info_iter)?;
     let vault_token_info = next_account_info(account_info_iter)?;
@@ -274,21 +271,32 @@ pub fn process_cancel(
         Some(CashError::InvalidVaultTokenOwner),
     )?;
     if vault_token.amount > 0 {
-        let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
-        assert_token_owned_by(&owner_token, &cash_link.owner)?;
-        spl_token_transfer(
-            vault_token_info,
-            owner_token_info,
-            cash_link_info,
-            vault_token.amount,
-            &[&signer_seeds],
-        )?;
-        spl_token_close(
-            vault_token_info,
-            fee_payer_info,
-            cash_link_info,
-            &[&signer_seeds],
-        )?;
+        if cmp_pubkeys(&cash_link.mint, &native_mint::id()) {
+            assert_account_key(owner_token_info, &cash_link.owner, Some(CashError::InvalidOwner))?;
+            spl_token_close(
+                vault_token_info,
+                fee_payer_info,
+                cash_link_info,
+                &[&signer_seeds],
+            )?;
+            native_transfer(fee_payer_info, owner_token_info, vault_token.amount, &[])?;
+        } else {
+            let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
+            assert_token_owned_by(&owner_token, &cash_link.owner)?;
+            spl_token_transfer(
+                vault_token_info,
+                owner_token_info,
+                cash_link_info,
+                vault_token.amount,
+                &[&signer_seeds],
+            )?;
+            spl_token_close(
+                vault_token_info,
+                fee_payer_info,
+                cash_link_info,
+                &[&signer_seeds],
+            )?;
+        }
     } else {
         spl_token_close(
             vault_token_info,
@@ -327,8 +335,7 @@ pub fn process_redemption(
         &cash_link.authority,
         Some(CashError::InvalidAuthorityId),
     )?;
- 
-    
+
     assert_account_key(
         pass_info,
         &cash_link.pass_key,
@@ -394,12 +401,16 @@ pub fn process_redemption(
                 cash_link.remaining_amount
             } else {
                 // get slot hash
-                let max_possible = cash_link.remaining_amount.checked_div(cash_link.max_num_redemptions as u64).and_then(|amount| amount.checked_mul(2))
-                .ok_or(CashError::Overflow)?;
+                let max_possible = cash_link
+                    .remaining_amount
+                    .checked_div(cash_link.max_num_redemptions as u64)
+                    .and_then(|amount| amount.checked_mul(2))
+                    .ok_or(CashError::Overflow)?;
 
-                let rand = get_random_value(recent_slothashes_info, clock)? as f64 / u64::MAX as f64;
+                let rand =
+                    get_random_value(recent_slothashes_info, clock)? as f64 / u64::MAX as f64;
                 let money;
-                
+
                 if max_possible > cash_link.min_amount {
                     let range_amount = max_possible - cash_link.min_amount;
                     money = cash_link.min_amount + (rand * range_amount as f64) as u64;
@@ -443,7 +454,8 @@ pub fn process_redemption(
     let _: TokenAccount = assert_initialized(fee_token_info)?;
     assert_owned_by(fee_token_info, &spl_token::id())?;
     assert_owned_by(vault_token_info, &spl_token::id())?;
-    let associated_token_account = get_associated_token_address(&cash_link_info.key, &cash_link.mint);
+    let associated_token_account =
+        get_associated_token_address(&cash_link_info.key, &cash_link.mint);
     assert_account_key(
         vault_token_info,
         &associated_token_account,
@@ -514,15 +526,16 @@ pub fn process_redemption(
         .ok_or::<ProgramError>(CashError::Overflow.into())?;
     if cash_link.is_fully_redeemed()? {
         if cmp_pubkeys(&cash_link.mint, &native_mint::id()) {
+            assert_account_key(owner_token_info, &cash_link.owner, Some(CashError::InvalidOwner))?;
             spl_token_close(
                 vault_token_info,
                 fee_payer_info,
                 cash_link_info,
                 &[&signer_seeds],
-            )?; 
+            )?;
             if remaining > 0 {
                 native_transfer(fee_payer_info, owner_token_info, remaining, &[])?;
-            } 
+            }
         } else {
             let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
             assert_token_owned_by(&owner_token, &cash_link.owner)?;
