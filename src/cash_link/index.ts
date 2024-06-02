@@ -124,6 +124,7 @@ export class CashLinkClient {
     return {
       transaction: Buffer.from(transaction.serialize()).toString('base64'),
       slot: context.slot,
+      asLegacyTransaction: false,
     };
   };
 
@@ -174,6 +175,7 @@ export class CashLinkClient {
     return {
       transaction: Buffer.from(transaction.serialize()).toString('base64'),
       slot: context.slot,
+      asLegacyTransaction: false,
     };
   };
 
@@ -343,6 +345,7 @@ export class CashLinkClient {
     return {
       transaction: Buffer.from(transaction.serialize()).toString('base64'),
       slot: context.slot,
+      asLegacyTransaction: false,
     };
   };
 
@@ -400,6 +403,7 @@ export class CashLinkClient {
     return {
       transaction: Buffer.from(transaction.serialize()).toString('base64'),
       slot: context.slot,
+      asLegacyTransaction: false,
     };
   };
 
@@ -656,6 +660,7 @@ export class CashLinkClient {
     return {
       transaction: Buffer.from(transaction.serialize()).toString('base64'),
       slot: context.slot,
+      asLegacyTransaction: false,
     };
   };
 

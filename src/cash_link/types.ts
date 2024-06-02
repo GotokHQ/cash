@@ -24,6 +24,7 @@ export interface InitializeCashLinkInput {
 export interface ResultContext {
   transaction: string;
   slot: number;
+  asLegacyTransaction: boolean;
 }
 
 export interface CashLinkInput {
