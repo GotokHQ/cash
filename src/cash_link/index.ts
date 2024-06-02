@@ -12,6 +12,9 @@ import {
   RpcResponseAndContext,
   SignatureResult,
   ComputeBudgetProgram,
+  AddressLookupTableAccount,
+  TransactionMessage,
+  VersionedTransaction,
   // TransactionMessage,
   // VersionedTransaction,
   // AddressLookupTableProgram,
@@ -94,14 +97,20 @@ export class CashLinkClient {
       );
     }
     const { context, value } = await this.connection.getLatestBlockhashAndContext(input.commitment);
-    const transaction = new Transaction();
-    transaction.add(...instructions);
-    transaction.recentBlockhash = value.blockhash;
-    transaction.lastValidBlockHeight = value.lastValidBlockHeight;
-    transaction.feePayer = this.feePayer.publicKey;
-    transaction.sign(this.feePayer, this.authority, ...signers);
+    let lookUpTable: AddressLookupTableAccount | undefined;
+    if (input.addressLookupTable) {
+      const lookUpTableAddresses = new PublicKey(input.addressLookupTable);
+      lookUpTable = (await this.connection.getAddressLookupTable(lookUpTableAddresses)).value;
+    }
+    const messageV0 = new TransactionMessage({
+      payerKey: this.feePayer.publicKey,
+      recentBlockhash: value.blockhash,
+      instructions,
+    }).compileToV0Message([lookUpTable]);
+    const transaction = new VersionedTransaction(messageV0);
+    transaction.sign([this.feePayer, this.authority, ...signers]);
     return {
-      transaction: transaction.serialize().toString('base64'),
+      transaction: Buffer.from(transaction.serialize()).toString('base64'),
       slot: context.slot,
     };
   };
@@ -138,14 +147,20 @@ export class CashLinkClient {
       );
     }
     const { context, value } = await this.connection.getLatestBlockhashAndContext(input.commitment);
-    const transaction = new Transaction();
-    transaction.add(...instructions);
-    transaction.recentBlockhash = value.blockhash;
-    transaction.lastValidBlockHeight = value.lastValidBlockHeight;
-    transaction.feePayer = this.feePayer.publicKey;
-    transaction.sign(this.feePayer, this.authority, ...signers);
+    let lookUpTable: AddressLookupTableAccount | undefined;
+    if (input.addressLookupTable) {
+      const lookUpTableAddresses = new PublicKey(input.addressLookupTable);
+      lookUpTable = (await this.connection.getAddressLookupTable(lookUpTableAddresses)).value;
+    }
+    const messageV0 = new TransactionMessage({
+      payerKey: this.feePayer.publicKey,
+      recentBlockhash: value.blockhash,
+      instructions,
+    }).compileToV0Message([lookUpTable]);
+    const transaction = new VersionedTransaction(messageV0);
+    transaction.sign([this.feePayer, this.authority, ...signers]);
     return {
-      transaction: transaction.serialize().toString('base64'),
+      transaction: Buffer.from(transaction.serialize()).toString('base64'),
       slot: context.slot,
     };
   };
@@ -258,7 +273,6 @@ export class CashLinkClient {
       SystemProgram.programId,
       spl.TOKEN_PROGRAM_ID,
       SYSVAR_CLOCK_PUBKEY,
-      spl.getAssociatedTokenAddressSync(spl.NATIVE_MINT, this.feePayer.publicKey, true),
       spl.NATIVE_MINT,
       ComputeBudgetProgram.programId,
       CashProgram.PUBKEY,
@@ -280,32 +294,42 @@ export class CashLinkClient {
     if (cashLink.data.totalRedemptions !== 0) {
       throw new Error(ACCOUNT_HAS_REDEMPTIONS);
     }
-    const closeInstruction = this.closeInstruction({
-      cashLink: cashLinkAddress,
-      authority: this.authority.publicKey,
-      destinationWallet: this.feePayer.publicKey,
-    });
-    const transaction = new Transaction().add(closeInstruction);
+    const instructions = [
+      this.closeInstruction({
+        cashLink: cashLinkAddress,
+        authority: this.authority.publicKey,
+        destinationWallet: this.feePayer.publicKey,
+      }),
+    ];
     if (input.computeBudget) {
-      transaction.add(
+      instructions.push(
         ComputeBudgetProgram.setComputeUnitLimit({
           units: input.computeBudget,
         }),
       );
     }
     if (input.computeUnitPrice) {
-      transaction.add(
+      instructions.push(
         ComputeBudgetProgram.setComputeUnitPrice({
           microLamports: input.computeUnitPrice,
         }),
       );
     }
     const { context, value } = await this.connection.getLatestBlockhashAndContext(input.commitment);
-    transaction.recentBlockhash = value.blockhash;
-    transaction.feePayer = this.feePayer.publicKey;
-    transaction.sign(this.feePayer, this.authority);
+    let lookUpTable: AddressLookupTableAccount | undefined;
+    if (input.addressLookupTable) {
+      const lookUpTableAddresses = new PublicKey(input.addressLookupTable);
+      lookUpTable = (await this.connection.getAddressLookupTable(lookUpTableAddresses)).value;
+    }
+    const messageV0 = new TransactionMessage({
+      payerKey: this.feePayer.publicKey,
+      recentBlockhash: value.blockhash,
+      instructions,
+    }).compileToV0Message([lookUpTable]);
+    const transaction = new VersionedTransaction(messageV0);
+    transaction.sign([this.feePayer, this.authority]);
     return {
-      transaction: transaction.serialize().toString('base64'),
+      transaction: Buffer.from(transaction.serialize()).toString('base64'),
       slot: context.slot,
     };
   };
@@ -334,32 +358,35 @@ export class CashLinkClient {
   initialize = async (input: InitializeCashLinkInput): Promise<ResultContext> => {
     const { instructions, signers } = await this.initializeTransaction(input);
     const { context, value } = await this.connection.getLatestBlockhashAndContext(input.commitment);
-    const transaction = new Transaction();
-    transaction.add(...instructions);
-    transaction.recentBlockhash = value.blockhash;
-    transaction.lastValidBlockHeight = value.lastValidBlockHeight;
-    transaction.feePayer = this.feePayer.publicKey;
     if (input.computeBudget) {
-      transaction.add(
+      instructions.push(
         ComputeBudgetProgram.setComputeUnitLimit({
           units: input.computeBudget,
         }),
       );
     }
     if (input.computeUnitPrice) {
-      transaction.add(
+      instructions.push(
         ComputeBudgetProgram.setComputeUnitPrice({
           microLamports: input.computeUnitPrice,
         }),
       );
     }
-    transaction.partialSign(this.feePayer, this.authority, ...signers);
+    let lookUpTable: AddressLookupTableAccount | undefined;
+    if (input.addressLookupTable) {
+      const lookUpTableAddresses = new PublicKey(input.addressLookupTable);
+      lookUpTable = (await this.connection.getAddressLookupTable(lookUpTableAddresses)).value;
+    }
+    const messageV0 = new TransactionMessage({
+      payerKey: this.feePayer.publicKey,
+      recentBlockhash: value.blockhash,
+      instructions,
+    }).compileToV0Message([lookUpTable]);
+    const transaction = new VersionedTransaction(messageV0);
+    signers.push(...[this.feePayer, this.authority]);
+    transaction.sign(signers);
     return {
-      transaction: transaction
-        .serialize({
-          requireAllSignatures: false,
-        })
-        .toString('base64'),
+      transaction: Buffer.from(transaction.serialize()).toString('base64'),
       slot: context.slot,
     };
   };
@@ -600,29 +627,22 @@ export class CashLinkClient {
       );
     }
     const { context, value } = await this.connection.getLatestBlockhashAndContext(input.commitment);
-    // const [lookupTableInst, lookupTableAddress] = AddressLookupTableProgram.createLookupTable({
-    //   authority: this.feePayer.publicKey,
-    //   payer: this.feePayer.publicKey,
-    //   recentSlot: context.slot,
-    // });
-    // const messageV0 = new TransactionMessage({
-    //   payerKey: this.feePayer.publicKey,
-    //   recentBlockhash: value.blockhash,
-    //   instructions,
-    // }).compileToV0Message();
+    let lookUpTable: AddressLookupTableAccount | undefined;
+    if (input.addressLookupTable) {
+      const lookUpTableAddresses = new PublicKey(input.addressLookupTable);
+      lookUpTable = (await this.connection.getAddressLookupTable(lookUpTableAddresses)).value;
+    }
+    const messageV0 = new TransactionMessage({
+      payerKey: this.feePayer.publicKey,
+      recentBlockhash: value.blockhash,
+      instructions,
+    }).compileToV0Message([lookUpTable]);
 
-    const transaction = new Transaction(); //new VersionedTransaction(messageV0);
-    transaction.add(...instructions);
-    transaction.recentBlockhash = value.blockhash;
-    transaction.lastValidBlockHeight = value.lastValidBlockHeight;
+    const transaction = new VersionedTransaction(messageV0);
     signers.push(...[this.feePayer, this.authority]);
-    transaction.sign(...signers);
+    transaction.sign(signers);
     return {
-      transaction: transaction
-        .serialize({
-          requireAllSignatures: false,
-        })
-        .toString('base64'),
+      transaction: Buffer.from(transaction.serialize()).toString('base64'),
       slot: context.slot,
     };
   };
