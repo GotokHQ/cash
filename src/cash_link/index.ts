@@ -284,10 +284,10 @@ export class CashLinkClient {
     return [
       this.feePayer,
       this.authority,
+      this.feeWallet,
       SystemProgram.programId,
       spl.TOKEN_PROGRAM_ID,
       SYSVAR_CLOCK_PUBKEY,
-      spl.NATIVE_MINT,
       ComputeBudgetProgram.programId,
       CashProgram.PUBKEY,
       SYSVAR_RENT_PUBKEY,
