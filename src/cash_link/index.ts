@@ -74,7 +74,7 @@ export class CashLinkClient {
   }
 
   get feePayer(): PublicKey {
-    return this.feePayer;
+    return this._feePayer.publicKey;
   }
 
   get authority(): PublicKey {
