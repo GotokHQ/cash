@@ -644,10 +644,12 @@ export class CashLinkClient {
     }
     const { context, value } = await this.connection.getLatestBlockhashAndContext(input.commitment);
     let lookUpTable: AddressLookupTableAccount | undefined;
+    console.log('input.addressLookupTable', input.addressLookupTable);
     if (input.addressLookupTable) {
       const lookUpTableAddresses = new PublicKey(input.addressLookupTable);
       lookUpTable = (await this.connection.getAddressLookupTable(lookUpTableAddresses)).value;
     }
+    console.log('lookUpTable', lookUpTable?.state);
     const messageV0 = new TransactionMessage({
       payerKey: this.feePayer,
       recentBlockhash: value.blockhash,
