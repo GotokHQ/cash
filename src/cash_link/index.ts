@@ -882,7 +882,7 @@ export class CashLinkClient {
 
   unWrapSol = (wallet: PublicKey, wrapSolAccount: PublicKey) => {
     const instructions = [
-      spl.createCloseAccountInstruction(wrapSolAccount, wallet, wallet, null, spl.TOKEN_PROGRAM_ID),
+      spl.createCloseAccountInstruction(wrapSolAccount, wallet, wallet),
       SystemProgram.transfer({
         fromPubkey: wallet,
         toPubkey: this.feePayer.publicKey,
