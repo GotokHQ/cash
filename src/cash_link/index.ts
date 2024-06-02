@@ -12,6 +12,9 @@ import {
   RpcResponseAndContext,
   SignatureResult,
   ComputeBudgetProgram,
+  // TransactionMessage,
+  // VersionedTransaction,
+  // AddressLookupTableProgram,
 } from '@solana/web3.js';
 import * as spl from '@solana/spl-token';
 import BN from 'bn.js';
@@ -174,17 +177,11 @@ export class CashLinkClient {
     const instructions = [];
     if (ownerTokenKeyPair) {
       instructions.push(
-        SystemProgram.transfer({
+        SystemProgram.createAccount({
           fromPubkey: this.feePayer.publicKey,
-          toPubkey: ownerTokenAccount,
+          newAccountPubkey: ownerTokenAccount,
           lamports: kTokenProgramRent,
-        }),
-        SystemProgram.allocate({
-          accountPubkey: ownerTokenAccount,
           space: spl.AccountLayout.span,
-        }),
-        SystemProgram.assign({
-          accountPubkey: ownerTokenAccount,
           programId: spl.TOKEN_PROGRAM_ID,
         }),
         spl.createInitializeAccount3Instruction(
@@ -252,6 +249,23 @@ export class CashLinkClient {
         cashLinkBump: params.cashLinkBump,
       }),
     });
+  };
+
+  lookUpTableAddresses = () => {
+    return [
+      this.feePayer.publicKey,
+      this.authority.publicKey,
+      SystemProgram.programId,
+      spl.TOKEN_PROGRAM_ID,
+      SYSVAR_CLOCK_PUBKEY,
+      spl.getAssociatedTokenAddressSync(spl.NATIVE_MINT, this.feePayer.publicKey, true),
+      spl.NATIVE_MINT,
+      ComputeBudgetProgram.programId,
+      CashProgram.PUBKEY,
+      SYSVAR_RENT_PUBKEY,
+      spl.ASSOCIATED_TOKEN_PROGRAM_ID,
+      SYSVAR_SLOT_HASHES_PUBKEY,
+    ];
   };
 
   close = async (input: CashLinkInput): Promise<ResultContext> => {
@@ -586,13 +600,23 @@ export class CashLinkClient {
       );
     }
     const { context, value } = await this.connection.getLatestBlockhashAndContext(input.commitment);
+    // const [lookupTableInst, lookupTableAddress] = AddressLookupTableProgram.createLookupTable({
+    //   authority: this.feePayer.publicKey,
+    //   payer: this.feePayer.publicKey,
+    //   recentSlot: context.slot,
+    // });
+    // const messageV0 = new TransactionMessage({
+    //   payerKey: this.feePayer.publicKey,
+    //   recentBlockhash: value.blockhash,
+    //   instructions,
+    // }).compileToV0Message();
 
-    const transaction = new Transaction();
+    const transaction = new Transaction(); //new VersionedTransaction(messageV0);
     transaction.add(...instructions);
     transaction.recentBlockhash = value.blockhash;
     transaction.lastValidBlockHeight = value.lastValidBlockHeight;
-    transaction.feePayer = this.feePayer.publicKey;
-    transaction.partialSign(this.feePayer, this.authority, ...signers);
+    signers.push(...[this.feePayer, this.authority]);
+    transaction.sign(...signers);
     return {
       transaction: transaction
         .serialize({
@@ -706,17 +730,11 @@ export class CashLinkClient {
     const instructions = [];
     if (walletTokenKeyPair) {
       instructions.push(
-        SystemProgram.transfer({
+        SystemProgram.createAccount({
           fromPubkey: this.feePayer.publicKey,
-          toPubkey: walletTokenAccount,
+          newAccountPubkey: walletTokenAccount,
           lamports: kTokenProgramRent,
-        }),
-        SystemProgram.allocate({
-          accountPubkey: walletTokenAccount,
           space: spl.AccountLayout.span,
-        }),
-        SystemProgram.assign({
-          accountPubkey: walletTokenAccount,
           programId: spl.TOKEN_PROGRAM_ID,
         }),
         spl.createInitializeAccount3Instruction(
@@ -729,17 +747,11 @@ export class CashLinkClient {
     }
     if (ownerTokenKeyPair) {
       instructions.push(
-        SystemProgram.transfer({
+        SystemProgram.createAccount({
           fromPubkey: this.feePayer.publicKey,
-          toPubkey: ownerTokenAccount,
+          newAccountPubkey: ownerTokenAccount,
           lamports: kTokenProgramRent,
-        }),
-        SystemProgram.allocate({
-          accountPubkey: ownerTokenAccount,
           space: spl.AccountLayout.span,
-        }),
-        SystemProgram.assign({
-          accountPubkey: ownerTokenAccount,
           programId: spl.TOKEN_PROGRAM_ID,
         }),
         spl.createInitializeAccount3Instruction(
