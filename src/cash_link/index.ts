@@ -44,7 +44,7 @@ import { Redemption } from '../accounts/redemption';
 
 export const FAILED_TO_FIND_ACCOUNT = 'Failed to find account';
 export const INVALID_ACCOUNT_OWNER = 'Invalid account owner';
-export const INVALID_AUTHORITY = 'Invalid authority';
+export const INVALID_AUTHORITY = 'Invalid _authority';
 export const INVALID_PAYER_ADDRESS = 'Invalid payer address';
 export const ACCOUNT_ALREADY_EXPIRED = 'Account already canceled';
 export const ACCOUNT_ALREADY_SETTLED = 'Account already settled';
@@ -61,16 +61,28 @@ export const FINGERPRINT_NOT_FOUND = 'Fingerprint required';
 export const kTokenProgramRent = 2039280;
 
 export class CashLinkClient {
-  private feePayer: Keypair;
-  private authority: Keypair;
-  private feeWallet: PublicKey;
+  private _feePayer: Keypair;
+  private _authority: Keypair;
+  private _feeWallet: PublicKey;
   private connection: Connection;
 
   constructor(feePayer: Keypair, authority: Keypair, feeWallet: PublicKey, connection: Connection) {
-    this.feePayer = feePayer;
-    this.authority = authority;
-    this.feeWallet = feeWallet;
+    this._feePayer = feePayer;
+    this._authority = authority;
+    this._feeWallet = feeWallet;
     this.connection = connection;
+  }
+
+  get feePayer(): PublicKey {
+    return this.feePayer;
+  }
+
+  get authority(): PublicKey {
+    return this._authority.publicKey;
+  }
+
+  get feeWallet(): PublicKey {
+    return this._feeWallet;
   }
 
   cancel = async (input: CashLinkInput): Promise<ResultContext> => {
@@ -103,12 +115,12 @@ export class CashLinkClient {
       lookUpTable = (await this.connection.getAddressLookupTable(lookUpTableAddresses)).value;
     }
     const messageV0 = new TransactionMessage({
-      payerKey: this.feePayer.publicKey,
+      payerKey: this.feePayer,
       recentBlockhash: value.blockhash,
       instructions,
     }).compileToV0Message([lookUpTable]);
     const transaction = new VersionedTransaction(messageV0);
-    transaction.sign([this.feePayer, this.authority, ...signers]);
+    transaction.sign([this._feePayer, this._authority, ...signers]);
     return {
       transaction: Buffer.from(transaction.serialize()).toString('base64'),
       slot: context.slot,
@@ -127,8 +139,8 @@ export class CashLinkClient {
     if (cashLink.data.totalRedemptions === 0) {
       const closeInstruction = this.closeInstruction({
         cashLink: cashLinkAddress,
-        authority: this.authority.publicKey,
-        destinationWallet: this.feePayer.publicKey,
+        authority: this.authority,
+        destinationWallet: this.feePayer,
       });
       instructions.push(closeInstruction);
     }
@@ -153,12 +165,12 @@ export class CashLinkClient {
       lookUpTable = (await this.connection.getAddressLookupTable(lookUpTableAddresses)).value;
     }
     const messageV0 = new TransactionMessage({
-      payerKey: this.feePayer.publicKey,
+      payerKey: this.feePayer,
       recentBlockhash: value.blockhash,
       instructions,
     }).compileToV0Message([lookUpTable]);
     const transaction = new VersionedTransaction(messageV0);
-    transaction.sign([this.feePayer, this.authority, ...signers]);
+    transaction.sign([this._feePayer, this._authority, ...signers]);
     return {
       transaction: Buffer.from(transaction.serialize()).toString('base64'),
       slot: context.slot,
@@ -193,7 +205,7 @@ export class CashLinkClient {
     if (ownerTokenKeyPair) {
       instructions.push(
         SystemProgram.createAccount({
-          fromPubkey: this.feePayer.publicKey,
+          fromPubkey: this.feePayer,
           newAccountPubkey: ownerTokenAccount,
           lamports: kTokenProgramRent,
           space: spl.AccountLayout.span,
@@ -209,12 +221,12 @@ export class CashLinkClient {
     }
     const cancelInstruction = await this.cancelInstruction({
       owner,
-      authority: this.authority.publicKey,
+      authority: this.authority,
       cashLink: cashLink.pubkey,
       ownerToken: spl.getAssociatedTokenAddressSync(mint, owner, true),
       ownerTokenIsSigner: !!ownerTokenKeyPair,
       vaultToken: spl.getAssociatedTokenAddressSync(mint, cashLink.pubkey, true),
-      feePayer: this.feePayer.publicKey,
+      feePayer: this.feePayer,
       passKey: new PublicKey(input.passKey),
       cashLinkBump,
     });
@@ -268,8 +280,8 @@ export class CashLinkClient {
 
   lookUpTableAddresses = () => {
     return [
-      this.feePayer.publicKey,
-      this.authority.publicKey,
+      this.feePayer,
+      this.authority,
       SystemProgram.programId,
       spl.TOKEN_PROGRAM_ID,
       SYSVAR_CLOCK_PUBKEY,
@@ -297,8 +309,8 @@ export class CashLinkClient {
     const instructions = [
       this.closeInstruction({
         cashLink: cashLinkAddress,
-        authority: this.authority.publicKey,
-        destinationWallet: this.feePayer.publicKey,
+        authority: this.authority,
+        destinationWallet: this.feePayer,
       }),
     ];
     if (input.computeBudget) {
@@ -322,12 +334,12 @@ export class CashLinkClient {
       lookUpTable = (await this.connection.getAddressLookupTable(lookUpTableAddresses)).value;
     }
     const messageV0 = new TransactionMessage({
-      payerKey: this.feePayer.publicKey,
+      payerKey: this.feePayer,
       recentBlockhash: value.blockhash,
       instructions,
     }).compileToV0Message([lookUpTable]);
     const transaction = new VersionedTransaction(messageV0);
-    transaction.sign([this.feePayer, this.authority]);
+    transaction.sign([this._feePayer, this._authority]);
     return {
       transaction: Buffer.from(transaction.serialize()).toString('base64'),
       slot: context.slot,
@@ -378,12 +390,12 @@ export class CashLinkClient {
       lookUpTable = (await this.connection.getAddressLookupTable(lookUpTableAddresses)).value;
     }
     const messageV0 = new TransactionMessage({
-      payerKey: this.feePayer.publicKey,
+      payerKey: this.feePayer,
       recentBlockhash: value.blockhash,
       instructions,
     }).compileToV0Message([lookUpTable]);
     const transaction = new VersionedTransaction(messageV0);
-    signers.push(...[this.feePayer, this.authority]);
+    signers.push(...[this._feePayer, this._authority]);
     transaction.sign(signers);
     return {
       transaction: Buffer.from(transaction.serialize()).toString('base64'),
@@ -432,8 +444,8 @@ export class CashLinkClient {
       minAmount,
       passKey,
       amount: amount,
-      authority: this.authority.publicKey,
-      feePayer: this.feePayer.publicKey,
+      authority: this.authority,
+      feePayer: this.feePayer,
       distributionType: input.distributionType,
       fingerprintEnabled: input.fingerprintEnabled,
       numDaysToExpire: input.numDaysToExpire ?? 1,
@@ -442,7 +454,7 @@ export class CashLinkClient {
     if (ownerTokenKeyPair) {
       instructions.push(
         SystemProgram.transfer({
-          fromPubkey: this.feePayer.publicKey,
+          fromPubkey: this.feePayer,
           toPubkey: ownerTokenAccount,
           lamports: kTokenProgramRent,
         }),
@@ -523,7 +535,7 @@ export class CashLinkClient {
         isWritable: !mint,
       },
       {
-        pubkey: this.feePayer.publicKey,
+        pubkey: this.feePayer,
         isSigner: true,
         isWritable: true,
       },
@@ -633,13 +645,13 @@ export class CashLinkClient {
       lookUpTable = (await this.connection.getAddressLookupTable(lookUpTableAddresses)).value;
     }
     const messageV0 = new TransactionMessage({
-      payerKey: this.feePayer.publicKey,
+      payerKey: this.feePayer,
       recentBlockhash: value.blockhash,
       instructions,
     }).compileToV0Message([lookUpTable]);
 
     const transaction = new VersionedTransaction(messageV0);
-    signers.push(...[this.feePayer, this.authority]);
+    signers.push(...[this._feePayer, this._authority]);
     transaction.sign(signers);
     return {
       transaction: Buffer.from(transaction.serialize()).toString('base64'),
@@ -673,7 +685,7 @@ export class CashLinkClient {
     }
     const walletAddress = new PublicKey(input.walletAddress);
     const owner = new PublicKey(cashLink.data.owner);
-    let accountKeys = [walletAddress, this.feeWallet, owner, this.feePayer.publicKey];
+    let accountKeys = [walletAddress, this.feeWallet, owner, this.feePayer];
     const mint = new PublicKey(cashLink.data.mint);
     const vaultToken = spl.getAssociatedTokenAddressSync(mint, cashLinkAddress, true);
     let walletTokenKeyPair: Keypair | undefined;
@@ -690,7 +702,7 @@ export class CashLinkClient {
       ownerTokenAccount = (
         await spl.getOrCreateAssociatedTokenAccount(
           this.connection,
-          this.feePayer,
+          this._feePayer,
           mint,
           accountKeys[2],
           true,
@@ -703,7 +715,7 @@ export class CashLinkClient {
       spl
         .getOrCreateAssociatedTokenAccount(
           this.connection,
-          this.feePayer,
+          this._feePayer,
           mint,
           accountKeys[1],
           true,
@@ -714,7 +726,7 @@ export class CashLinkClient {
       spl
         .getOrCreateAssociatedTokenAccount(
           this.connection,
-          this.feePayer,
+          this._feePayer,
           mint,
           accountKeys[3],
           true,
@@ -740,9 +752,9 @@ export class CashLinkClient {
       ownerTokenIsSigner: !!ownerTokenKeyPair,
       feePayerToken: accountKeys[3],
       vaultToken,
-      authority: this.authority.publicKey,
+      authority: this.authority,
       cashLink: cashLink.pubkey,
-      feePayer: this.feePayer.publicKey,
+      feePayer: this.feePayer,
       fingerprint,
       fingerprintBump,
       fingerprintPda,
@@ -751,7 +763,7 @@ export class CashLinkClient {
     if (walletTokenKeyPair) {
       instructions.push(
         SystemProgram.createAccount({
-          fromPubkey: this.feePayer.publicKey,
+          fromPubkey: this.feePayer,
           newAccountPubkey: walletTokenAccount,
           lamports: kTokenProgramRent,
           space: spl.AccountLayout.span,
@@ -768,7 +780,7 @@ export class CashLinkClient {
     if (ownerTokenKeyPair) {
       instructions.push(
         SystemProgram.createAccount({
-          fromPubkey: this.feePayer.publicKey,
+          fromPubkey: this.feePayer,
           newAccountPubkey: ownerTokenAccount,
           lamports: kTokenProgramRent,
           space: spl.AccountLayout.span,
@@ -871,8 +883,8 @@ export class CashLinkClient {
   };
 
   signTransaction = (transaction: Transaction): Buffer => {
-    transaction.feePayer = this.feePayer.publicKey;
-    transaction.partialSign(this.feePayer);
+    transaction.feePayer = this.feePayer;
+    transaction.partialSign(this._feePayer);
     return transaction.serialize();
   };
 
@@ -911,7 +923,7 @@ export class CashLinkClient {
       spl.createCloseAccountInstruction(wrapSolAccount, wallet, wallet),
       SystemProgram.transfer({
         fromPubkey: wallet,
-        toPubkey: this.feePayer.publicKey,
+        toPubkey: this.feePayer,
         lamports: kTokenProgramRent,
       }),
     ];
