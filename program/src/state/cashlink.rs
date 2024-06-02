@@ -11,7 +11,7 @@ use crate::error::CashError;
 
 use super::AccountType;
 
-pub const CASH_LINK_DATA_SIZE: usize = 194;
+pub const CASH_LINK_DATA_SIZE: usize = 195;
 
 #[repr(C)]
 #[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq, Clone, Default)]

@@ -330,7 +330,8 @@ pub fn process_redemption(
         &cash_link.authority,
         Some(CashError::InvalidAuthorityId),
     )?;
-
+ 
+    
     assert_account_key(
         pass_info,
         &cash_link.pass_key,
@@ -396,12 +397,19 @@ pub fn process_redemption(
                 cash_link.remaining_amount
             } else {
                 // get slot hash
-                let rand = get_random_value(recent_slothashes_info, clock)?;
-                let max_possible = cash_link.remaining_amount;
+                let max_possible = cash_link.remaining_amount.checked_div(cash_link.max_num_redemptions as u64).and_then(|amount| amount.checked_mul(2))
+                .ok_or(CashError::Overflow)?;
 
-                rand.checked_rem(max_possible - cash_link.min_amount)
-                    .and_then(|amount| amount.checked_add(cash_link.min_amount))
-                    .ok_or(CashError::Overflow)?
+                let rand = get_random_value(recent_slothashes_info, clock)? as f64 / u64::MAX as f64;
+                let money;
+                
+                if max_possible > cash_link.min_amount {
+                    let range_amount = max_possible - cash_link.min_amount;
+                    money = cash_link.min_amount + (rand * range_amount as f64) as u64;
+                } else {
+                    money = cash_link.min_amount;
+                }
+                money
             }
         }
     };
