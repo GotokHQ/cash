@@ -11,10 +11,7 @@ use crate::{
         AccountType, FINGERPRINT_PREFIX, FLAG_ACCOUNT_SIZE,
     },
     utils::{
-        assert_account_key, assert_initialized, assert_owned_by, assert_signer,
-        assert_token_owned_by, calculate_fee, create_associated_token_account_raw,
-        create_new_account_raw, empty_account_balance, exists, get_random_value,
-        spl_token_close, spl_token_transfer,
+        assert_account_key, assert_initialized, assert_owned_by, assert_signer, assert_token_owned_by, calculate_fee, cmp_pubkeys, create_associated_token_account_raw, create_new_account_raw, empty_account_balance, exists, get_random_value, native_transfer, spl_token_close, spl_token_transfer
     },
 };
 
@@ -28,7 +25,7 @@ use solana_program::{
     sysvar::{clock::Clock, slot_hashes, Sysvar},
 };
 use spl_associated_token_account::get_associated_token_address;
-use spl_token::state::Account as TokenAccount;
+use spl_token::{native_mint, state::Account as TokenAccount};
 
 pub struct Processor;
 
@@ -516,23 +513,35 @@ pub fn process_redemption(
         .checked_sub(total)
         .ok_or::<ProgramError>(CashError::Overflow.into())?;
     if cash_link.is_fully_redeemed()? {
-        let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
-        assert_token_owned_by(&owner_token, &cash_link.owner)?;
-        if remaining > 0 {
-            spl_token_transfer(
+        if cmp_pubkeys(&cash_link.mint, &native_mint::id()) {
+            spl_token_close(
                 vault_token_info,
-                owner_token_info,
+                fee_payer_info,
                 cash_link_info,
-                remaining,
+                &[&signer_seeds],
+            )?; 
+            if remaining > 0 {
+                native_transfer(fee_payer_info, owner_token_info, remaining, &[])?;
+            } 
+        } else {
+            let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
+            assert_token_owned_by(&owner_token, &cash_link.owner)?;
+            if remaining > 0 {
+                spl_token_transfer(
+                    vault_token_info,
+                    owner_token_info,
+                    cash_link_info,
+                    remaining,
+                    &[&signer_seeds],
+                )?;
+            }
+            spl_token_close(
+                vault_token_info,
+                fee_payer_info,
+                cash_link_info,
                 &[&signer_seeds],
             )?;
         }
-        spl_token_close(
-            vault_token_info,
-            fee_payer_info,
-            cash_link_info,
-            &[&signer_seeds],
-        )?;
     }
     let system_account_info = next_account_info(account_info_iter)?;
     if redemption_info.lamports() > 0 && !redemption_info.data_is_empty() {

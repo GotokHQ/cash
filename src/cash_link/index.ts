@@ -697,13 +697,11 @@ export class CashLinkClient {
     const vaultToken = spl.getAssociatedTokenAddressSync(mint, cashLinkAddress, true);
     let walletTokenKeyPair: Keypair | undefined;
     let walletTokenAccount: PublicKey | undefined;
-    let ownerTokenKeyPair: Keypair | undefined;
     let ownerTokenAccount: PublicKey | undefined;
     if (mint.equals(spl.NATIVE_MINT)) {
       walletTokenKeyPair = Keypair.generate();
       walletTokenAccount = walletTokenKeyPair.publicKey;
-      ownerTokenKeyPair = Keypair.generate();
-      ownerTokenAccount = ownerTokenKeyPair.publicKey;
+      ownerTokenAccount = owner;
     } else {
       walletTokenAccount = spl.getAssociatedTokenAddressSync(mint, walletAddress, true);
       ownerTokenAccount = (
@@ -756,7 +754,6 @@ export class CashLinkClient {
       walletTokenIsSigner: !!walletTokenKeyPair,
       platformFeeToken: accountKeys[1],
       ownerToken: accountKeys[2],
-      ownerTokenIsSigner: !!ownerTokenKeyPair,
       feePayerToken: accountKeys[3],
       vaultToken,
       authority: this.authority,
@@ -784,32 +781,11 @@ export class CashLinkClient {
         ),
       );
     }
-    if (ownerTokenKeyPair) {
-      instructions.push(
-        SystemProgram.createAccount({
-          fromPubkey: this.feePayer,
-          newAccountPubkey: ownerTokenAccount,
-          lamports: kTokenProgramRent,
-          space: spl.AccountLayout.span,
-          programId: spl.TOKEN_PROGRAM_ID,
-        }),
-        spl.createInitializeAccount3Instruction(
-          ownerTokenAccount,
-          spl.NATIVE_MINT,
-          owner,
-          spl.TOKEN_PROGRAM_ID,
-        ),
-      );
-    }
     instructions.push(redeemInstruction);
     const signers = [];
     if (walletTokenKeyPair) {
       instructions.push(...this.unWrapSol(walletAddress, walletTokenAccount));
       signers.push(walletTokenKeyPair);
-    }
-    if (ownerTokenKeyPair) {
-      instructions.push(...this.unWrapSol(owner, ownerTokenAccount));
-      signers.push(ownerTokenKeyPair);
     }
     return {
       instructions,
@@ -825,7 +801,7 @@ export class CashLinkClient {
       { pubkey: params.cashLink, isSigner: false, isWritable: true },
       { pubkey: params.passKey, isSigner: true, isWritable: false },
       { pubkey: params.redemption, isSigner: false, isWritable: true },
-      { pubkey: params.ownerToken, isSigner: params.ownerTokenIsSigner, isWritable: true },
+      { pubkey: params.ownerToken, isSigner: false, isWritable: true },
       { pubkey: params.feePayer, isSigner: true, isWritable: true },
       { pubkey: params.feePayerToken, isSigner: false, isWritable: true },
       {
