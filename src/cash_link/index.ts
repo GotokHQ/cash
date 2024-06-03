@@ -112,6 +112,8 @@ export class CashLinkClient {
     signers.push(this._feePayer, this._authority);
     if (input.asLegacyTransaction) {
       const transaction = new Transaction();
+      transaction.recentBlockhash = value.blockhash;
+      transaction.lastValidBlockHeight = value.lastValidBlockHeight;
       transaction.add(...instructions);
       transaction.feePayer = this.feePayer;
       transaction.partialSign(...signers);
@@ -180,6 +182,8 @@ export class CashLinkClient {
     signers.push(this._feePayer, this._authority);
     if (input.asLegacyTransaction) {
       const transaction = new Transaction();
+      transaction.recentBlockhash = value.blockhash;
+      transaction.lastValidBlockHeight = value.lastValidBlockHeight;
       transaction.add(...instructions);
       transaction.feePayer = this.feePayer;
       transaction.partialSign(...signers);
@@ -342,6 +346,8 @@ export class CashLinkClient {
     const signers = [this._feePayer, this._authority];
     if (input.asLegacyTransaction) {
       const transaction = new Transaction();
+      transaction.recentBlockhash = value.blockhash;
+      transaction.lastValidBlockHeight = value.lastValidBlockHeight;
       transaction.add(...instructions);
       transaction.feePayer = this.feePayer;
       transaction.partialSign(...signers);
@@ -415,6 +421,8 @@ export class CashLinkClient {
     }
     if (input.asLegacyTransaction) {
       const transaction = new Transaction();
+      transaction.recentBlockhash = value.blockhash;
+      transaction.lastValidBlockHeight = value.lastValidBlockHeight;
       transaction.add(...instructions);
       transaction.feePayer = this.feePayer;
       transaction.partialSign(...signers);
@@ -687,9 +695,10 @@ export class CashLinkClient {
     signers.push(...[this._feePayer, this._authority]);
     if (input.asLegacyTransaction) {
       const transaction = new Transaction();
-      transaction.add(...instructions);
-      transaction.add(...instructions);
       transaction.feePayer = this.feePayer;
+      transaction.recentBlockhash = value.blockhash;
+      transaction.lastValidBlockHeight = value.lastValidBlockHeight;
+      transaction.add(...instructions);
       transaction.partialSign(...signers);
       return {
         transaction: transaction
