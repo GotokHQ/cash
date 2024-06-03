@@ -534,12 +534,14 @@ export class CashLinkClient {
       );
     }
     instructions.push(await this.initInstruction(initParams));
+    const signers = [];
     if (ownerTokenKeyPair) {
       instructions.push(...this.unWrapSol(owner, ownerTokenAccount));
+      signers.push(ownerTokenKeyPair);
     }
     return {
       instructions,
-      signers: ownerTokenKeyPair ? [ownerTokenKeyPair] : undefined,
+      signers,
     };
   };
 

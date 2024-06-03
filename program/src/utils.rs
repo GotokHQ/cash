@@ -191,20 +191,23 @@ pub fn spl_token_close<'a>(
 
 /// SPL transfer instruction.
 pub fn spl_token_init<'a>(
+    token_program_id: &Pubkey,
     account: &AccountInfo<'a>,
     mint: &AccountInfo<'a>,
     owner: &AccountInfo<'a>,
+    signers_seeds: &[&[&[u8]]],
 ) -> Result<(), ProgramError> {
-    let ix = spl_token::instruction::initialize_account(
-        &spl_token::id(),
+    let ix = spl_token::instruction::initialize_account3(
+        token_program_id,
         account.key,
         mint.key,
         owner.key,
     )?;
     
-    invoke(
+    invoke_signed(
         &ix,
         &[account.clone(), mint.clone(), owner.clone()],
+        signers_seeds
     )
 }
 

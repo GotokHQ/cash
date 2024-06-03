@@ -11,7 +11,10 @@ use crate::{
         AccountType, FINGERPRINT_PREFIX, FLAG_ACCOUNT_SIZE,
     },
     utils::{
-        assert_account_key, assert_initialized, assert_owned_by, assert_signer, assert_token_owned_by, calculate_fee, cmp_pubkeys, create_associated_token_account_raw, create_new_account_raw, empty_account_balance, exists, get_random_value, native_transfer, spl_token_close, spl_token_init, spl_token_transfer
+        assert_account_key, assert_initialized, assert_owned_by, assert_signer,
+        assert_token_owned_by, calculate_fee, cmp_pubkeys, create_associated_token_account_raw,
+        create_new_account_raw, empty_account_balance, exists, get_random_value, native_transfer,
+        spl_token_close, spl_token_init, spl_token_transfer,
     },
 };
 
@@ -175,7 +178,7 @@ pub fn process_init_cash_link(
 fn create_cash_link<'a>(
     program_id: &Pubkey,
     cash_link_info: &AccountInfo<'a>,
-    owner_info: &AccountInfo<'a>,
+    payer_info: &AccountInfo<'a>,
     rent_sysvar_info: &AccountInfo<'a>,
     system_program_info: &AccountInfo<'a>,
     signer_seeds: &[&[u8]],
@@ -192,7 +195,7 @@ fn create_cash_link<'a>(
                 program_id,
                 cash_link_info,
                 rent_sysvar_info,
-                owner_info,
+                payer_info,
                 system_program_info,
                 CashLink::LEN,
                 signer_seeds,
@@ -269,7 +272,11 @@ pub fn process_cancel(
     )?;
     if vault_token.amount > 0 {
         if cmp_pubkeys(&cash_link.mint, &native_mint::id()) {
-            assert_account_key(owner_token_info, &cash_link.owner, Some(CashError::InvalidOwner))?;
+            assert_account_key(
+                owner_token_info,
+                &cash_link.owner,
+                Some(CashError::InvalidOwner),
+            )?;
             spl_token_close(
                 vault_token_info,
                 fee_payer_info,
@@ -324,7 +331,7 @@ pub fn process_redemption(
     let fee_token_info = next_account_info(account_info_iter)?;
     let cash_link_info = next_account_info(account_info_iter)?;
     let pass_info = next_account_info(account_info_iter)?;
-    
+
     assert_owned_by(cash_link_info, program_id)?;
     let mut cash_link = CashLink::unpack(&cash_link_info.data.borrow())?;
     assert_account_key(
@@ -460,7 +467,7 @@ pub fn process_redemption(
     assert_owned_by(fee_payer_token_info, &spl_token::id())?;
     if cmp_pubkeys(&cash_link.mint, &native_mint::id()) {
         create_new_account_raw(
-            program_id,
+            &spl_token::id(),
             recipient_token_info,
             rent_info,
             fee_payer_info,
@@ -468,10 +475,15 @@ pub fn process_redemption(
             TokenAccount::LEN,
             &[],
         )?;
-        spl_token_init(recipient_token_info, mint_info, cash_link_info)?;
+        spl_token_init(
+            &spl_token::id(),
+            recipient_token_info,
+            mint_info,
+            cash_link_info,
+            &[&signer_seeds],
+        )?;
     } else {
         if exists(recipient_token_info)? {
-            msg!("Cash link has a mint and an existing recipient token. Validate the recipient token");
             let recipient_token: TokenAccount = assert_initialized(recipient_token_info)?;
             assert_token_owned_by(&recipient_token, &wallet_info.key)?;
             assert_owned_by(recipient_token_info, &spl_token::id())?;
@@ -546,7 +558,11 @@ pub fn process_redemption(
         .ok_or::<ProgramError>(CashError::Overflow.into())?;
     if cash_link.is_fully_redeemed()? {
         if cmp_pubkeys(&cash_link.mint, &native_mint::id()) {
-            assert_account_key(owner_token_info, &cash_link.owner, Some(CashError::InvalidOwner))?;
+            assert_account_key(
+                owner_token_info,
+                &cash_link.owner,
+                Some(CashError::InvalidOwner),
+            )?;
             spl_token_close(
                 vault_token_info,
                 fee_payer_info,
@@ -576,9 +592,7 @@ pub fn process_redemption(
             )?;
         }
     }
-    let system_account_info = next_account_info(account_info_iter)?;
     if redemption_info.lamports() > 0 && !redemption_info.data_is_empty() {
-        msg!("Redemption AccountAlreadyInitialized");
         return Err(ProgramError::AccountAlreadyInitialized);
     }
     create_new_account_raw(
@@ -596,14 +610,12 @@ pub fn process_redemption(
         ],
     )?;
     if cash_link.fingerprint_enabled {
-        msg!("Cash Link Fingerprint Enabled");
         if let Some(bump) = args.fingerprint_bump {
             if let Some(fingerprint) = args.fingerprint {
                 let fingerprint_account_info = next_account_info(account_info_iter)?;
                 if fingerprint_account_info.lamports() > 0
                     && !fingerprint_account_info.data_is_empty()
                 {
-                    msg!("Fingerprint AccountAlreadyInitialized");
                     return Err(ProgramError::AccountAlreadyInitialized);
                 }
                 create_new_account_raw(
