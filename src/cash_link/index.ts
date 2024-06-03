@@ -419,6 +419,7 @@ export class CashLinkClient {
         }),
       );
     }
+    signers.push(this._feePayer, this._authority);
     if (input.asLegacyTransaction) {
       const transaction = new Transaction();
       transaction.recentBlockhash = value.blockhash;
@@ -692,7 +693,7 @@ export class CashLinkClient {
       );
     }
     const { context, value } = await this.connection.getLatestBlockhashAndContext(input.commitment);
-    signers.push(...[this._feePayer, this._authority]);
+    signers.push(this._feePayer, this._authority);
     if (input.asLegacyTransaction) {
       const transaction = new Transaction();
       transaction.feePayer = this.feePayer;
