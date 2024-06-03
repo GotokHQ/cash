@@ -19,6 +19,7 @@ export interface InitializeCashLinkInput {
   fingerprintEnabled?: boolean;
   numDaysToExpire?: number;
   addressLookupTable?: string;
+  asLegacyTransaction: boolean;
 }
 
 export interface ResultContext {
@@ -34,11 +35,13 @@ export interface CashLinkInput {
   computeUnitPrice?: number;
   computeBudget?: number;
   addressLookupTable?: string;
+  asLegacyTransaction: boolean;
 }
 
 export interface RedeemCashLinkInput extends CashLinkInput {
   fingerprint?: string;
   addressLookupTable?: string;
+  asLegacyTransaction: boolean;
 }
 
 export interface SettleAndTransferInput {

@@ -109,23 +109,40 @@ export class CashLinkClient {
       );
     }
     const { context, value } = await this.connection.getLatestBlockhashAndContext(input.commitment);
-    let lookUpTable: AddressLookupTableAccount | undefined;
-    if (input.addressLookupTable) {
-      const lookUpTableAddresses = new PublicKey(input.addressLookupTable);
-      lookUpTable = (await this.connection.getAddressLookupTable(lookUpTableAddresses)).value;
+    signers.push(this._feePayer, this._authority);
+    if (input.asLegacyTransaction) {
+      const transaction = new Transaction();
+      transaction.add(...instructions);
+      transaction.feePayer = this.feePayer;
+      transaction.partialSign(...signers);
+      return {
+        transaction: transaction
+          .serialize({
+            requireAllSignatures: false,
+          })
+          .toString('base64'),
+        slot: context.slot,
+        asLegacyTransaction: input.asLegacyTransaction,
+      };
+    } else {
+      let lookUpTable: AddressLookupTableAccount | undefined;
+      if (input.addressLookupTable) {
+        const lookUpTableAddresses = new PublicKey(input.addressLookupTable);
+        lookUpTable = (await this.connection.getAddressLookupTable(lookUpTableAddresses)).value;
+      }
+      const messageV0 = new TransactionMessage({
+        payerKey: this.feePayer,
+        recentBlockhash: value.blockhash,
+        instructions,
+      }).compileToV0Message([lookUpTable]);
+      const transaction = new VersionedTransaction(messageV0);
+      transaction.sign(signers);
+      return {
+        transaction: Buffer.from(transaction.serialize()).toString('base64'),
+        slot: context.slot,
+        asLegacyTransaction: input.asLegacyTransaction,
+      };
     }
-    const messageV0 = new TransactionMessage({
-      payerKey: this.feePayer,
-      recentBlockhash: value.blockhash,
-      instructions,
-    }).compileToV0Message([lookUpTable]);
-    const transaction = new VersionedTransaction(messageV0);
-    transaction.sign([this._feePayer, this._authority, ...signers]);
-    return {
-      transaction: Buffer.from(transaction.serialize()).toString('base64'),
-      slot: context.slot,
-      asLegacyTransaction: false,
-    };
   };
 
   cancelAndClose = async (input: CashLinkInput): Promise<ResultContext> => {
@@ -160,23 +177,40 @@ export class CashLinkClient {
       );
     }
     const { context, value } = await this.connection.getLatestBlockhashAndContext(input.commitment);
-    let lookUpTable: AddressLookupTableAccount | undefined;
-    if (input.addressLookupTable) {
-      const lookUpTableAddresses = new PublicKey(input.addressLookupTable);
-      lookUpTable = (await this.connection.getAddressLookupTable(lookUpTableAddresses)).value;
+    signers.push(this._feePayer, this._authority);
+    if (input.asLegacyTransaction) {
+      const transaction = new Transaction();
+      transaction.add(...instructions);
+      transaction.feePayer = this.feePayer;
+      transaction.partialSign(...signers);
+      return {
+        transaction: transaction
+          .serialize({
+            requireAllSignatures: false,
+          })
+          .toString('base64'),
+        slot: context.slot,
+        asLegacyTransaction: input.asLegacyTransaction,
+      };
+    } else {
+      let lookUpTable: AddressLookupTableAccount | undefined;
+      if (input.addressLookupTable) {
+        const lookUpTableAddresses = new PublicKey(input.addressLookupTable);
+        lookUpTable = (await this.connection.getAddressLookupTable(lookUpTableAddresses)).value;
+      }
+      const messageV0 = new TransactionMessage({
+        payerKey: this.feePayer,
+        recentBlockhash: value.blockhash,
+        instructions,
+      }).compileToV0Message([lookUpTable]);
+      const transaction = new VersionedTransaction(messageV0);
+      transaction.sign(signers);
+      return {
+        transaction: Buffer.from(transaction.serialize()).toString('base64'),
+        slot: context.slot,
+        asLegacyTransaction: input.asLegacyTransaction,
+      };
     }
-    const messageV0 = new TransactionMessage({
-      payerKey: this.feePayer,
-      recentBlockhash: value.blockhash,
-      instructions,
-    }).compileToV0Message([lookUpTable]);
-    const transaction = new VersionedTransaction(messageV0);
-    transaction.sign([this._feePayer, this._authority, ...signers]);
-    return {
-      transaction: Buffer.from(transaction.serialize()).toString('base64'),
-      slot: context.slot,
-      asLegacyTransaction: false,
-    };
   };
 
   cancelTransaction = async (
@@ -305,23 +339,40 @@ export class CashLinkClient {
       );
     }
     const { context, value } = await this.connection.getLatestBlockhashAndContext(input.commitment);
-    let lookUpTable: AddressLookupTableAccount | undefined;
-    if (input.addressLookupTable) {
-      const lookUpTableAddresses = new PublicKey(input.addressLookupTable);
-      lookUpTable = (await this.connection.getAddressLookupTable(lookUpTableAddresses)).value;
+    const signers = [this._feePayer, this._authority];
+    if (input.asLegacyTransaction) {
+      const transaction = new Transaction();
+      transaction.add(...instructions);
+      transaction.feePayer = this.feePayer;
+      transaction.partialSign(...signers);
+      return {
+        transaction: transaction
+          .serialize({
+            requireAllSignatures: false,
+          })
+          .toString('base64'),
+        slot: context.slot,
+        asLegacyTransaction: input.asLegacyTransaction,
+      };
+    } else {
+      let lookUpTable: AddressLookupTableAccount | undefined;
+      if (input.addressLookupTable) {
+        const lookUpTableAddresses = new PublicKey(input.addressLookupTable);
+        lookUpTable = (await this.connection.getAddressLookupTable(lookUpTableAddresses)).value;
+      }
+      const messageV0 = new TransactionMessage({
+        payerKey: this.feePayer,
+        recentBlockhash: value.blockhash,
+        instructions,
+      }).compileToV0Message([lookUpTable]);
+      const transaction = new VersionedTransaction(messageV0);
+      transaction.sign(signers);
+      return {
+        transaction: Buffer.from(transaction.serialize()).toString('base64'),
+        slot: context.slot,
+        asLegacyTransaction: input.asLegacyTransaction,
+      };
     }
-    const messageV0 = new TransactionMessage({
-      payerKey: this.feePayer,
-      recentBlockhash: value.blockhash,
-      instructions,
-    }).compileToV0Message([lookUpTable]);
-    const transaction = new VersionedTransaction(messageV0);
-    transaction.sign([this._feePayer, this._authority]);
-    return {
-      transaction: Buffer.from(transaction.serialize()).toString('base64'),
-      slot: context.slot,
-      asLegacyTransaction: false,
-    };
   };
 
   closeInstruction = (params: CloseCashLinkParams): TransactionInstruction => {
@@ -362,24 +413,39 @@ export class CashLinkClient {
         }),
       );
     }
-    let lookUpTable: AddressLookupTableAccount | undefined;
-    if (input.addressLookupTable) {
-      const lookUpTableAddresses = new PublicKey(input.addressLookupTable);
-      lookUpTable = (await this.connection.getAddressLookupTable(lookUpTableAddresses)).value;
+    if (input.asLegacyTransaction) {
+      const transaction = new Transaction();
+      transaction.add(...instructions);
+      transaction.feePayer = this.feePayer;
+      transaction.partialSign(...signers);
+      return {
+        transaction: transaction
+          .serialize({
+            requireAllSignatures: false,
+          })
+          .toString('base64'),
+        slot: context.slot,
+        asLegacyTransaction: input.asLegacyTransaction,
+      };
+    } else {
+      let lookUpTable: AddressLookupTableAccount | undefined;
+      if (input.addressLookupTable) {
+        const lookUpTableAddresses = new PublicKey(input.addressLookupTable);
+        lookUpTable = (await this.connection.getAddressLookupTable(lookUpTableAddresses)).value;
+      }
+      const messageV0 = new TransactionMessage({
+        payerKey: this.feePayer,
+        recentBlockhash: value.blockhash,
+        instructions,
+      }).compileToV0Message([lookUpTable]);
+      const transaction = new VersionedTransaction(messageV0);
+      transaction.sign(signers);
+      return {
+        transaction: Buffer.from(transaction.serialize()).toString('base64'),
+        slot: context.slot,
+        asLegacyTransaction: input.asLegacyTransaction,
+      };
     }
-    const messageV0 = new TransactionMessage({
-      payerKey: this.feePayer,
-      recentBlockhash: value.blockhash,
-      instructions,
-    }).compileToV0Message([lookUpTable]);
-    const transaction = new VersionedTransaction(messageV0);
-    signers.push(...[this._feePayer, this._authority]);
-    transaction.sign(signers);
-    return {
-      transaction: Buffer.from(transaction.serialize()).toString('base64'),
-      slot: context.slot,
-      asLegacyTransaction: false,
-    };
   };
 
   initializeTransaction = async (
@@ -618,27 +684,42 @@ export class CashLinkClient {
       );
     }
     const { context, value } = await this.connection.getLatestBlockhashAndContext(input.commitment);
-    let lookUpTable: AddressLookupTableAccount | undefined;
-    console.log('input.addressLookupTable', input.addressLookupTable);
-    if (input.addressLookupTable) {
-      const lookUpTableAddresses = new PublicKey(input.addressLookupTable);
-      lookUpTable = (await this.connection.getAddressLookupTable(lookUpTableAddresses)).value;
-    }
-    console.log('lookUpTable', lookUpTable?.state);
-    const messageV0 = new TransactionMessage({
-      payerKey: this.feePayer,
-      recentBlockhash: value.blockhash,
-      instructions,
-    }).compileToV0Message([lookUpTable]);
-
-    const transaction = new VersionedTransaction(messageV0);
     signers.push(...[this._feePayer, this._authority]);
-    transaction.sign(signers);
-    return {
-      transaction: Buffer.from(transaction.serialize()).toString('base64'),
-      slot: context.slot,
-      asLegacyTransaction: false,
-    };
+    if (input.asLegacyTransaction) {
+      const transaction = new Transaction();
+      transaction.add(...instructions);
+      transaction.add(...instructions);
+      transaction.feePayer = this.feePayer;
+      transaction.partialSign(...signers);
+      return {
+        transaction: transaction
+          .serialize({
+            requireAllSignatures: false,
+          })
+          .toString('base64'),
+        slot: context.slot,
+        asLegacyTransaction: input.asLegacyTransaction,
+      };
+    } else {
+      let lookUpTable: AddressLookupTableAccount | undefined;
+      if (input.addressLookupTable) {
+        const lookUpTableAddresses = new PublicKey(input.addressLookupTable);
+        lookUpTable = (await this.connection.getAddressLookupTable(lookUpTableAddresses)).value;
+      }
+      const messageV0 = new TransactionMessage({
+        payerKey: this.feePayer,
+        recentBlockhash: value.blockhash,
+        instructions,
+      }).compileToV0Message([lookUpTable]);
+
+      const transaction = new VersionedTransaction(messageV0);
+      transaction.sign(signers);
+      return {
+        transaction: Buffer.from(transaction.serialize()).toString('base64'),
+        slot: context.slot,
+        asLegacyTransaction: input.asLegacyTransaction,
+      };
+    }
   };
 
   redeemTransaction = async (
@@ -739,27 +820,9 @@ export class CashLinkClient {
       fingerprintPda,
     });
     const instructions = [];
-    if (walletTokenKeyPair) {
-      instructions.push(
-        SystemProgram.createAccount({
-          fromPubkey: this.feePayer,
-          newAccountPubkey: walletTokenAccount,
-          lamports: kTokenProgramRent,
-          space: spl.AccountLayout.span,
-          programId: spl.TOKEN_PROGRAM_ID,
-        }),
-        spl.createInitializeAccount3Instruction(
-          walletTokenAccount,
-          spl.NATIVE_MINT,
-          walletAddress,
-          spl.TOKEN_PROGRAM_ID,
-        ),
-      );
-    }
     instructions.push(redeemInstruction);
     const signers = [];
     if (walletTokenKeyPair) {
-      instructions.push(...this.unWrapSol(walletAddress, walletTokenAccount));
       signers.push(walletTokenKeyPair);
     }
     return {
