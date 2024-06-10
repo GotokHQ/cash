@@ -7,7 +7,6 @@ use crate::{
     math::SafeMath,
     state::{
         cashlink::{CashLink, CashLinkState, DistributionType},
-        redemption::Redemption,
         AccountType, FINGERPRINT_PREFIX, FLAG_ACCOUNT_SIZE,
     },
     utils::{
@@ -352,11 +351,6 @@ pub fn process_redemption(
     if cash_link.redeemed() {
         return Err(AccountAlreadyRedeemed.into());
     }
-
-    let redemption_info = next_account_info(account_info_iter)?;
-    if redemption_info.lamports() > 0 && !redemption_info.data_is_empty() {
-        return Err(ProgramError::AccountAlreadyInitialized);
-    }
     let owner_token_info = next_account_info(account_info_iter)?; //owner_token_info
     let fee_payer_info = next_account_info(account_info_iter)?;
     let fee_payer_token_info = next_account_info(account_info_iter)?;
@@ -592,23 +586,6 @@ pub fn process_redemption(
             )?;
         }
     }
-    if redemption_info.lamports() > 0 && !redemption_info.data_is_empty() {
-        return Err(ProgramError::AccountAlreadyInitialized);
-    }
-    create_new_account_raw(
-        program_id,
-        redemption_info,
-        rent_info,
-        fee_payer_info,
-        system_account_info,
-        Redemption::LEN,
-        &[
-            Redemption::PREFIX.as_bytes(),
-            cash_link_info.key.as_ref(),
-            wallet_info.key.as_ref(),
-            &[args.redemption_bump],
-        ],
-    )?;
     if cash_link.fingerprint_enabled {
         if let Some(bump) = args.fingerprint_bump {
             if let Some(fingerprint) = args.fingerprint {
@@ -641,13 +618,6 @@ pub fn process_redemption(
             return Err(CashError::FingerprintBumpNotFound.into());
         }
     }
-    let mut redemption = Redemption::unpack_unchecked(&redemption_info.data.borrow_mut())?;
-    redemption.account_type = AccountType::Redemption;
-    redemption.redeemed_at = clock.unix_timestamp as u64;
-    redemption.amount = amount_to_redeem;
-    redemption.wallet = *wallet_info.key;
-    redemption.cash_link = *cash_link_info.key;
-    Redemption::pack(redemption, &mut redemption_info.data.borrow_mut())?;
     cash_link.state = if cash_link.is_fully_redeemed()? {
         CashLinkState::Redeemed
     } else {

@@ -1,7 +1,6 @@
 use borsh::{BorshDeserialize, BorshSerialize, BorshSchema};
 
 pub mod cashlink;
-pub mod redemption;
 
 pub const FLAG_ACCOUNT_SIZE: usize = 1;
 pub const FINGERPRINT_PREFIX: &'static str = "fingerprint";

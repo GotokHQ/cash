@@ -34,7 +34,6 @@ pub struct InitCashLinkArgs {
 #[derive(BorshSerialize, BorshDeserialize, PartialEq, Debug, Clone)]
 /// Initialize a cash_link params
 pub struct InitCashRedemptionArgs {
-    pub redemption_bump: u8,
     pub cash_link_bump: u8,
     pub fingerprint: Option<String>,
     pub fingerprint_bump: Option<u8>,
@@ -81,20 +80,19 @@ pub enum CashInstruction {
     /// 2. `[writable]` The platform fee account for the token they will receive should the trade go through
     /// 3. `[writable]` The cash_link account holding the cash_link info
     /// 4. `[]` The pass key required to unlock the cash link for redemption
-    /// 5. `[writable]` The redemption account to flag a user has redeemed this cashlink
-    /// 6. `[writable]` The payer token account of the payer that initialized the cash_link  
-    /// 7. `[writable]` The fee payer account that pays network and rent fees
-    /// 8. `[writable]` The fee payer's associated token account that collects the rent or network fees
-    /// 9. `[writable]` The vault token account to get tokens. This value is Optional. if the mint is set, then this must be set.
-    /// 10. `[writable]` The recipient token account for the token they will receive should the trade go through
-    /// 11. `[]` The mint account for the token
-    /// 12. `[]` The clock account
-    /// 13. `[]` The rent account
-    /// 14. `[]` The recent slot hash account
-    /// 15. `[]` The system program
-    /// 16. `[writable][Optional]` The fingerprint info
-    /// 17. `[]` The token program
-    /// 18. `[]` The associated program
+    /// 5. `[writable]` The payer token account of the payer that initialized the cash_link  
+    /// 6. `[writable]` The fee payer account that pays network and rent fees
+    /// 7. `[writable]` The fee payer's associated token account that collects the rent or network fees
+    /// 8. `[writable]` The vault token account to get tokens. This value is Optional. if the mint is set, then this must be set.
+    /// 9. `[writable]` The recipient token account for the token they will receive should the trade go through
+    /// 10. `[]` The mint account for the token
+    /// 11. `[]` The clock account
+    /// 12. `[]` The rent account
+    /// 13. `[]` The recent slot hash account
+    /// 14. `[]` The system program
+    /// 15. `[writable][Optional]` The fingerprint info
+    /// 16. `[]` The token program
+    /// 17. `[]` The associated program
     Redeem(InitCashRedemptionArgs),
     /// Cancel the cash_link
     ///
@@ -197,7 +195,6 @@ pub fn redeem_cash_link(
     vault_token: &Pubkey,
     cash_link: &Pubkey,
     pass_key: &Pubkey,
-    redemption_pda: &Pubkey,
     owner_token: &Pubkey,
     fee_payer: &Pubkey,
     fee_payer_token: &Pubkey,
@@ -211,7 +208,6 @@ pub fn redeem_cash_link(
         AccountMeta::new(*collection_fee_token, false),
         AccountMeta::new(*cash_link, false),
         AccountMeta::new_readonly(*pass_key, false),
-        AccountMeta::new(*redemption_pda, false),
         AccountMeta::new(*owner_token, false),
         AccountMeta::new(*fee_payer, true),
         AccountMeta::new(*fee_payer_token, false),

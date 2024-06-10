@@ -40,7 +40,6 @@ import {
   RedeemCashLinkParams,
 } from '../transactions';
 import { Account } from '@metaplex-foundation/mpl-core';
-import { Redemption } from '../accounts/redemption';
 
 export const FAILED_TO_FIND_ACCOUNT = 'Failed to find account';
 export const INVALID_ACCOUNT_OWNER = 'Invalid account owner';
@@ -807,16 +806,10 @@ export class CashLinkClient {
         )
         .then((acc) => acc.address),
     ]);
-    const [redemption, redemptionBump] = await CashProgram.findRedemptionAccount(
-      cashLinkAddress,
-      walletAddress,
-    );
     const redeemInstruction = await this.redeemInstruction({
       mint,
-      redemption,
       cashLinkBump,
       passKey,
-      redemptionBump: redemptionBump,
       wallet: walletAddress,
       walletToken: accountKeys[0],
       walletTokenIsSigner: !!walletTokenKeyPair,
@@ -850,7 +843,6 @@ export class CashLinkClient {
       { pubkey: params.platformFeeToken, isSigner: false, isWritable: true },
       { pubkey: params.cashLink, isSigner: false, isWritable: true },
       { pubkey: params.passKey, isSigner: true, isWritable: false },
-      { pubkey: params.redemption, isSigner: false, isWritable: true },
       { pubkey: params.ownerToken, isSigner: false, isWritable: true },
       { pubkey: params.feePayer, isSigner: true, isWritable: true },
       { pubkey: params.feePayerToken, isSigner: false, isWritable: true },
@@ -908,7 +900,6 @@ export class CashLinkClient {
       programId: CashProgram.PUBKEY,
       data: RedeemCashLinkArgs.serialize({
         cashLinkBump: params.cashLinkBump,
-        redemptionBump: params.redemptionBump,
         fingerprintBump: params.fingerprintBump,
         fingerprint: params.fingerprint,
       }),
@@ -962,20 +953,6 @@ export class CashLinkClient {
     ];
     return instructions;
   };
-
-  getCashLinkRedemption = async (
-    address: PublicKey,
-    commitment?: Commitment,
-  ): Promise<Redemption | null> => {
-    try {
-      return await _getCashLinkRedemptionAccount(this.connection, address, commitment);
-    } catch (error) {
-      if (error.message === FAILED_TO_FIND_ACCOUNT) {
-        return null;
-      }
-      throw error;
-    }
-  };
 }
 
 const _getCashLinkAccount = async (
@@ -990,23 +967,6 @@ const _getCashLinkAccount = async (
     }
     const cashLink = CashLink.from(new Account(cashLinkAddress, accountInfo));
     return cashLink;
-  } catch (error) {
-    return null;
-  }
-};
-
-const _getCashLinkRedemptionAccount = async (
-  connection: Connection,
-  redemptionAddress: PublicKey,
-  commitment?: Commitment,
-): Promise<Redemption | null> => {
-  try {
-    const accountInfo = await connection.getAccountInfo(redemptionAddress, commitment);
-    if (accountInfo === null) {
-      return null;
-    }
-    const redemption = Redemption.from(new Account(redemptionAddress, accountInfo));
-    return redemption;
   } catch (error) {
     return null;
   }
