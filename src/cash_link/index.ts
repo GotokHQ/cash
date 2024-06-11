@@ -15,6 +15,7 @@ import {
   AddressLookupTableAccount,
   TransactionMessage,
   VersionedTransaction,
+  sendAndConfirmTransaction,
   // TransactionMessage,
   // VersionedTransaction,
   // AddressLookupTableProgram,
@@ -64,12 +65,22 @@ export class CashLinkClient {
   private _authority: Keypair;
   private _feeWallet: PublicKey;
   private connection: Connection;
-
-  constructor(feePayer: Keypair, authority: Keypair, feeWallet: PublicKey, connection: Connection) {
+  private computeUnit?: number;
+  private computePriorityFee?: number;
+  constructor(
+    feePayer: Keypair,
+    authority: Keypair,
+    feeWallet: PublicKey,
+    connection: Connection,
+    computeUnit?: number,
+    computePriorityFee?: number,
+  ) {
     this._feePayer = feePayer;
     this._authority = authority;
     this._feeWallet = feeWallet;
     this.connection = connection;
+    this.computePriorityFee = computePriorityFee;
+    this.computeUnit = computeUnit;
   }
 
   get feePayer(): PublicKey {
@@ -941,15 +952,36 @@ export class CashLinkClient {
       const associatedToken = spl.getAssociatedTokenAddressSync(mint, owner, true);
       const acc = await this._getAccount(associatedToken, commitment);
       if (acc === null) {
-        return await spl.createAssociatedTokenAccount(
-          this.connection,
-          this._feePayer,
-          mint,
+        const instruction = spl.createAssociatedTokenAccountInstruction(
+          this.feePayer,
+          associatedToken,
           owner,
-          {
-            commitment,
-          },
+          mint,
         );
+        const { value } = await this.connection.getLatestBlockhashAndContext(commitment);
+        const transaction = new Transaction();
+        transaction.feePayer = this.feePayer;
+        transaction.lastValidBlockHeight = value.lastValidBlockHeight;
+        transaction.recentBlockhash = value.blockhash;
+        if (this.computeUnit) {
+          transaction.add(
+            ComputeBudgetProgram.setComputeUnitLimit({
+              units: this.computeUnit,
+            }),
+          );
+        }
+        if (this.computePriorityFee) {
+          transaction.add(
+            ComputeBudgetProgram.setComputeUnitPrice({
+              microLamports: this.computePriorityFee,
+            }),
+          );
+        }
+        transaction.add(instruction);
+        await sendAndConfirmTransaction(this.connection, transaction, [this._feePayer], {
+          commitment,
+        });
+        return associatedToken;
       }
       return acc.address;
     } catch (error: unknown) {
