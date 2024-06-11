@@ -748,10 +748,10 @@ export class CashLinkClient {
     const fingerprint = input.fingerprint;
     let fingerprintPda: PublicKey | undefined;
     let fingerprintBump: number | undefined;
-    if (cashLink.data.fingerprintEnabled) {
-      if (!fingerprint) {
-        throw new Error(FINGERPRINT_NOT_FOUND);
-      }
+    if (cashLink.data.fingerprintEnabled && !fingerprint) {
+      throw new Error(FINGERPRINT_NOT_FOUND);
+    }
+    if (fingerprint) {
       [fingerprintPda, fingerprintBump] = await CashProgram.findFingerprintAccount(
         cashLinkAddress,
         input.fingerprint,
@@ -828,9 +828,6 @@ export class CashLinkClient {
     const instructions = [];
     instructions.push(redeemInstruction);
     const signers = [];
-    console.log('walletTokenKey', accountKeys[0].toBase58());
-    console.log('walletTokenIsSigner', walletTokenIsSigner);
-    console.log('passKey', passKey.toBase58());
     if (walletTokenIsSigner) {
       signers.push(walletTokenKeyPair);
     }
