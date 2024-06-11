@@ -806,13 +806,14 @@ export class CashLinkClient {
         )
         .then((acc) => acc.address),
     ]);
+    const walletTokenIsSigner = !!walletTokenKeyPair;
     const redeemInstruction = await this.redeemInstruction({
       mint,
       cashLinkBump,
       passKey,
+      walletTokenIsSigner,
       wallet: walletAddress,
       walletToken: accountKeys[0],
-      walletTokenIsSigner: !!walletTokenKeyPair,
       platformFeeToken: accountKeys[1],
       ownerToken: accountKeys[2],
       feePayerToken: accountKeys[3],
@@ -828,9 +829,9 @@ export class CashLinkClient {
     instructions.push(redeemInstruction);
     const signers = [];
     console.log('walletTokenKey', accountKeys[0].toBase58());
-    console.log('walletTokenIsSigner', !!walletTokenKeyPair);
+    console.log('walletTokenIsSigner', walletTokenIsSigner);
     console.log('passKey', passKey.toBase58());
-    if (walletTokenKeyPair) {
+    if (walletTokenIsSigner) {
       signers.push(walletTokenKeyPair);
     }
     return {
