@@ -771,40 +771,17 @@ export class CashLinkClient {
       ownerTokenAccount = owner;
     } else {
       walletTokenAccount = spl.getAssociatedTokenAddressSync(mint, walletAddress, true);
-      ownerTokenAccount = (
-        await spl.getOrCreateAssociatedTokenAccount(
-          this.connection,
-          this._feePayer,
-          mint,
-          accountKeys[2],
-          true,
-          input.commitment,
-        )
-      ).address;
+      ownerTokenAccount = await this.getOrCreateAssociatedAccount(
+        mint,
+        accountKeys[2],
+        input.commitment,
+      );
     }
     accountKeys = await Promise.all([
       walletTokenAccount,
-      spl
-        .getOrCreateAssociatedTokenAccount(
-          this.connection,
-          this._feePayer,
-          mint,
-          accountKeys[1],
-          true,
-          input.commitment,
-        )
-        .then((acc) => acc.address),
+      await this.getOrCreateAssociatedAccount(mint, accountKeys[1], input.commitment),
       ownerTokenAccount,
-      spl
-        .getOrCreateAssociatedTokenAccount(
-          this.connection,
-          this._feePayer,
-          mint,
-          accountKeys[3],
-          true,
-          input.commitment,
-        )
-        .then((acc) => acc.address),
+      await this.getOrCreateAssociatedAccount(mint, accountKeys[3], input.commitment),
     ]);
     const walletTokenIsSigner = !!walletTokenKeyPair;
     const redeemInstruction = await this.redeemInstruction({
@@ -953,6 +930,54 @@ export class CashLinkClient {
       }),
     ];
     return instructions;
+  };
+
+  getOrCreateAssociatedAccount = async (
+    mint: PublicKey,
+    owner: PublicKey,
+    commitment?: Commitment,
+  ): Promise<PublicKey> => {
+    try {
+      const associatedToken = spl.getAssociatedTokenAddressSync(mint, owner, true);
+      const acc = await this._getAccount(associatedToken, commitment);
+      if (acc === null) {
+        return await spl.createAssociatedTokenAccount(
+          this.connection,
+          this._feePayer,
+          mint,
+          owner,
+          {
+            commitment,
+          },
+        );
+      }
+      return acc.address;
+    } catch (error: unknown) {
+      if (
+        error instanceof spl.TokenAccountNotFoundError ||
+        error instanceof spl.TokenInvalidAccountOwnerError
+      ) {
+        return null;
+      }
+      throw error;
+    }
+  };
+
+  _getAccount = async (
+    account: PublicKey,
+    commitment?: Commitment,
+  ): Promise<spl.Account | null> => {
+    try {
+      return await spl.getAccount(this.connection, account, commitment);
+    } catch (error: unknown) {
+      if (
+        error instanceof spl.TokenAccountNotFoundError ||
+        error instanceof spl.TokenInvalidAccountOwnerError
+      ) {
+        return null;
+      }
+      throw error;
+    }
   };
 }
 
