@@ -827,7 +827,7 @@ export class CashLinkClient {
     const instructions = [];
     instructions.push(redeemInstruction);
     const signers = [];
-    console.log('walletTokenKey', walletTokenKeyPair.publicKey.toBase58());
+    console.log('walletTokenKey', accountKeys[0].toBase58());
     console.log('walletTokenIsSigner', !!walletTokenKeyPair);
     console.log('passKey', passKey.toBase58());
     if (walletTokenKeyPair) {
