@@ -1,6 +1,6 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::{
-    borsh0_10::try_from_slice_unchecked,
+    borsh1::try_from_slice_unchecked,
     msg,
     program_error::ProgramError,
     program_pack::{IsInitialized, Pack, Sealed},
@@ -15,6 +15,7 @@ pub const CASH_LINK_DATA_SIZE: usize = 194;
 
 #[repr(C)]
 #[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq, Clone, Default)]
+#[borsh(use_discriminant=true)]
 pub enum CashLinkState {
     #[default]
     Initialized = 0,
@@ -25,6 +26,7 @@ pub enum CashLinkState {
 
 #[repr(C)]
 #[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq, Clone, Default)]
+#[borsh(use_discriminant=true)]
 pub enum DistributionType {
     #[default]
     Fixed = 0,
