@@ -57,6 +57,7 @@ export const INVALID_STATE = 'Invalid state';
 export const FEE_MISMATCH = 'Fee mismatch';
 export const TRANSACTION_SEND_ERROR = 'Transaction send error';
 export const FINGERPRINT_NOT_FOUND = 'Fingerprint required';
+export const REFERRER_WALLET = 'Referrer required';
 
 export const kTokenProgramRent = 2039280;
 
@@ -768,6 +769,9 @@ export class CashLinkClient {
         input.fingerprint,
       );
     }
+    if (input.referrerFeeBps && !input.referrer) {
+      throw new Error(REFERRER_WALLET);
+    }
     const walletAddress = new PublicKey(input.walletAddress);
     const owner = new PublicKey(cashLink.data.owner);
     let accountKeys = [walletAddress, this.feeWallet, owner, this.feePayer];
@@ -776,10 +780,18 @@ export class CashLinkClient {
     let walletTokenKeyPair: Keypair | undefined;
     let walletTokenAccount: PublicKey | undefined;
     let ownerTokenAccount: PublicKey | undefined;
+    let feeTokenAccount: PublicKey | undefined;
+    let referrer: PublicKey | undefined;
+    let referrerToken: PublicKey | undefined;
+    if (input.referrerFeeBps) {
+      referrer = new PublicKey(referrer);
+      referrerToken = spl.getAssociatedTokenAddressSync(mint, referrer, true);
+    }
     if (mint.equals(spl.NATIVE_MINT)) {
       walletTokenKeyPair = Keypair.generate();
       walletTokenAccount = walletTokenKeyPair.publicKey;
       ownerTokenAccount = owner;
+      feeTokenAccount = this.feeWallet;
     } else {
       walletTokenAccount = spl.getAssociatedTokenAddressSync(mint, walletAddress, true);
       ownerTokenAccount = await this.getOrCreateAssociatedAccount(
@@ -787,10 +799,15 @@ export class CashLinkClient {
         accountKeys[2],
         input.commitment,
       );
+      feeTokenAccount = await this.getOrCreateAssociatedAccount(
+        mint,
+        accountKeys[1],
+        input.commitment,
+      );
     }
     accountKeys = await Promise.all([
       walletTokenAccount,
-      await this.getOrCreateAssociatedAccount(mint, accountKeys[1], input.commitment),
+      feeTokenAccount,
       ownerTokenAccount,
       await this.getOrCreateAssociatedAccount(mint, accountKeys[3], input.commitment),
     ]);
@@ -812,6 +829,10 @@ export class CashLinkClient {
       fingerprint,
       fingerprintBump,
       fingerprintPda,
+      referrer,
+      referrerToken,
+      refereeFeeBps: input.refereeFeeBps,
+      referrerFeeBps: input.refereeFeeBps,
     });
     const instructions = [];
     instructions.push(redeemInstruction);
@@ -867,6 +888,18 @@ export class CashLinkClient {
         isWritable: false,
       },
     ];
+    if (params.referrer) {
+      keys.push({
+        pubkey: params.referrer,
+        isSigner: false,
+        isWritable: true,
+      });
+      keys.push({
+        pubkey: params.referrerToken,
+        isSigner: false,
+        isWritable: true,
+      });
+    }
     if (params.fingerprintPda) {
       keys.push({
         pubkey: params.fingerprintPda,
@@ -891,6 +924,8 @@ export class CashLinkClient {
         cashLinkBump: params.cashLinkBump,
         fingerprintBump: params.fingerprintBump,
         fingerprint: params.fingerprint,
+        referrerFeeBps: params.referrerFeeBps,
+        refereeFeeBps: params.refereeFeeBps,
       }),
     });
   };

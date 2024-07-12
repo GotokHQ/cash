@@ -7,6 +7,7 @@ export class CashProgram extends Program {
   static readonly PREFIX = 'cash';
   static readonly FINGERPRINT_PREFIX = 'fingerprint';
   static readonly REDEMPTION_PREFIX = 'redeem';
+  static readonly REFERRAL_PREFIX = 'referral';
   static readonly PUBKEY = new PublicKey('cashQKx31fVsquVKXQ9prKqVtSYf8SqcYt9Jyvg966q');
 
   static async findCashLinkAccount(passKey: PublicKey): Promise<[PublicKey, number]> {
@@ -22,6 +23,13 @@ export class CashProgram extends Program {
   ): Promise<[PublicKey, number]> {
     return PublicKey.findProgramAddress(
       [Buffer.from(CashProgram.REDEMPTION_PREFIX), cashLink.toBuffer(), wallet.toBuffer()],
+      CashProgram.PUBKEY,
+    );
+  }
+
+  static async findReferralKey(mint: PublicKey, wallet: PublicKey): Promise<[PublicKey, number]> {
+    return PublicKey.findProgramAddress(
+      [Buffer.from(CashProgram.REFERRAL_PREFIX), mint.toBuffer(), wallet.toBuffer()],
       CashProgram.PUBKEY,
     );
   }

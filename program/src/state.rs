@@ -11,8 +11,8 @@ pub enum AccountType {
     Uninitialized,
     /// A cashlink account type
     CashLink,
-    /// A redemption account type
-    Redemption,
+    /// A referral account type
+    Referral,
 }
 
 impl Default for AccountType {

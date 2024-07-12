@@ -506,7 +506,7 @@ pub fn process_redemption(
             vault_token_info,
             recipient_token_info,
             cash_link_info,
-            amount_to_redeem,
+            total,
             &[&signer_seeds],
         )?;
         spl_token_close(
@@ -526,18 +526,103 @@ pub fn process_redemption(
         )?;
     }
     if platform_fee_per_redeem > 0 {
-        spl_token_transfer(
-            vault_token_info,
-            fee_token_info,
-            cash_link_info,
-            platform_fee_per_redeem,
-            &[&signer_seeds],
-        )?;
+        if let Some(referrer_fee_bps) = args.referrer_fee_bps {
+            let referral_wallet_info = next_account_info(account_info_iter)?;
+            let referral_account_info = next_account_info(account_info_iter)?;
+            if exists(referral_account_info)? {
+                let referral_token: TokenAccount = assert_initialized(referral_account_info)?;
+                assert_token_owned_by(&referral_token, &referral_wallet_info.key)?;
+                assert_owned_by(referral_account_info, &spl_token::id())?;
+            } else {
+                create_associated_token_account_raw(
+                    fee_payer_info,
+                    referral_account_info,
+                    referral_wallet_info,
+                    mint_info,
+                    rent_info,
+                )?;
+            }
+
+            let referee_fee_bps = match args.referee_fee_bps {
+                Some(fee) => fee,
+                None => 0,
+            };
+
+            let commission_bps = referrer_fee_bps
+                .checked_add(referee_fee_bps)
+                .ok_or(CashError::Overflow)?;
+
+            if commission_bps > 10000 {
+                return Err(CashError::InvalidReferralFees.into());
+            }
+            let referrer_fee: u64 =
+                calculate_fee(platform_fee_per_redeem, referrer_fee_bps as u64)?;
+
+            let referee_fee: u64 = calculate_fee(platform_fee_per_redeem, referee_fee_bps as u64)?;
+
+            let platform_fee = platform_fee_per_redeem
+                .checked_sub(referrer_fee)
+                .ok_or(CashError::Overflow)?
+                .checked_sub(referee_fee)
+                .ok_or(CashError::Overflow)?;
+
+            if platform_fee > 0 {
+                if cmp_pubkeys(&cash_link.mint, &native_mint::id()) {
+                    native_transfer(fee_payer_info, fee_token_info, platform_fee, &[])?;
+                } else {
+                    spl_token_transfer(
+                        vault_token_info,
+                        fee_token_info,
+                        cash_link_info,
+                        platform_fee,
+                        &[&signer_seeds],
+                    )?;
+                }
+            }
+            if referrer_fee > 0 {
+                if cmp_pubkeys(&cash_link.mint, &native_mint::id()) {
+                    native_transfer(fee_payer_info, referral_wallet_info, referrer_fee, &[])?;
+                } else {
+                    spl_token_transfer(
+                        vault_token_info,
+                        referral_account_info,
+                        cash_link_info,
+                        referrer_fee,
+                        &[&signer_seeds],
+                    )?;
+                }
+            }
+            if referee_fee > 0 {
+                if cmp_pubkeys(&cash_link.mint, &native_mint::id()) {
+                    native_transfer(fee_payer_info, owner_token_info, referee_fee, &[])?;
+                } else {
+                    spl_token_transfer(
+                        vault_token_info,
+                        owner_token_info,
+                        cash_link_info,
+                        referee_fee,
+                        &[&signer_seeds],
+                    )?;
+                }
+            }
+        } else {
+            if cmp_pubkeys(&cash_link.mint, &native_mint::id()) {
+                native_transfer(fee_payer_info, fee_token_info, platform_fee_per_redeem, &[])?;
+            } else {
+                spl_token_transfer(
+                    vault_token_info,
+                    fee_token_info,
+                    cash_link_info,
+                    platform_fee_per_redeem,
+                    &[&signer_seeds],
+                )?;
+            }
+        }
     }
     let total_network_fee = total_fee_to_redeem
         .checked_sub(platform_fee_per_redeem)
         .ok_or::<ProgramError>(CashError::Overflow.into())?;
-    if total_network_fee > 0 {
+    if total_network_fee > 0 && !cmp_pubkeys(&cash_link.mint, &native_mint::id()) {
         spl_token_transfer(
             vault_token_info,
             fee_payer_token_info,

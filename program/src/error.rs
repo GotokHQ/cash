@@ -99,6 +99,8 @@ pub enum CashError {
     InvalidCashLinkReference,
     #[error("Pass Key is invalid")]
     InvalidPassKey,
+    #[error("The sum of the referral and referee fee in bps must be less than or equal to 10000")]
+    InvalidReferralFees,
 }
 
 impl From<CashError> for ProgramError {

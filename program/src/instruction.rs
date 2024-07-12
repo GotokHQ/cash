@@ -37,6 +37,8 @@ pub struct InitCashRedemptionArgs {
     pub cash_link_bump: u8,
     pub fingerprint: Option<String>,
     pub fingerprint_bump: Option<u8>,
+    pub referrer_fee_bps:  Option<u16>,
+    pub referee_fee_bps:  Option<u16>,
 }
 
 /// Cancel a cash link
@@ -76,10 +78,10 @@ pub enum CashInstruction {
     /// Accounts expected:
     ///
     /// 0. `[signer]` The account of the authority
-    /// 1. `[signer]` The user wallet
+    /// 1. `[]` The user wallet
     /// 2. `[writable]` The platform fee account for the token they will receive should the trade go through
     /// 3. `[writable]` The cash_link account holding the cash_link info
-    /// 4. `[]` The pass key required to unlock the cash link for redemption
+    /// 4. `[signer]` The pass key required to unlock the cash link for redemption
     /// 5. `[writable]` The payer token account of the payer that initialized the cash_link  
     /// 6. `[writable]` The fee payer account that pays network and rent fees
     /// 7. `[writable]` The fee payer's associated token account that collects the rent or network fees
@@ -90,9 +92,11 @@ pub enum CashInstruction {
     /// 12. `[]` The rent account
     /// 13. `[]` The recent slot hash account
     /// 14. `[]` The system program
-    /// 15. `[writable][Optional]` The fingerprint info
-    /// 16. `[]` The token program
-    /// 17. `[]` The associated program
+    /// 15. `[writable][Optional]` The referrer wallet account
+    /// 16. `[writable][Optional]` The referrer token account
+    /// 17. `[writable][Optional]` The fingerprint info
+    /// 18. `[]` The token program
+    /// 19. `[]` The associated program
     Redeem(InitCashRedemptionArgs),
     /// Cancel the cash_link
     ///
@@ -198,6 +202,8 @@ pub fn redeem_cash_link(
     owner_token: &Pubkey,
     fee_payer: &Pubkey,
     fee_payer_token: &Pubkey,
+    referral_wallet: Option<&Pubkey>,
+    referral_token: Option<&Pubkey>,
     fingerprint: Option<&Pubkey>,
     mint: &Pubkey,
     args: InitCashRedemptionArgs
@@ -219,6 +225,12 @@ pub fn redeem_cash_link(
         AccountMeta::new_readonly(sysvar::slot_hashes::id(), false),
         AccountMeta::new_readonly(system_program::id(), false),
     ];
+    if let Some(referral) = referral_wallet {
+        accounts.push(AccountMeta::new(*referral, false));
+    }
+    if let Some(referral_token_account) = referral_token {
+        accounts.push(AccountMeta::new(*referral_token_account, false));
+    }
     if let Some(fingerprint_id) = fingerprint {
         accounts.push(AccountMeta::new(*fingerprint_id, false));
     }

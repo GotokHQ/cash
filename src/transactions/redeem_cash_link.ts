@@ -5,6 +5,8 @@ export type RedeemArgs = {
   cashLinkBump: number;
   fingerprint?: string;
   fingerprintBump?: number;
+  referrerFeeBps?: number;
+  refereeFeeBps?: number;
 };
 
 export class RedeemCashLinkArgs extends Borsh.Data<RedeemArgs> {
@@ -13,6 +15,8 @@ export class RedeemCashLinkArgs extends Borsh.Data<RedeemArgs> {
     ['cashLinkBump', 'u8'],
     ['fingerprint', { kind: 'option', type: 'string' }],
     ['fingerprintBump', { kind: 'option', type: 'u8' }],
+    ['referrerFeeBps', { kind: 'option', type: 'u16' }],
+    ['refereeFeeBps', { kind: 'option', type: 'u16' }],
   ]);
 
   instruction = 1;
@@ -34,5 +38,9 @@ export type RedeemCashLinkParams = {
   fingerprintPda?: PublicKey;
   fingerprint?: string;
   fingerprintBump?: number;
+  referrerFeeBps?: number;
+  refereeFeeBps?: number;
+  referrer?: PublicKey;
+  referrerToken?: PublicKey;
   mint?: PublicKey;
 };
