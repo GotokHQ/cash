@@ -1,4 +1,4 @@
-import { Commitment, PublicKey } from '@solana/web3.js';
+import { Commitment } from '@solana/web3.js';
 import { CashLinkDistributionType } from 'src/accounts';
 export interface InitializeCashLinkInput {
   wallet: string;
@@ -44,7 +44,7 @@ export interface RedeemCashLinkInput extends CashLinkInput {
   asLegacyTransaction: boolean;
   referrerFeeBps?: number;
   refereeFeeBps?: number;
-  referrer?: PublicKey;
+  referrer?: string;
 }
 
 export interface SettleAndTransferInput {
