@@ -832,7 +832,7 @@ export class CashLinkClient {
       referrer,
       referrerToken,
       refereeFeeBps: input.refereeFeeBps,
-      referrerFeeBps: input.refereeFeeBps,
+      referrerFeeBps: input.referrerFeeBps,
     });
     const instructions = [];
     instructions.push(redeemInstruction);
