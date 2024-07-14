@@ -784,7 +784,7 @@ export class CashLinkClient {
     let referrer: PublicKey | undefined;
     let referrerToken: PublicKey | undefined;
     if (input.referrerFeeBps) {
-      referrer = new PublicKey(referrer);
+      referrer = new PublicKey(input.referrer);
       referrerToken = spl.getAssociatedTokenAddressSync(mint, referrer, true);
     }
     if (mint.equals(spl.NATIVE_MINT)) {
