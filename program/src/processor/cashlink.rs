@@ -11,9 +11,9 @@ use crate::{
     },
     utils::{
         assert_account_key, assert_initialized, assert_owned_by, assert_signer,
-        assert_token_owned_by, calculate_fee, cmp_pubkeys, create_associated_token_account_raw,
-        create_new_account_raw, empty_account_balance, exists, get_random_value, native_transfer,
-        spl_token_close, spl_token_init, spl_token_transfer,
+        assert_token_owned_by, calculate_fee, create_associated_token_account_raw,
+        create_new_account_raw, empty_account_balance, exists, get_random_value,
+        spl_token_close, spl_token_transfer,
     },
 };
 
@@ -27,7 +27,7 @@ use solana_program::{
     sysvar::{clock::Clock, slot_hashes, Sysvar},
 };
 use spl_associated_token_account::get_associated_token_address;
-use spl_token::{native_mint, state::Account as TokenAccount};
+use spl_token::state::Account as TokenAccount;
 
 pub struct Processor;
 
@@ -150,13 +150,11 @@ pub fn process_init_cash_link(
         Some(CashError::InvalidVaultTokenOwner),
     )?;
     if exists(vault_token_info)? {
-        msg!("Cash link has a mint and an existing vault token. Validate the vault token");
         let vault_token: TokenAccount = assert_initialized(vault_token_info)?;
         assert_owned_by(vault_token_info, &spl_token::id())?;
         assert_token_owned_by(&vault_token, cash_link_info.key)?;
         assert_account_key(mint_info, &vault_token.mint, Some(CashError::InvalidMint))?;
     } else {
-        msg!("Cash link has a mint. Create an associated token account for the value");
         create_associated_token_account_raw(
             fee_payer_info,
             vault_token_info,
@@ -199,7 +197,6 @@ fn create_cash_link<'a>(
                 CashLink::LEN,
                 signer_seeds,
             )?;
-            msg!("New cash_link account was created");
             Ok(CashLink::unpack_unchecked(
                 &cash_link_info.data.borrow_mut(),
             )?)
@@ -270,36 +267,21 @@ pub fn process_cancel(
         Some(CashError::InvalidVaultTokenOwner),
     )?;
     if vault_token.amount > 0 {
-        if cmp_pubkeys(&cash_link.mint, &native_mint::id()) {
-            assert_account_key(
-                owner_token_info,
-                &cash_link.owner,
-                Some(CashError::InvalidOwner),
-            )?;
-            spl_token_close(
-                vault_token_info,
-                fee_payer_info,
-                cash_link_info,
-                &[&signer_seeds],
-            )?;
-            native_transfer(fee_payer_info, owner_token_info, vault_token.amount, &[])?;
-        } else {
-            let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
-            assert_token_owned_by(&owner_token, &cash_link.owner)?;
-            spl_token_transfer(
-                vault_token_info,
-                owner_token_info,
-                cash_link_info,
-                vault_token.amount,
-                &[&signer_seeds],
-            )?;
-            spl_token_close(
-                vault_token_info,
-                fee_payer_info,
-                cash_link_info,
-                &[&signer_seeds],
-            )?;
-        }
+        let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
+        assert_token_owned_by(&owner_token, &cash_link.owner)?;
+        spl_token_transfer(
+            vault_token_info,
+            owner_token_info,
+            cash_link_info,
+            vault_token.amount,
+            &[&signer_seeds],
+        )?;
+        spl_token_close(
+            vault_token_info,
+            fee_payer_info,
+            cash_link_info,
+            &[&signer_seeds],
+        )?;
     } else {
         spl_token_close(
             vault_token_info,
@@ -445,8 +427,6 @@ pub fn process_redemption(
     let mut total = amount_to_redeem
         .checked_add(total_fee_to_redeem)
         .ok_or::<ProgramError>(CashError::Overflow.into())?;
-    let _: TokenAccount = assert_initialized(fee_token_info)?;
-    assert_owned_by(fee_token_info, &spl_token::id())?;
     assert_owned_by(vault_token_info, &spl_token::id())?;
     let associated_token_account =
         get_associated_token_address(&cash_link_info.key, &cash_link.mint);
@@ -459,72 +439,38 @@ pub fn process_redemption(
     let fee_payer_token: TokenAccount = assert_initialized(fee_payer_token_info)?;
     assert_token_owned_by(&fee_payer_token, &fee_payer_info.key)?;
     assert_owned_by(fee_payer_token_info, &spl_token::id())?;
-    if cmp_pubkeys(&cash_link.mint, &native_mint::id()) {
-        create_new_account_raw(
-            &spl_token::id(),
-            recipient_token_info,
-            rent_info,
-            fee_payer_info,
-            system_account_info,
-            TokenAccount::LEN,
-            &[],
-        )?;
-        spl_token_init(
-            &spl_token::id(),
-            recipient_token_info,
-            mint_info,
-            cash_link_info,
-            &[&signer_seeds],
-        )?;
+    let _: TokenAccount = assert_initialized(fee_token_info)?;
+    assert_owned_by(fee_token_info, &spl_token::id())?;
+    if exists(recipient_token_info)? {
+        let recipient_token: TokenAccount = assert_initialized(recipient_token_info)?;
+        assert_token_owned_by(&recipient_token, &wallet_info.key)?;
+        assert_owned_by(recipient_token_info, &spl_token::id())?;
+        //subtract rent_fee
+        total_fee_to_redeem = total_fee_to_redeem
+            .checked_sub(cash_link.rent_fee_to_redeem)
+            .ok_or::<ProgramError>(CashError::Overflow.into())?;
+        total = amount_to_redeem
+            .checked_add(total_fee_to_redeem)
+            .ok_or::<ProgramError>(CashError::Overflow.into())?;
     } else {
-        if exists(recipient_token_info)? {
-            let recipient_token: TokenAccount = assert_initialized(recipient_token_info)?;
-            assert_token_owned_by(&recipient_token, &wallet_info.key)?;
-            assert_owned_by(recipient_token_info, &spl_token::id())?;
-            //subtract rent_fee
-            total_fee_to_redeem = total_fee_to_redeem
-                .checked_sub(cash_link.rent_fee_to_redeem)
-                .ok_or::<ProgramError>(CashError::Overflow.into())?;
-            total = amount_to_redeem
-                .checked_add(total_fee_to_redeem)
-                .ok_or::<ProgramError>(CashError::Overflow.into())?;
-        } else {
-            create_associated_token_account_raw(
-                fee_payer_info,
-                recipient_token_info,
-                wallet_info,
-                mint_info,
-                rent_info,
-            )?;
-        }
+        create_associated_token_account_raw(
+            fee_payer_info,
+            recipient_token_info,
+            wallet_info,
+            mint_info,
+            rent_info,
+        )?;
     }
     if vault_token.amount < total {
         return Err(InsufficientSettlementFunds.into());
     }
-    if cmp_pubkeys(&cash_link.mint, &native_mint::id()) {
-        spl_token_transfer(
-            vault_token_info,
-            recipient_token_info,
-            cash_link_info,
-            total,
-            &[&signer_seeds],
-        )?;
-        spl_token_close(
-            recipient_token_info,
-            fee_payer_info,
-            cash_link_info,
-            &[&signer_seeds],
-        )?;
-        native_transfer(fee_payer_info, wallet_info, amount_to_redeem, &[])?;
-    } else {
-        spl_token_transfer(
-            vault_token_info,
-            recipient_token_info,
-            cash_link_info,
-            amount_to_redeem,
-            &[&signer_seeds],
-        )?;
-    }
+    spl_token_transfer(
+        vault_token_info,
+        recipient_token_info,
+        cash_link_info,
+        amount_to_redeem,
+        &[&signer_seeds],
+    )?;
     if platform_fee_per_redeem > 0 {
         if let Some(referrer_fee_bps) = args.referrer_fee_bps {
             let referral_wallet_info = next_account_info(account_info_iter)?;
@@ -542,7 +488,6 @@ pub fn process_redemption(
                     rent_info,
                 )?;
             }
-
             let referee_fee_bps = match args.referee_fee_bps {
                 Some(fee) => fee,
                 None => 0,
@@ -567,62 +512,46 @@ pub fn process_redemption(
                 .ok_or(CashError::Overflow)?;
 
             if platform_fee > 0 {
-                if cmp_pubkeys(&cash_link.mint, &native_mint::id()) {
-                    native_transfer(fee_payer_info, fee_token_info, platform_fee, &[])?;
-                } else {
-                    spl_token_transfer(
-                        vault_token_info,
-                        fee_token_info,
-                        cash_link_info,
-                        platform_fee,
-                        &[&signer_seeds],
-                    )?;
-                }
-            }
-            if referrer_fee > 0 {
-                if cmp_pubkeys(&cash_link.mint, &native_mint::id()) {
-                    native_transfer(fee_payer_info, referral_wallet_info, referrer_fee, &[])?;
-                } else {
-                    spl_token_transfer(
-                        vault_token_info,
-                        referral_account_info,
-                        cash_link_info,
-                        referrer_fee,
-                        &[&signer_seeds],
-                    )?;
-                }
-            }
-            if referee_fee > 0 {
-                if cmp_pubkeys(&cash_link.mint, &native_mint::id()) {
-                    native_transfer(fee_payer_info, owner_token_info, referee_fee, &[])?;
-                } else {
-                    spl_token_transfer(
-                        vault_token_info,
-                        owner_token_info,
-                        cash_link_info,
-                        referee_fee,
-                        &[&signer_seeds],
-                    )?;
-                }
-            }
-        } else {
-            if cmp_pubkeys(&cash_link.mint, &native_mint::id()) {
-                native_transfer(fee_payer_info, fee_token_info, platform_fee_per_redeem, &[])?;
-            } else {
                 spl_token_transfer(
                     vault_token_info,
                     fee_token_info,
                     cash_link_info,
-                    platform_fee_per_redeem,
+                    platform_fee,
                     &[&signer_seeds],
                 )?;
             }
+            if referrer_fee > 0 {
+                spl_token_transfer(
+                    vault_token_info,
+                    referral_account_info,
+                    cash_link_info,
+                    referrer_fee,
+                    &[&signer_seeds],
+                )?;
+            }
+            if referee_fee > 0 {
+                spl_token_transfer(
+                    vault_token_info,
+                    owner_token_info,
+                    cash_link_info,
+                    referee_fee,
+                    &[&signer_seeds],
+                )?;
+            }
+        } else {
+            spl_token_transfer(
+                vault_token_info,
+                fee_token_info,
+                cash_link_info,
+                platform_fee_per_redeem,
+                &[&signer_seeds],
+            )?;
         }
     }
     let total_network_fee = total_fee_to_redeem
         .checked_sub(platform_fee_per_redeem)
         .ok_or::<ProgramError>(CashError::Overflow.into())?;
-    if total_network_fee > 0 && !cmp_pubkeys(&cash_link.mint, &native_mint::id()) {
+    if total_network_fee > 0 {
         spl_token_transfer(
             vault_token_info,
             fee_payer_token_info,
@@ -636,40 +565,23 @@ pub fn process_redemption(
         .checked_sub(total)
         .ok_or::<ProgramError>(CashError::Overflow.into())?;
     if cash_link.is_fully_redeemed()? {
-        if cmp_pubkeys(&cash_link.mint, &native_mint::id()) {
-            assert_account_key(
+        let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
+        assert_token_owned_by(&owner_token, &cash_link.owner)?;
+        if remaining > 0 {
+            spl_token_transfer(
+                vault_token_info,
                 owner_token_info,
-                &cash_link.owner,
-                Some(CashError::InvalidOwner),
-            )?;
-            spl_token_close(
-                vault_token_info,
-                fee_payer_info,
                 cash_link_info,
-                &[&signer_seeds],
-            )?;
-            if remaining > 0 {
-                native_transfer(fee_payer_info, owner_token_info, remaining, &[])?;
-            }
-        } else {
-            let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
-            assert_token_owned_by(&owner_token, &cash_link.owner)?;
-            if remaining > 0 {
-                spl_token_transfer(
-                    vault_token_info,
-                    owner_token_info,
-                    cash_link_info,
-                    remaining,
-                    &[&signer_seeds],
-                )?;
-            }
-            spl_token_close(
-                vault_token_info,
-                fee_payer_info,
-                cash_link_info,
+                remaining,
                 &[&signer_seeds],
             )?;
         }
+        spl_token_close(
+            vault_token_info,
+            fee_payer_info,
+            cash_link_info,
+            &[&signer_seeds],
+        )?;
     }
     if cash_link.fingerprint_enabled {
         if let Some(bump) = args.fingerprint_bump {

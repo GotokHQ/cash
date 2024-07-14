@@ -777,46 +777,33 @@ export class CashLinkClient {
     let accountKeys = [walletAddress, this.feeWallet, owner, this.feePayer];
     const mint = new PublicKey(cashLink.data.mint);
     const vaultToken = spl.getAssociatedTokenAddressSync(mint, cashLinkAddress, true);
-    let walletTokenKeyPair: Keypair | undefined;
-    let walletTokenAccount: PublicKey | undefined;
-    let ownerTokenAccount: PublicKey | undefined;
-    let feeTokenAccount: PublicKey | undefined;
     let referrer: PublicKey | undefined;
     let referrerToken: PublicKey | undefined;
     if (input.referrerFeeBps) {
       referrer = new PublicKey(input.referrer);
       referrerToken = spl.getAssociatedTokenAddressSync(mint, referrer, true);
     }
-    if (mint.equals(spl.NATIVE_MINT)) {
-      walletTokenKeyPair = Keypair.generate();
-      walletTokenAccount = walletTokenKeyPair.publicKey;
-      ownerTokenAccount = owner;
-      feeTokenAccount = this.feeWallet;
-    } else {
-      walletTokenAccount = spl.getAssociatedTokenAddressSync(mint, walletAddress, true);
-      ownerTokenAccount = await this.getOrCreateAssociatedAccount(
-        mint,
-        accountKeys[2],
-        input.commitment,
-      );
-      feeTokenAccount = await this.getOrCreateAssociatedAccount(
-        mint,
-        accountKeys[1],
-        input.commitment,
-      );
-    }
+    const walletTokenAccount = spl.getAssociatedTokenAddressSync(mint, walletAddress, true);
+    const ownerTokenAccount = await this.getOrCreateAssociatedAccount(
+      mint,
+      accountKeys[2],
+      input.commitment,
+    );
+    const feeTokenAccount = await this.getOrCreateAssociatedAccount(
+      mint,
+      accountKeys[1],
+      input.commitment,
+    );
     accountKeys = await Promise.all([
       walletTokenAccount,
       feeTokenAccount,
       ownerTokenAccount,
       await this.getOrCreateAssociatedAccount(mint, accountKeys[3], input.commitment),
     ]);
-    const walletTokenIsSigner = !!walletTokenKeyPair;
     const redeemInstruction = await this.redeemInstruction({
       mint,
       cashLinkBump,
       passKey,
-      walletTokenIsSigner,
       wallet: walletAddress,
       walletToken: accountKeys[0],
       platformFeeToken: accountKeys[1],
@@ -837,9 +824,6 @@ export class CashLinkClient {
     const instructions = [];
     instructions.push(redeemInstruction);
     const signers = [];
-    if (walletTokenIsSigner) {
-      signers.push(walletTokenKeyPair);
-    }
     return {
       instructions,
       signers,
@@ -861,7 +845,7 @@ export class CashLinkClient {
         isSigner: false,
         isWritable: true,
       },
-      { pubkey: params.walletToken, isSigner: params.walletTokenIsSigner, isWritable: true },
+      { pubkey: params.walletToken, isSigner: false, isWritable: true },
       {
         pubkey: params.mint,
         isSigner: false,
