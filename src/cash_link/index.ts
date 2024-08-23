@@ -244,18 +244,19 @@ export class CashLinkClient {
     }
     const owner = new PublicKey(cashLink.data.owner);
     const mint = new PublicKey(cashLink.data.mint);
+    const programId = new PublicKey(input.tokenProgramId);
     let ownerTokenAccount: PublicKey | undefined;
     if (mint.equals(spl.NATIVE_MINT)) {
       ownerTokenAccount = owner;
     } else {
-      ownerTokenAccount = spl.getAssociatedTokenAddressSync(mint, owner, true);
+      ownerTokenAccount = spl.getAssociatedTokenAddressSync(mint, owner, true, programId);
     }
     const instructions = [];
     const cancelInstruction = await this.cancelInstruction({
       authority: this.authority,
       cashLink: cashLink.pubkey,
       ownerToken: ownerTokenAccount,
-      vaultToken: spl.getAssociatedTokenAddressSync(mint, cashLink.pubkey, true),
+      vaultToken: spl.getAssociatedTokenAddressSync(mint, cashLink.pubkey, true, programId),
       feePayer: this.feePayer,
       passKey: new PublicKey(input.passKey),
       tokenProgramId: new PublicKey(input.tokenProgramId),
@@ -478,6 +479,7 @@ export class CashLinkClient {
     const owner = new PublicKey(input.wallet);
     const mint: PublicKey = new PublicKey(input.mint);
     const passKey = new PublicKey(input.passKey);
+    const tokenProgramId = new PublicKey(input.tokenProgramId);
     const [cashLink, cashLinkBump] = await CashProgram.findCashLinkAccount(passKey);
     const amount = new BN(input.amount);
     const networkFee = new BN(input.networkFee ?? 0);
@@ -493,7 +495,7 @@ export class CashLinkClient {
       ownerTokenKeyPair = Keypair.generate();
       ownerTokenAccount = ownerTokenKeyPair.publicKey;
     } else {
-      ownerTokenAccount = spl.getAssociatedTokenAddressSync(mint, owner, true);
+      ownerTokenAccount = spl.getAssociatedTokenAddressSync(mint, owner, true, tokenProgramId);
     }
     const initParams: InitCashLinkParams = {
       mint,
@@ -515,7 +517,7 @@ export class CashLinkClient {
       distributionType: input.distributionType,
       fingerprintEnabled: input.fingerprintEnabled,
       numDaysToExpire: input.numDaysToExpire ?? 1,
-      tokenProgramId: new PublicKey(input.tokenProgramId),
+      tokenProgramId: tokenProgramId,
     };
     const instructions = [];
     if (ownerTokenKeyPair) {
@@ -755,6 +757,7 @@ export class CashLinkClient {
     signers: Keypair[];
   }> => {
     const passKey = new PublicKey(input.passKey);
+    const tokenProgramId = new PublicKey(input.tokenProgramId);
     const [cashLinkAddress, cashLinkBump] = await CashProgram.findCashLinkAccount(passKey);
     const cashLink = await _getCashLinkAccount(this.connection, cashLinkAddress, input.commitment);
     if (cashLink == null) {
@@ -779,31 +782,47 @@ export class CashLinkClient {
     const owner = new PublicKey(cashLink.data.owner);
     let accountKeys = [walletAddress, this.feeWallet, owner, this.feePayer];
     const mint = new PublicKey(cashLink.data.mint);
-    const vaultToken = spl.getAssociatedTokenAddressSync(mint, cashLinkAddress, true);
+    const vaultToken = spl.getAssociatedTokenAddressSync(
+      mint,
+      cashLinkAddress,
+      true,
+      tokenProgramId,
+    );
     let referrer: PublicKey | undefined;
     let referrerToken: PublicKey | undefined;
     if (input.referrerFeeBps) {
       referrer = new PublicKey(input.referrer);
-      referrerToken = spl.getAssociatedTokenAddressSync(mint, referrer, true);
+      referrerToken = spl.getAssociatedTokenAddressSync(mint, referrer, true, tokenProgramId);
     }
-    const walletTokenAccount = spl.getAssociatedTokenAddressSync(mint, walletAddress, true);
+    const walletTokenAccount = spl.getAssociatedTokenAddressSync(
+      mint,
+      walletAddress,
+      true,
+      tokenProgramId,
+    );
     const ownerTokenAccount = await this.getOrCreateAssociatedAccount(
       mint,
       accountKeys[2],
+      tokenProgramId,
       input.commitment,
     );
     const feeTokenAccount = await this.getOrCreateAssociatedAccount(
       mint,
       accountKeys[1],
+      tokenProgramId,
       input.commitment,
     );
     accountKeys = await Promise.all([
       walletTokenAccount,
       feeTokenAccount,
       ownerTokenAccount,
-      await this.getOrCreateAssociatedAccount(mint, accountKeys[3], input.commitment),
+      await this.getOrCreateAssociatedAccount(
+        mint,
+        accountKeys[3],
+        tokenProgramId,
+        input.commitment,
+      ),
     ]);
-    const tokenProgramId = new PublicKey(input.tokenProgramId);
     const redeemInstruction = await this.redeemInstruction({
       mint,
       cashLinkBump,
@@ -933,10 +952,11 @@ export class CashLinkClient {
   getVault = async (
     cashLink: PublicKey,
     mint: PublicKey,
+    tokenProgramId: PublicKey,
     commitment?: Commitment,
   ): Promise<spl.Account | null> => {
     try {
-      const vault = spl.getAssociatedTokenAddressSync(mint, cashLink, true);
+      const vault = spl.getAssociatedTokenAddressSync(mint, cashLink, true, tokenProgramId);
       return await spl.getAccount(this.connection, vault, commitment);
     } catch (error: unknown) {
       if (
@@ -975,10 +995,11 @@ export class CashLinkClient {
   getOrCreateAssociatedAccount = async (
     mint: PublicKey,
     owner: PublicKey,
+    tokenProgramId: PublicKey,
     commitment?: Commitment,
   ): Promise<PublicKey> => {
     try {
-      const associatedToken = spl.getAssociatedTokenAddressSync(mint, owner, true);
+      const associatedToken = spl.getAssociatedTokenAddressSync(mint, owner, true, tokenProgramId);
       const acc = await this._getAccount(associatedToken, commitment);
       if (acc === null) {
         const instruction = spl.createAssociatedTokenAccountInstruction(
@@ -986,6 +1007,7 @@ export class CashLinkClient {
           associatedToken,
           owner,
           mint,
+          tokenProgramId,
         );
         const { value } = await this.connection.getLatestBlockhashAndContext(commitment);
         const transaction = new Transaction();
