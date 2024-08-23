@@ -258,6 +258,7 @@ export class CashLinkClient {
       vaultToken: spl.getAssociatedTokenAddressSync(mint, cashLink.pubkey, true),
       feePayer: this.feePayer,
       passKey: new PublicKey(input.passKey),
+      tokenProgramId: new PublicKey(input.tokenProgramId),
       cashLinkBump,
     });
     instructions.push(cancelInstruction);
@@ -285,7 +286,7 @@ export class CashLinkClient {
         isWritable: false,
       },
       {
-        pubkey: spl.TOKEN_PROGRAM_ID,
+        pubkey: params.tokenProgramId,
         isSigner: false,
         isWritable: false,
       },
@@ -514,6 +515,7 @@ export class CashLinkClient {
       distributionType: input.distributionType,
       fingerprintEnabled: input.fingerprintEnabled,
       numDaysToExpire: input.numDaysToExpire ?? 1,
+      tokenProgramId: new PublicKey(input.tokenProgramId),
     };
     const instructions = [];
     if (ownerTokenKeyPair) {
@@ -576,6 +578,7 @@ export class CashLinkClient {
       numDaysToExpire,
       ownerTokenAccount,
       ownerTokenAccountIsSigner,
+      tokenProgramId,
     } = params;
     const data = InitCashLinkArgs.serialize({
       amount,
@@ -647,7 +650,7 @@ export class CashLinkClient {
         isWritable: false,
       },
       {
-        pubkey: spl.TOKEN_PROGRAM_ID,
+        pubkey: tokenProgramId,
         isSigner: false,
         isWritable: false,
       },
@@ -800,6 +803,7 @@ export class CashLinkClient {
       ownerTokenAccount,
       await this.getOrCreateAssociatedAccount(mint, accountKeys[3], input.commitment),
     ]);
+    const tokenProgramId = new PublicKey(input.tokenProgramId);
     const redeemInstruction = await this.redeemInstruction({
       mint,
       cashLinkBump,
@@ -818,6 +822,7 @@ export class CashLinkClient {
       fingerprintPda,
       referrer,
       referrerToken,
+      tokenProgramId,
       refereeFeeBps: input.refereeFeeBps,
       referrerFeeBps: input.referrerFeeBps,
     });
@@ -868,6 +873,11 @@ export class CashLinkClient {
       },
       {
         pubkey: SystemProgram.programId,
+        isSigner: false,
+        isWritable: false,
+      },
+      {
+        pubkey: params.tokenProgramId,
         isSigner: false,
         isWritable: false,
       },

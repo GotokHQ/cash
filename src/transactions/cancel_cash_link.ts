@@ -22,4 +22,5 @@ export type CancelCashLinkParams = {
   vaultToken?: PublicKey | null;
   feePayer: PublicKey;
   cashLinkBump: number;
+  tokenProgramId: PublicKey;
 };

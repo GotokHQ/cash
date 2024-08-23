@@ -67,4 +67,5 @@ export type InitCashLinkParams = {
   minAmount?: BN;
   fingerprintEnabled?: boolean;
   numDaysToExpire: number;
+  tokenProgramId: PublicKey;
 };

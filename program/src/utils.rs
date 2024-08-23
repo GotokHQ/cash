@@ -17,8 +17,9 @@ use solana_program::{
     sysvar::{rent::Rent, Sysvar},
     clock::Clock,
 };
-use spl_token::state::Account;
+use spl_token_2022::state::Account;
 use spl_associated_token_account::instruction::create_associated_token_account;
+
 
 use arrayref::array_ref;
 
@@ -53,6 +54,17 @@ pub fn assert_owned_by(account: &AccountInfo, owner: &Pubkey) -> ProgramResult {
 pub fn assert_token_owned_by(token: &Account, owner: &Pubkey) -> ProgramResult {
     if !cmp_pubkeys(&token.owner, owner) {
         Err(CashError::InvalidOwner.into())
+    } else {
+        Ok(())
+    }
+}
+
+/// Assert valid key
+pub fn assert_valid_token_program(
+    key: &Pubkey,
+) -> ProgramResult {
+    if !(cmp_pubkeys(&spl_token::id(), &key) || cmp_pubkeys(&spl_token_2022::id(), &key)) {
+        Err(ProgramError::InvalidArgument)
     } else {
         Ok(())
     }
@@ -113,6 +125,7 @@ pub fn transfer<'a>(
     destination_account_info: &AccountInfo<'a>,
     owner_account_info: &AccountInfo<'a>,
     amount: u64,
+    token_id: &Pubkey,
     signers_seeds: &[&[&[u8]]],
 ) -> Result<(), ProgramError> {
     if is_native {
@@ -122,6 +135,7 @@ pub fn transfer<'a>(
             source_account_info,
             destination_account_info,
             owner_account_info,
+            token_id,
             amount,
             signers_seeds,
         )
@@ -133,11 +147,12 @@ pub fn spl_token_transfer<'a>(
     source: &AccountInfo<'a>,
     destination: &AccountInfo<'a>,
     authority: &AccountInfo<'a>,
+    token_id: &Pubkey,
     amount: u64,
     signers_seeds: &[&[&[u8]]],
 ) -> Result<(), ProgramError> {
     let ix = spl_token::instruction::transfer(
-        &spl_token::id(),
+        token_id,
         source.key,
         destination.key,
         authority.key,
@@ -172,16 +187,16 @@ pub fn spl_token_close<'a>(
     source: &AccountInfo<'a>,
     destination: &AccountInfo<'a>,
     authority: &AccountInfo<'a>,
+    token_id: &Pubkey,
     signers_seeds: &[&[&[u8]]],
 ) -> Result<(), ProgramError> {
     let ix = spl_token::instruction::close_account(
-        &spl_token::id(),
+        token_id,
         source.key,
         destination.key,
         authority.key,
         &[],
     )?;
-
     invoke_signed(
         &ix,
         &[source.clone(), destination.clone(), authority.clone()],
@@ -273,9 +288,10 @@ pub fn create_associated_token_account_raw<'a>(
     wallet_info: &AccountInfo<'a>,
     mint_info: &AccountInfo<'a>,
     rent_sysvar_info: &AccountInfo<'a>,
+    token_program_id: &Pubkey
 ) -> ProgramResult {
     invoke(
-        &create_associated_token_account(payer_info.key, wallet_info.key, mint_info.key, &spl_token::id()),
+        &create_associated_token_account(payer_info.key, wallet_info.key, mint_info.key, &token_program_id),
         &[
             payer_info.clone(),
             vault_token_info.clone(),

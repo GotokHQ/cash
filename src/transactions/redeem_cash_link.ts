@@ -41,5 +41,6 @@ export type RedeemCashLinkParams = {
   refereeFeeBps?: number;
   referrer?: PublicKey;
   referrerToken?: PublicKey;
-  mint?: PublicKey;
+  mint: PublicKey;
+  tokenProgramId: PublicKey;
 };

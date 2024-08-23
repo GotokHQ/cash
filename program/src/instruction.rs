@@ -7,7 +7,7 @@ use solana_program::{
     pubkey::Pubkey,
     system_program, sysvar,
 };
-use spl_associated_token_account::get_associated_token_address;
+use spl_associated_token_account::get_associated_token_address_with_program_id;
 
 use crate::state::cashlink::DistributionType;
 
@@ -108,11 +108,10 @@ pub enum CashInstruction {
     /// 2. `[]` The pass key required to unlock the cash link for redemption   
     /// 3. `[writable]` The owner associated token account of the owner if it's not a native mint
     /// 4. `[writable]` The fee payer token account to receive tokens from the vault
-    /// 5. `[]` The clock account
-    /// 6. `[]` The rent account
-    /// 7. `[writable]` The vault token account to get tokens from and eventually close. This value is Optional. if the mint is set, then this must be set.
-    /// 8. `[]` The token program
-    /// 9. `[]` The system program
+    /// 5. `[writable]` The vault token account to get tokens from and eventually close. This value is Optional. if the mint is set, then this must be set.
+    /// 6. `[]` The clock account 
+    /// 7. `[]` The token program
+    /// 8. `[]` The system program   
     Cancel(CancelCashRedemptionArgs),
     /// Close the cash_link
     ///
@@ -134,6 +133,7 @@ pub fn init_cash_link(
     cash_link_pda: &Pubkey,
     pass_key: &Pubkey,
     mint: &Pubkey,
+    token_program_id: &Pubkey,
     args: InitCashLinkArgs,
 ) -> Instruction {
     let accounts = vec![
@@ -145,10 +145,10 @@ pub fn init_cash_link(
         AccountMeta::new_readonly(*mint, false),
         AccountMeta::new_readonly(sysvar::rent::id(), false),
         AccountMeta::new_readonly(system_program::id(), false),
-        AccountMeta::new_readonly(sysvar::clock::id(), false),
-        AccountMeta::new(get_associated_token_address(cash_link_pda, &mint), false),
-        AccountMeta::new(get_associated_token_address(owner, &mint), false),        
-        AccountMeta::new_readonly(spl_token::id(), false),
+        AccountMeta::new_readonly(sysvar::clock::id(), false),   
+        AccountMeta::new_readonly(*token_program_id, false),
+        AccountMeta::new(get_associated_token_address_with_program_id(cash_link_pda, &mint, token_program_id), false),
+        AccountMeta::new(get_associated_token_address_with_program_id(owner, &mint, token_program_id), false),     
         AccountMeta::new_readonly(spl_associated_token_account::id(), false),
     ];
 
@@ -168,6 +168,7 @@ pub fn cancel_cash_link(
     owner_token: &Pubkey,
     vault_token: &Pubkey,
     fee_payer: &Pubkey,
+    token_program_id: &Pubkey,
     args: CancelCashRedemptionArgs,
 ) -> Instruction {
     let accounts = vec![
@@ -178,8 +179,8 @@ pub fn cancel_cash_link(
         AccountMeta::new(*fee_payer, false),
         AccountMeta::new(*vault_token, false),
         AccountMeta::new_readonly(sysvar::clock::id(), false),
-        AccountMeta::new_readonly(spl_token::id(), false),
-        AccountMeta::new_readonly(system_program::id(), false)
+        AccountMeta::new_readonly(*token_program_id, false),
+        AccountMeta::new_readonly(system_program::id(), false),
     ];
 
     Instruction::new_with_borsh(
@@ -206,6 +207,7 @@ pub fn redeem_cash_link(
     referral_token: Option<&Pubkey>,
     fingerprint: Option<&Pubkey>,
     mint: &Pubkey,
+    token_program_id: &Pubkey,
     args: InitCashRedemptionArgs
 ) -> Instruction {
     let mut accounts = vec![
@@ -224,6 +226,7 @@ pub fn redeem_cash_link(
         AccountMeta::new_readonly(sysvar::rent::id(), false),
         AccountMeta::new_readonly(sysvar::slot_hashes::id(), false),
         AccountMeta::new_readonly(system_program::id(), false),
+        AccountMeta::new_readonly(*token_program_id, false),
     ];
     if let Some(referral) = referral_wallet {
         accounts.push(AccountMeta::new(*referral, false));
@@ -234,7 +237,6 @@ pub fn redeem_cash_link(
     if let Some(fingerprint_id) = fingerprint {
         accounts.push(AccountMeta::new(*fingerprint_id, false));
     }
-    accounts.push(AccountMeta::new_readonly(spl_token::id(), false));
     accounts.push(AccountMeta::new_readonly(spl_associated_token_account::id(), false));
 
     Instruction::new_with_borsh(
@@ -249,7 +251,7 @@ pub fn close_cash_link(
     program_id: &Pubkey,
     authority: &Pubkey,
     cash_link: &Pubkey,
-    destination: &Pubkey,
+    destination: &Pubkey
 ) -> Instruction {
     let accounts = vec![
         AccountMeta::new_readonly(*authority, true),

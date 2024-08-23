@@ -20,6 +20,7 @@ export interface InitializeCashLinkInput {
   numDaysToExpire?: number;
   addressLookupTable?: string;
   asLegacyTransaction: boolean;
+  tokenProgramId: string;
 }
 
 export interface ResultContext {
@@ -36,6 +37,7 @@ export interface CashLinkInput {
   computeBudget?: number;
   addressLookupTable?: string;
   asLegacyTransaction: boolean;
+  tokenProgramId: string;
 }
 
 export interface RedeemCashLinkInput extends CashLinkInput {
@@ -45,6 +47,7 @@ export interface RedeemCashLinkInput extends CashLinkInput {
   referrerFeeBps?: number;
   refereeFeeBps?: number;
   referrer?: string;
+  tokenProgramId: string;
 }
 
 export interface SettleAndTransferInput {

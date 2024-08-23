@@ -10,10 +10,7 @@ use crate::{
         AccountType, FINGERPRINT_PREFIX, FLAG_ACCOUNT_SIZE,
     },
     utils::{
-        assert_account_key, assert_initialized, assert_owned_by, assert_signer,
-        assert_token_owned_by, calculate_fee, create_associated_token_account_raw,
-        create_new_account_raw, empty_account_balance, exists, get_random_value,
-        spl_token_close, spl_token_transfer,
+        assert_account_key, assert_initialized, assert_owned_by, assert_signer, assert_token_owned_by, assert_valid_token_program, calculate_fee, create_associated_token_account_raw, create_new_account_raw, empty_account_balance, exists, get_random_value, spl_token_close, spl_token_transfer
     },
 };
 
@@ -27,7 +24,7 @@ use solana_program::{
     sysvar::{clock::Clock, slot_hashes, Sysvar},
 };
 use spl_associated_token_account::get_associated_token_address;
-use spl_token::state::Account as TokenAccount;
+use spl_token_2022::state::Account as TokenAccount;
 
 pub struct Processor;
 
@@ -53,6 +50,9 @@ pub fn process_init_cash_link(
 
     let clock = &Clock::from_account_info(clock_info)?;
 
+    let token_program_info = next_account_info(account_info_iter)?;
+
+    assert_valid_token_program(&token_program_info.key)?;
     msg!("Start to read the mint info for the cashlink");
     let mut cash_link = create_cash_link(
         program_id,
@@ -151,7 +151,7 @@ pub fn process_init_cash_link(
     )?;
     if exists(vault_token_info)? {
         let vault_token: TokenAccount = assert_initialized(vault_token_info)?;
-        assert_owned_by(vault_token_info, &spl_token::id())?;
+        assert_owned_by(vault_token_info, &token_program_info.key)?;
         assert_token_owned_by(&vault_token, cash_link_info.key)?;
         assert_account_key(mint_info, &vault_token.mint, Some(CashError::InvalidMint))?;
     } else {
@@ -161,12 +161,13 @@ pub fn process_init_cash_link(
             cash_link_info,
             mint_info,
             rent_info,
+            &token_program_info.key
         )?;
     }
-    assert_owned_by(owner_token_info, &spl_token::id())?;
+    assert_owned_by(owner_token_info, &token_program_info.key)?;
     let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
     assert_token_owned_by(&owner_token, owner_info.key)?;
-    spl_token_transfer(owner_token_info, vault_token_info, owner_info, total, &[])?;
+    spl_token_transfer(owner_token_info, vault_token_info, owner_info, &token_program_info.key, total, &[])?;
     //spl_token_transfer(owner_token_info, fee_token_info, owner_info, total_platform_fee, &[])?;
     CashLink::pack(cash_link, &mut cash_link_info.data.borrow_mut())?;
     Ok(())
@@ -240,6 +241,10 @@ pub fn process_cancel(
     let clock_info = next_account_info(account_info_iter)?;
     let clock = &Clock::from_account_info(clock_info)?;
 
+
+    let token_program_info = next_account_info(account_info_iter)?;
+    assert_valid_token_program(&token_program_info.key)?;
+
     if cash_link.expired() {
         return Err(AccountAlreadyExpired.into());
     }
@@ -273,6 +278,7 @@ pub fn process_cancel(
             vault_token_info,
             owner_token_info,
             cash_link_info,
+            &token_program_info.key,
             vault_token.amount,
             &[&signer_seeds],
         )?;
@@ -280,6 +286,7 @@ pub fn process_cancel(
             vault_token_info,
             fee_payer_info,
             cash_link_info,
+            &token_program_info.key,
             &[&signer_seeds],
         )?;
     } else {
@@ -287,6 +294,7 @@ pub fn process_cancel(
             vault_token_info,
             fee_payer_info,
             cash_link_info,
+            &token_program_info.key,
             &[&signer_seeds],
         )?;
     }
@@ -344,6 +352,7 @@ pub fn process_redemption(
     let rent_info = next_account_info(account_info_iter)?;
     let recent_slothashes_info = next_account_info(account_info_iter)?;
     let system_account_info = next_account_info(account_info_iter)?;
+    let token_program_info = next_account_info(account_info_iter)?;
     if clock.unix_timestamp as u64 > cash_link.expires_at {
         return Err(CashError::CashlinkExpired.into());
     }
@@ -352,6 +361,8 @@ pub fn process_redemption(
         &slot_hashes::id(),
         Some(CashError::InvalidSlotHashProgram.into()),
     )?;
+
+    assert_valid_token_program(&token_program_info.key)?;
 
     let signer_seeds = [
         CashLink::PREFIX.as_bytes(),
@@ -427,7 +438,7 @@ pub fn process_redemption(
     let mut total = amount_to_redeem
         .checked_add(total_fee_to_redeem)
         .ok_or::<ProgramError>(CashError::Overflow.into())?;
-    assert_owned_by(vault_token_info, &spl_token::id())?;
+    assert_owned_by(vault_token_info, &token_program_info.key)?;
     let associated_token_account =
         get_associated_token_address(&cash_link_info.key, &cash_link.mint);
     assert_account_key(
@@ -438,13 +449,13 @@ pub fn process_redemption(
     let vault_token: TokenAccount = assert_initialized(vault_token_info)?;
     let fee_payer_token: TokenAccount = assert_initialized(fee_payer_token_info)?;
     assert_token_owned_by(&fee_payer_token, &fee_payer_info.key)?;
-    assert_owned_by(fee_payer_token_info, &spl_token::id())?;
+    assert_owned_by(fee_payer_token_info, &token_program_info.key)?;
     let _: TokenAccount = assert_initialized(fee_token_info)?;
-    assert_owned_by(fee_token_info, &spl_token::id())?;
+    assert_owned_by(fee_token_info, &token_program_info.key)?;
     if exists(recipient_token_info)? {
         let recipient_token: TokenAccount = assert_initialized(recipient_token_info)?;
         assert_token_owned_by(&recipient_token, &wallet_info.key)?;
-        assert_owned_by(recipient_token_info, &spl_token::id())?;
+        assert_owned_by(recipient_token_info, &token_program_info.key)?;
         //subtract rent_fee
         total_fee_to_redeem = total_fee_to_redeem
             .checked_sub(cash_link.rent_fee_to_redeem)
@@ -459,6 +470,7 @@ pub fn process_redemption(
             wallet_info,
             mint_info,
             rent_info,
+            &token_program_info.key,
         )?;
     }
     if vault_token.amount < total {
@@ -468,6 +480,7 @@ pub fn process_redemption(
         vault_token_info,
         recipient_token_info,
         cash_link_info,
+        &token_program_info.key,
         amount_to_redeem,
         &[&signer_seeds],
     )?;
@@ -478,7 +491,7 @@ pub fn process_redemption(
             if exists(referral_account_info)? {
                 let referral_token: TokenAccount = assert_initialized(referral_account_info)?;
                 assert_token_owned_by(&referral_token, &referral_wallet_info.key)?;
-                assert_owned_by(referral_account_info, &spl_token::id())?;
+                assert_owned_by(referral_account_info, &token_program_info.key)?;
             } else {
                 create_associated_token_account_raw(
                     fee_payer_info,
@@ -486,6 +499,7 @@ pub fn process_redemption(
                     referral_wallet_info,
                     mint_info,
                     rent_info,
+                    &token_program_info.key
                 )?;
             }
             let referee_fee_bps = match args.referee_fee_bps {
@@ -516,6 +530,7 @@ pub fn process_redemption(
                     vault_token_info,
                     fee_token_info,
                     cash_link_info,
+                    &token_program_info.key,
                     platform_fee,
                     &[&signer_seeds],
                 )?;
@@ -525,6 +540,7 @@ pub fn process_redemption(
                     vault_token_info,
                     referral_account_info,
                     cash_link_info,
+                    &token_program_info.key,
                     referrer_fee,
                     &[&signer_seeds],
                 )?;
@@ -534,6 +550,7 @@ pub fn process_redemption(
                     vault_token_info,
                     owner_token_info,
                     cash_link_info,
+                    &token_program_info.key,
                     referee_fee,
                     &[&signer_seeds],
                 )?;
@@ -543,6 +560,7 @@ pub fn process_redemption(
                 vault_token_info,
                 fee_token_info,
                 cash_link_info,
+                &token_program_info.key,
                 platform_fee_per_redeem,
                 &[&signer_seeds],
             )?;
@@ -556,6 +574,7 @@ pub fn process_redemption(
             vault_token_info,
             fee_payer_token_info,
             cash_link_info,
+            &token_program_info.key,
             total_network_fee,
             &[&signer_seeds],
         )?;
@@ -572,6 +591,7 @@ pub fn process_redemption(
                 vault_token_info,
                 owner_token_info,
                 cash_link_info,
+                &token_program_info.key,
                 remaining,
                 &[&signer_seeds],
             )?;
@@ -580,6 +600,7 @@ pub fn process_redemption(
             vault_token_info,
             fee_payer_info,
             cash_link_info,
+            &token_program_info.key,
             &[&signer_seeds],
         )?;
     }
