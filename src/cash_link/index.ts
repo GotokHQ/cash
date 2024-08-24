@@ -749,7 +749,6 @@ export class CashLinkClient {
     }
     const walletAddress = new PublicKey(input.walletAddress);
     const owner = new PublicKey(cashLink.data.owner);
-    let accountKeys = [walletAddress, this.feeWallet, owner, this.feePayer];
     const mint = new PublicKey(cashLink.data.mint);
     const vaultToken = spl.getAssociatedTokenAddressSync(
       mint,
@@ -769,38 +768,39 @@ export class CashLinkClient {
       true,
       tokenProgramId,
     );
+    console.log('start get ownerTokenAccount');
     const ownerTokenAccount = await this.getOrCreateAssociatedAccount(
       mint,
-      accountKeys[2],
+      owner,
       tokenProgramId,
       input.commitment,
     );
+    console.log('done get ownerTokenAccount', ownerTokenAccount.toBase58());
+    console.log('start get feeTokenAccount');
     const feeTokenAccount = await this.getOrCreateAssociatedAccount(
       mint,
-      accountKeys[1],
+      this.feeWallet,
       tokenProgramId,
       input.commitment,
     );
-    accountKeys = await Promise.all([
-      walletTokenAccount,
-      feeTokenAccount,
-      ownerTokenAccount,
-      await this.getOrCreateAssociatedAccount(
-        mint,
-        accountKeys[3],
-        tokenProgramId,
-        input.commitment,
-      ),
-    ]);
+    console.log('done get feeTokenAccount', feeTokenAccount.toBase58());
+    console.log('start get feePayerTokenAccount');
+    const feePayerTokenAccount = await this.getOrCreateAssociatedAccount(
+      mint,
+      this.feePayer,
+      tokenProgramId,
+      input.commitment,
+    );
+    console.log('done get feePayerTokenAccount', feePayerTokenAccount.toBase58());
     const redeemInstruction = await this.redeemInstruction({
       mint,
       cashLinkBump,
       passKey,
       wallet: walletAddress,
-      walletToken: accountKeys[0],
-      platformFeeToken: accountKeys[1],
-      ownerToken: accountKeys[2],
-      feePayerToken: accountKeys[3],
+      walletToken: walletTokenAccount,
+      platformFeeToken: feeTokenAccount,
+      ownerToken: ownerTokenAccount,
+      feePayerToken: feePayerTokenAccount,
       vaultToken,
       authority: this.authority,
       cashLink: cashLink.pubkey,
