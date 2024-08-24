@@ -53,7 +53,6 @@ pub fn process_init_cash_link(
     let token_program_info = next_account_info(account_info_iter)?;
 
     assert_valid_token_program(&token_program_info.key)?;
-    msg!("Start to read the mint info for the cashlink");
     let mut cash_link = create_cash_link(
         program_id,
         cash_link_info,

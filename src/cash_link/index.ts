@@ -245,12 +245,7 @@ export class CashLinkClient {
     const owner = new PublicKey(cashLink.data.owner);
     const mint = new PublicKey(cashLink.data.mint);
     const programId = new PublicKey(input.tokenProgramId);
-    let ownerTokenAccount: PublicKey | undefined;
-    if (mint.equals(spl.NATIVE_MINT)) {
-      ownerTokenAccount = owner;
-    } else {
-      ownerTokenAccount = spl.getAssociatedTokenAddressSync(mint, owner, true, programId);
-    }
+    const ownerTokenAccount = spl.getAssociatedTokenAddressSync(mint, owner, true, programId);
     const instructions = [];
     const cancelInstruction = await this.cancelInstruction({
       authority: this.authority,
@@ -319,6 +314,7 @@ export class CashLinkClient {
       this.feeWallet,
       SystemProgram.programId,
       spl.TOKEN_PROGRAM_ID,
+      spl.TOKEN_2022_PROGRAM_ID,
       SYSVAR_CLOCK_PUBKEY,
       ComputeBudgetProgram.programId,
       CashProgram.PUBKEY,
@@ -495,10 +491,6 @@ export class CashLinkClient {
     const maxNumRedemptions = input.maxNumRedemptions;
     const minAmount = input.minAmount ? new BN(input.minAmount) : undefined;
     const ownerTokenAccount = spl.getAssociatedTokenAddressSync(mint, owner, true, tokenProgramId);
-    console.log('Token program', tokenProgramId.toBase58());
-    console.log('Owner token', ownerTokenAccount.toBase58());
-    console.log('Owner', owner.toBase58());
-    console.log('Mint', mint.toBase58());
     const initParams: InitCashLinkParams = {
       mint,
       owner,
@@ -768,30 +760,24 @@ export class CashLinkClient {
       true,
       tokenProgramId,
     );
-    console.log('start get ownerTokenAccount');
     const ownerTokenAccount = await this.getOrCreateAssociatedAccount(
       mint,
       owner,
       tokenProgramId,
       input.commitment,
     );
-    console.log('done get ownerTokenAccount', ownerTokenAccount.toBase58());
-    console.log('start get feeTokenAccount');
     const feeTokenAccount = await this.getOrCreateAssociatedAccount(
       mint,
       this.feeWallet,
       tokenProgramId,
       input.commitment,
     );
-    console.log('done get feeTokenAccount', feeTokenAccount.toBase58());
-    console.log('start get feePayerTokenAccount');
     const feePayerTokenAccount = await this.getOrCreateAssociatedAccount(
       mint,
       this.feePayer,
       tokenProgramId,
       input.commitment,
     );
-    console.log('done get feePayerTokenAccount', feePayerTokenAccount.toBase58());
     const redeemInstruction = await this.redeemInstruction({
       mint,
       cashLinkBump,
