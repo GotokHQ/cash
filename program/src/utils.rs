@@ -214,7 +214,7 @@ pub fn spl_token_close<'a>(
     token_id: &Pubkey,
     signers_seeds: &[&[&[u8]]],
 ) -> Result<(), ProgramError> {
-    let ix = spl_token::instruction::close_account(
+    let ix = spl_token_2022::instruction::close_account(
         token_id,
         source.key,
         destination.key,
@@ -236,7 +236,7 @@ pub fn spl_token_init<'a>(
     owner: &AccountInfo<'a>,
     signers_seeds: &[&[&[u8]]],
 ) -> Result<(), ProgramError> {
-    let ix = spl_token::instruction::initialize_account3(
+    let ix = spl_token_2022::instruction::initialize_account3(
         token_program_id,
         account.key,
         mint.key,
