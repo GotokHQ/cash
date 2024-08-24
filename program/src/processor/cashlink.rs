@@ -24,7 +24,7 @@ use solana_program::{
     sysvar::{clock::Clock, slot_hashes, Sysvar},
 };
 use spl_associated_token_account::get_associated_token_address_with_program_id;
-use spl_token_2022::state::Account as TokenAccount;
+use spl_token_2022::state::{Account as TokenAccount, Mint};
 
 pub struct Processor;
 
@@ -164,10 +164,16 @@ pub fn process_init_cash_link(
             &token_program_info.key
         )?;
     }
+    msg!("Start: assert_owned_by");
     assert_owned_by(owner_token_info, &token_program_info.key)?;
-    let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
+    msg!("End: assert_owned_by");
+    msg!("Start: assert_initialized");
+    //let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
+    let owner_token = TokenAccount::unpack(&owner_token_info.data.borrow_mut())?;
+    msg!("Start: assert_initialized");
+    let mint: Mint = assert_initialized(mint_info)?;
     assert_token_owned_by(&owner_token, owner_info.key)?;
-    spl_token_transfer(owner_token_info, vault_token_info, owner_info, &token_program_info.key, total, &[])?;
+    spl_token_transfer(owner_token_info, vault_token_info, owner_info, &mint_info, &token_program_info.key, total, mint.decimals, &[])?;
     //spl_token_transfer(owner_token_info, fee_token_info, owner_info, total_platform_fee, &[])?;
     CashLink::pack(cash_link, &mut cash_link_info.data.borrow_mut())?;
     Ok(())
@@ -237,6 +243,7 @@ pub fn process_cancel(
     let owner_token_info = next_account_info(account_info_iter)?;
     let fee_payer_info = next_account_info(account_info_iter)?;
     let vault_token_info = next_account_info(account_info_iter)?;
+    let mint_info = next_account_info(account_info_iter)?;
 
     let clock_info = next_account_info(account_info_iter)?;
     let clock = &Clock::from_account_info(clock_info)?;
@@ -263,6 +270,7 @@ pub fn process_cancel(
     ];
 
     let vault_token: TokenAccount = assert_initialized(vault_token_info)?;
+    let mint: Mint = assert_initialized(mint_info)?;
     // assert_account_key(vault_token.mint, mint, Some(CashError::InvalidMint))?;
     let associated_token_account =
     get_associated_token_address_with_program_id(&cash_link_info.key, &cash_link.mint, &token_program_info.key);
@@ -278,8 +286,10 @@ pub fn process_cancel(
             vault_token_info,
             owner_token_info,
             cash_link_info,
+            mint_info,
             &token_program_info.key,
             vault_token.amount,
+            mint.decimals,
             &[&signer_seeds],
         )?;
         spl_token_close(
@@ -447,6 +457,7 @@ pub fn process_redemption(
         Some(CashError::InvalidVaultTokenOwner),
     )?;
     let vault_token: TokenAccount = assert_initialized(vault_token_info)?;
+    let mint: Mint = assert_initialized(mint_info)?;
     let fee_payer_token: TokenAccount = assert_initialized(fee_payer_token_info)?;
     assert_token_owned_by(&fee_payer_token, &fee_payer_info.key)?;
     assert_owned_by(fee_payer_token_info, &token_program_info.key)?;
@@ -480,8 +491,10 @@ pub fn process_redemption(
         vault_token_info,
         recipient_token_info,
         cash_link_info,
+        mint_info,
         &token_program_info.key,
         amount_to_redeem,
+        mint.decimals,
         &[&signer_seeds],
     )?;
     if platform_fee_per_redeem > 0 {
@@ -530,8 +543,10 @@ pub fn process_redemption(
                     vault_token_info,
                     fee_token_info,
                     cash_link_info,
+                    mint_info,
                     &token_program_info.key,
                     platform_fee,
+                    mint.decimals,
                     &[&signer_seeds],
                 )?;
             }
@@ -540,8 +555,10 @@ pub fn process_redemption(
                     vault_token_info,
                     referral_account_info,
                     cash_link_info,
+                    mint_info,
                     &token_program_info.key,
                     referrer_fee,
+                    mint.decimals,
                     &[&signer_seeds],
                 )?;
             }
@@ -550,8 +567,10 @@ pub fn process_redemption(
                     vault_token_info,
                     owner_token_info,
                     cash_link_info,
+                    mint_info,
                     &token_program_info.key,
                     referee_fee,
+                    mint.decimals,
                     &[&signer_seeds],
                 )?;
             }
@@ -560,8 +579,10 @@ pub fn process_redemption(
                 vault_token_info,
                 fee_token_info,
                 cash_link_info,
+                mint_info,
                 &token_program_info.key,
                 platform_fee_per_redeem,
+                mint.decimals,
                 &[&signer_seeds],
             )?;
         }
@@ -574,8 +595,10 @@ pub fn process_redemption(
             vault_token_info,
             fee_payer_token_info,
             cash_link_info,
+            mint_info,
             &token_program_info.key,
             total_network_fee,
+            mint.decimals,
             &[&signer_seeds],
         )?;
     }
@@ -591,8 +614,10 @@ pub fn process_redemption(
                 vault_token_info,
                 owner_token_info,
                 cash_link_info,
+                mint_info,
                 &token_program_info.key,
                 remaining,
+                mint.decimals,
                 &[&signer_seeds],
             )?;
         }

@@ -57,7 +57,6 @@ export type InitCashLinkParams = {
   authority: PublicKey;
   feePayer: PublicKey;
   ownerTokenAccount: PublicKey;
-  ownerTokenAccountIsSigner: boolean;
   owner: PublicKey;
   cashLink: PublicKey;
   passKey: PublicKey;

@@ -23,4 +23,5 @@ export type CancelCashLinkParams = {
   feePayer: PublicKey;
   cashLinkBump: number;
   tokenProgramId: PublicKey;
+  mint: PublicKey;
 };

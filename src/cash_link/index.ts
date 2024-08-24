@@ -261,6 +261,7 @@ export class CashLinkClient {
       passKey: new PublicKey(input.passKey),
       tokenProgramId: new PublicKey(input.tokenProgramId),
       cashLinkBump,
+      mint,
     });
     instructions.push(cancelInstruction);
     return {
@@ -280,6 +281,11 @@ export class CashLinkClient {
         pubkey: params.vaultToken,
         isSigner: false,
         isWritable: true,
+      },
+      {
+        pubkey: params.mint,
+        isSigner: false,
+        isWritable: false,
       },
       {
         pubkey: SYSVAR_CLOCK_PUBKEY,
@@ -485,18 +491,14 @@ export class CashLinkClient {
     const networkFee = new BN(input.networkFee ?? 0);
     const rentFeeToRedeem = new BN(input.rentFeeToRedeem ?? 0);
     const baseFeeToRedeem = new BN(input.baseFeeToRedeem ?? 0);
-    const totalAmount = new BN(input.totalAmount);
     const feeBps = input.feeBps ?? 0;
     const maxNumRedemptions = input.maxNumRedemptions;
     const minAmount = input.minAmount ? new BN(input.minAmount) : undefined;
-    let ownerTokenKeyPair: Keypair | undefined;
-    let ownerTokenAccount: PublicKey | undefined;
-    if (mint.equals(spl.NATIVE_MINT)) {
-      ownerTokenKeyPair = Keypair.generate();
-      ownerTokenAccount = ownerTokenKeyPair.publicKey;
-    } else {
-      ownerTokenAccount = spl.getAssociatedTokenAddressSync(mint, owner, true, tokenProgramId);
-    }
+    const ownerTokenAccount = spl.getAssociatedTokenAddressSync(mint, owner, true, tokenProgramId);
+    console.log('Token program', tokenProgramId.toBase58());
+    console.log('Owner token', ownerTokenAccount.toBase58());
+    console.log('Owner', owner.toBase58());
+    console.log('Mint', mint.toBase58());
     const initParams: InitCashLinkParams = {
       mint,
       owner,
@@ -508,7 +510,6 @@ export class CashLinkClient {
       baseFeeToRedeem,
       maxNumRedemptions,
       ownerTokenAccount,
-      ownerTokenAccountIsSigner: !!ownerTokenKeyPair,
       minAmount,
       passKey,
       amount: amount,
@@ -520,40 +521,8 @@ export class CashLinkClient {
       tokenProgramId: tokenProgramId,
     };
     const instructions = [];
-    if (ownerTokenKeyPair) {
-      instructions.push(
-        SystemProgram.transfer({
-          fromPubkey: this.feePayer,
-          toPubkey: ownerTokenAccount,
-          lamports: kTokenProgramRent,
-        }),
-        SystemProgram.allocate({
-          accountPubkey: ownerTokenAccount,
-          space: spl.AccountLayout.span,
-        }),
-        SystemProgram.assign({
-          accountPubkey: ownerTokenAccount,
-          programId: spl.TOKEN_PROGRAM_ID,
-        }),
-        SystemProgram.transfer({
-          fromPubkey: owner,
-          toPubkey: ownerTokenAccount,
-          lamports: totalAmount.toNumber(),
-        }),
-        spl.createInitializeAccount3Instruction(
-          ownerTokenAccount,
-          spl.NATIVE_MINT,
-          owner,
-          spl.TOKEN_PROGRAM_ID,
-        ),
-      );
-    }
     instructions.push(await this.initInstruction(initParams));
     const signers = [];
-    if (ownerTokenKeyPair) {
-      instructions.push(...this.unWrapSol(owner, ownerTokenAccount));
-      signers.push(ownerTokenKeyPair);
-    }
     return {
       instructions,
       signers,
@@ -579,7 +548,6 @@ export class CashLinkClient {
       fingerprintEnabled,
       numDaysToExpire,
       ownerTokenAccount,
-      ownerTokenAccountIsSigner,
       tokenProgramId,
     } = params;
     const data = InitCashLinkArgs.serialize({
@@ -633,7 +601,7 @@ export class CashLinkClient {
       },
       {
         pubkey: ownerTokenAccount,
-        isSigner: ownerTokenAccountIsSigner,
+        isSigner: false,
         isWritable: true,
       },
       {

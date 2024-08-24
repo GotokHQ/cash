@@ -124,6 +124,8 @@ pub fn transfer<'a>(
     source_account_info: &AccountInfo<'a>,
     destination_account_info: &AccountInfo<'a>,
     owner_account_info: &AccountInfo<'a>,
+    mint: &AccountInfo<'a>,
+    decimals: u8,
     amount: u64,
     token_id: &Pubkey,
     signers_seeds: &[&[&[u8]]],
@@ -135,8 +137,10 @@ pub fn transfer<'a>(
             source_account_info,
             destination_account_info,
             owner_account_info,
+            mint,
             token_id,
             amount,
+            decimals,
             signers_seeds,
         )
     }
@@ -147,17 +151,21 @@ pub fn spl_token_transfer<'a>(
     source: &AccountInfo<'a>,
     destination: &AccountInfo<'a>,
     authority: &AccountInfo<'a>,
+    mint: &AccountInfo<'a>,
     token_id: &Pubkey,
     amount: u64,
+    decimals: u8,
     signers_seeds: &[&[&[u8]]],
 ) -> Result<(), ProgramError> {
-    let ix = spl_token::instruction::transfer(
+    let ix = spl_token_2022::instruction::transfer_checked(
         token_id,
         source.key,
+        mint.key,
         destination.key,
         authority.key,
         &[],
         amount,
+        decimals,
     )?;
 
     invoke_signed(
