@@ -627,7 +627,7 @@ export class CashLinkClient {
         isWritable: false,
       },
       {
-        pubkey: spl.getAssociatedTokenAddressSync(mint, cashLink, true),
+        pubkey: spl.getAssociatedTokenAddressSync(mint, cashLink, true, tokenProgramId),
         isSigner: false,
         isWritable: true,
       },
