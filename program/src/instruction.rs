@@ -35,7 +35,6 @@ pub struct InitCashLinkArgs {
 /// Initialize a cash_link params
 pub struct InitCashRedemptionArgs {
     pub cash_link_bump: u8,
-    pub fingerprint: Option<String>,
     pub fingerprint_bump: Option<u8>,
     pub referrer_fee_bps:  Option<u16>,
     pub referee_fee_bps:  Option<u16>,
@@ -95,8 +94,9 @@ pub enum CashInstruction {
     /// 15. `[writable][Optional]` The referrer wallet account
     /// 16. `[writable][Optional]` The referrer token account
     /// 17. `[writable][Optional]` The fingerprint info
-    /// 18. `[]` The token program
-    /// 19. `[]` The associated program
+    /// 18. `[][Optional]` The fingerprint reference
+    /// 19. `[]` The token program
+    /// 20. `[]` The associated program
     Redeem(InitCashRedemptionArgs),
     /// Cancel the cash_link
     ///
@@ -208,6 +208,7 @@ pub fn redeem_cash_link(
     referral_wallet: Option<&Pubkey>,
     referral_token: Option<&Pubkey>,
     fingerprint: Option<&Pubkey>,
+    fingerprint_ref: Option<&Pubkey>,
     mint: &Pubkey,
     token_program_id: &Pubkey,
     args: InitCashRedemptionArgs
@@ -238,6 +239,9 @@ pub fn redeem_cash_link(
     }
     if let Some(fingerprint_id) = fingerprint {
         accounts.push(AccountMeta::new(*fingerprint_id, false));
+    }
+    if let Some(fingerprint_id) = fingerprint_ref {
+        accounts.push(AccountMeta::new_readonly(*fingerprint_id, false));
     }
     accounts.push(AccountMeta::new_readonly(spl_associated_token_account::id(), false));
 

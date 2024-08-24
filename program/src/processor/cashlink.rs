@@ -164,13 +164,8 @@ pub fn process_init_cash_link(
             &token_program_info.key
         )?;
     }
-    msg!("Start: assert_owned_by");
     assert_owned_by(owner_token_info, &token_program_info.key)?;
-    msg!("End: assert_owned_by");
-    msg!("Start: assert_initialized");
-    //let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
-    let owner_token = TokenAccount::unpack(&owner_token_info.data.borrow_mut())?;
-    msg!("Start: assert_initialized");
+    let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
     let mint: Mint = assert_initialized(mint_info)?;
     assert_token_owned_by(&owner_token, owner_info.key)?;
     spl_token_transfer(owner_token_info, vault_token_info, owner_info, &mint_info, &token_program_info.key, total, mint.decimals, &[])?;
@@ -631,32 +626,27 @@ pub fn process_redemption(
     }
     if cash_link.fingerprint_enabled {
         if let Some(bump) = args.fingerprint_bump {
-            if let Some(fingerprint) = args.fingerprint {
-                let fingerprint_account_info = next_account_info(account_info_iter)?;
-                if fingerprint_account_info.lamports() > 0
-                    && !fingerprint_account_info.data_is_empty()
-                {
-                    return Err(ProgramError::AccountAlreadyInitialized);
-                }
-                create_new_account_raw(
-                    program_id,
-                    fingerprint_account_info,
-                    rent_info,
-                    fee_payer_info,
-                    system_account_info,
-                    FLAG_ACCOUNT_SIZE,
-                    &[
-                        FINGERPRINT_PREFIX.as_bytes(),
-                        cash_link_info.key.as_ref(),
-                        &bs58::decode(fingerprint)
-                            .into_vec()
-                            .map_err(|_| CashError::InvalidFingerprint)?,
-                        &[bump],
-                    ],
-                )?;
-            } else {
-                return Err(CashError::FingerprintFound.into());
+            let fingerprint_account_info = next_account_info(account_info_iter)?;
+            let fingerprint_ref_info = next_account_info(account_info_iter)?;
+            if fingerprint_account_info.lamports() > 0
+                && !fingerprint_account_info.data_is_empty()
+            {
+                return Err(ProgramError::AccountAlreadyInitialized);
             }
+            create_new_account_raw(
+                program_id,
+                fingerprint_account_info,
+                rent_info,
+                fee_payer_info,
+                system_account_info,
+                FLAG_ACCOUNT_SIZE,
+                &[
+                    FINGERPRINT_PREFIX.as_bytes(),
+                    cash_link_info.key.as_ref(),
+                    fingerprint_ref_info.key.as_ref(),
+                    &[bump],
+                ],
+            )?;
         } else {
             return Err(CashError::FingerprintBumpNotFound.into());
         }

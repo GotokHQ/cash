@@ -1,7 +1,6 @@
 import { PublicKey } from '@solana/web3.js';
 import { Program } from '@metaplex-foundation/mpl-core';
 import { CashLink } from './accounts';
-import bs58 from 'bs58';
 
 export class CashProgram extends Program {
   static readonly PREFIX = 'cash';
@@ -36,10 +35,10 @@ export class CashProgram extends Program {
 
   static async findFingerprintAccount(
     cashLink: PublicKey,
-    fingerprint: string,
+    fingerprint: PublicKey,
   ): Promise<[PublicKey, number]> {
     return PublicKey.findProgramAddress(
-      [Buffer.from(CashProgram.FINGERPRINT_PREFIX), cashLink.toBuffer(), bs58.decode(fingerprint)],
+      [Buffer.from(CashProgram.FINGERPRINT_PREFIX), cashLink.toBuffer(), fingerprint.toBuffer()],
       CashProgram.PUBKEY,
     );
   }

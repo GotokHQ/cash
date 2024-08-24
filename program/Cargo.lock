@@ -392,7 +392,6 @@ version = "0.1.0"
 dependencies = [
  "arrayref",
  "borsh 1.5.1",
- "bs58",
  "solana-program",
  "spl-associated-token-account",
  "spl-token",

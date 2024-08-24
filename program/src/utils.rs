@@ -17,7 +17,7 @@ use solana_program::{
     sysvar::{rent::Rent, Sysvar},
     clock::Clock,
 };
-use spl_token_2022::state::Account;
+use spl_token_2022::{extension::{BaseState, StateWithExtensions}, state::Account};
 use spl_associated_token_account::instruction::create_associated_token_account;
 
 
@@ -95,18 +95,34 @@ pub fn assert_rent_exempt(rent: &Rent, account_info: &AccountInfo) -> ProgramRes
     }
 }
 
+// /// assert initialized account
+// pub fn assert_initialized<T: Pack + IsInitialized>(
+//     account_info: &AccountInfo,
+// ) -> Result<T, ProgramError> {
+//     let account: T = T::unpack_unchecked(&account_info.data.borrow())?;
+//     if !account.is_initialized() {
+//         Err(CashError::AccountNotInitialized.into())
+//     } else {
+//         Ok(account)
+//     }
+// }
+
 /// assert initialized account
-pub fn assert_initialized<T: Pack + IsInitialized>(
-    account_info: &AccountInfo,
-) -> Result<T, ProgramError> {
-    let account: T = T::unpack_unchecked(&account_info.data.borrow())?;
+pub fn assert_initialized<T>(account_info: &AccountInfo) -> Result<T, ProgramError>
+where
+    T: Pack + IsInitialized + BaseState,
+{    
+    let data = account_info.data.borrow();
+    let state_with_ext = StateWithExtensions::<T>::unpack(&data)?;
+
+    let account = state_with_ext.base;
+    
     if !account.is_initialized() {
         Err(CashError::AccountNotInitialized.into())
     } else {
         Ok(account)
     }
 }
-
 /// transfer all the SOL from source to receiver
 pub fn empty_account_balance(
     source: &AccountInfo,
@@ -170,7 +186,7 @@ pub fn spl_token_transfer<'a>(
 
     invoke_signed(
         &ix,
-        &[source.clone(), destination.clone(), authority.clone()],
+        &[source.clone(), mint.clone(), destination.clone(), authority.clone()],
         signers_seeds,
     )
 }

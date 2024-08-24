@@ -731,17 +731,18 @@ export class CashLinkClient {
     if (cashLink == null) {
       throw new Error(FAILED_TO_FIND_ACCOUNT);
     }
-    const fingerprint = input.fingerprint;
+    let fingerprint: PublicKey | undefined;
     let fingerprintPda: PublicKey | undefined;
     let fingerprintBump: number | undefined;
-    if (cashLink.data.fingerprintEnabled && !fingerprint) {
-      throw new Error(FINGERPRINT_NOT_FOUND);
-    }
-    if (fingerprint) {
+    if (input.fingerprint) {
+      fingerprint = new PublicKey(input.fingerprint);
       [fingerprintPda, fingerprintBump] = await CashProgram.findFingerprintAccount(
         cashLinkAddress,
-        input.fingerprint,
+        fingerprint,
       );
+    }
+    if (cashLink.data.fingerprintEnabled && !fingerprint) {
+      throw new Error(FINGERPRINT_NOT_FOUND);
     }
     if (input.referrerFeeBps && !input.referrer) {
       throw new Error(REFERRER_WALLET);
@@ -888,8 +889,15 @@ export class CashLinkClient {
         isWritable: true,
       });
     }
+    if (params.fingerprint) {
+      keys.push({
+        pubkey: params.fingerprint,
+        isSigner: false,
+        isWritable: false,
+      });
+    }
     keys.push({
-      pubkey: spl.TOKEN_PROGRAM_ID,
+      pubkey: params.tokenProgramId,
       isSigner: false,
       isWritable: false,
     });
@@ -904,7 +912,6 @@ export class CashLinkClient {
       data: RedeemCashLinkArgs.serialize({
         cashLinkBump: params.cashLinkBump,
         fingerprintBump: params.fingerprintBump,
-        fingerprint: params.fingerprint,
         referrerFeeBps: params.referrerFeeBps,
         refereeFeeBps: params.refereeFeeBps,
       }),
