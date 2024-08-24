@@ -975,7 +975,7 @@ export class CashLinkClient {
   ): Promise<PublicKey> => {
     try {
       const associatedToken = spl.getAssociatedTokenAddressSync(mint, owner, true, tokenProgramId);
-      const acc = await this._getAccount(associatedToken, commitment);
+      const acc = await this._getAccount(associatedToken, tokenProgramId, commitment);
       if (acc === null) {
         const instruction = spl.createAssociatedTokenAccountInstruction(
           this.feePayer,
@@ -1023,10 +1023,11 @@ export class CashLinkClient {
 
   _getAccount = async (
     account: PublicKey,
+    programId: PublicKey,
     commitment?: Commitment,
   ): Promise<spl.Account | null> => {
     try {
-      return await spl.getAccount(this.connection, account, commitment);
+      return await spl.getAccount(this.connection, account, commitment, programId);
     } catch (error: unknown) {
       if (
         error instanceof spl.TokenAccountNotFoundError ||
