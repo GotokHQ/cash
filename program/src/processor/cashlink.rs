@@ -23,7 +23,7 @@ use solana_program::{
     pubkey::Pubkey,
     sysvar::{clock::Clock, slot_hashes, Sysvar},
 };
-use spl_associated_token_account::get_associated_token_address;
+use spl_associated_token_account::get_associated_token_address_with_program_id;
 use spl_token_2022::state::Account as TokenAccount;
 
 pub struct Processor;
@@ -141,7 +141,7 @@ pub fn process_init_cash_link(
     };
     cash_link.mint = *mint_info.key;
     let associated_token_account =
-        get_associated_token_address(&cash_link_info.key, &mint_info.key);
+    get_associated_token_address_with_program_id(&cash_link_info.key, &mint_info.key, &token_program_info.key);
     // let vault_token: TokenAccount = assert_initialized(associated_token_account)?;
     // assert_token_owned_by(&vault_token, cash_link_info.key)?;
     assert_account_key(
@@ -265,7 +265,7 @@ pub fn process_cancel(
     let vault_token: TokenAccount = assert_initialized(vault_token_info)?;
     // assert_account_key(vault_token.mint, mint, Some(CashError::InvalidMint))?;
     let associated_token_account =
-        get_associated_token_address(&cash_link_info.key, &cash_link.mint);
+    get_associated_token_address_with_program_id(&cash_link_info.key, &cash_link.mint, &token_program_info.key);
     assert_account_key(
         vault_token_info,
         &associated_token_account,
@@ -440,7 +440,7 @@ pub fn process_redemption(
         .ok_or::<ProgramError>(CashError::Overflow.into())?;
     assert_owned_by(vault_token_info, &token_program_info.key)?;
     let associated_token_account =
-        get_associated_token_address(&cash_link_info.key, &cash_link.mint);
+        get_associated_token_address_with_program_id(&cash_link_info.key, &cash_link.mint, &token_program_info.key);
     assert_account_key(
         vault_token_info,
         &associated_token_account,
