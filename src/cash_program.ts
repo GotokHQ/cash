@@ -5,39 +5,32 @@ import { CashLink } from './accounts';
 export class CashProgram extends Program {
   static readonly PREFIX = 'cash';
   static readonly FINGERPRINT_PREFIX = 'fingerprint';
-  static readonly REDEMPTION_PREFIX = 'redeem';
+  static readonly REFERRAL_REWARD_PREFIX = 'reward';
   static readonly REFERRAL_PREFIX = 'referral';
   static readonly PUBKEY = new PublicKey('cashQKx31fVsquVKXQ9prKqVtSYf8SqcYt9Jyvg966q');
 
-  static async findCashLinkAccount(passKey: PublicKey): Promise<[PublicKey, number]> {
-    return PublicKey.findProgramAddress(
+  static findCashLinkAccount(passKey: PublicKey): [PublicKey, number] {
+    return PublicKey.findProgramAddressSync(
       [Buffer.from(CashLink.PREFIX), passKey.toBuffer()],
       CashProgram.PUBKEY,
     );
   }
 
-  static async findRedemptionAccount(
-    cashLink: PublicKey,
-    wallet: PublicKey,
-  ): Promise<[PublicKey, number]> {
-    return PublicKey.findProgramAddress(
-      [Buffer.from(CashProgram.REDEMPTION_PREFIX), cashLink.toBuffer(), wallet.toBuffer()],
+  static findReferralKey(referrer: PublicKey, referee: PublicKey): [PublicKey, number] {
+    const referrerBuffer = referrer.toBuffer();
+    const refereeBuffer = referee.toBuffer();
+
+    // Sort the buffers in ascending order
+    const sortedBuffers = [referrerBuffer, refereeBuffer].sort(Buffer.compare);
+
+    return PublicKey.findProgramAddressSync(
+      [Buffer.from(CashProgram.REFERRAL_PREFIX), sortedBuffers[0], sortedBuffers[1]],
       CashProgram.PUBKEY,
     );
   }
 
-  static async findReferralKey(mint: PublicKey, wallet: PublicKey): Promise<[PublicKey, number]> {
-    return PublicKey.findProgramAddress(
-      [Buffer.from(CashProgram.REFERRAL_PREFIX), mint.toBuffer(), wallet.toBuffer()],
-      CashProgram.PUBKEY,
-    );
-  }
-
-  static async findFingerprintAccount(
-    cashLink: PublicKey,
-    fingerprint: PublicKey,
-  ): Promise<[PublicKey, number]> {
-    return PublicKey.findProgramAddress(
+  static findFingerprintAccount(cashLink: PublicKey, fingerprint: PublicKey): [PublicKey, number] {
+    return PublicKey.findProgramAddressSync(
       [Buffer.from(CashProgram.FINGERPRINT_PREFIX), cashLink.toBuffer(), fingerprint.toBuffer()],
       CashProgram.PUBKEY,
     );

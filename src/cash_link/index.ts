@@ -97,9 +97,7 @@ export class CashLinkClient {
   }
 
   cancel = async (input: CashLinkInput): Promise<ResultContext> => {
-    const [cashLinkAddress, bump] = await CashProgram.findCashLinkAccount(
-      new PublicKey(input.passKey),
-    );
+    const [cashLinkAddress, bump] = CashProgram.findCashLinkAccount(new PublicKey(input.passKey));
     const cashLink = await _getCashLinkAccount(this.connection, cashLinkAddress);
     if (cashLink == null) {
       throw new Error(FAILED_TO_FIND_ACCOUNT);
@@ -159,9 +157,7 @@ export class CashLinkClient {
   };
 
   cancelAndClose = async (input: CashLinkInput): Promise<ResultContext> => {
-    const [cashLinkAddress, bump] = await CashProgram.findCashLinkAccount(
-      new PublicKey(input.passKey),
-    );
+    const [cashLinkAddress, bump] = CashProgram.findCashLinkAccount(new PublicKey(input.passKey));
     const cashLink = await _getCashLinkAccount(this.connection, cashLinkAddress);
     if (cashLink == null) {
       throw new Error(FAILED_TO_FIND_ACCOUNT);
@@ -325,7 +321,7 @@ export class CashLinkClient {
   };
 
   close = async (input: CashLinkInput): Promise<ResultContext> => {
-    const [cashLinkAddress] = await CashProgram.findCashLinkAccount(new PublicKey(input.passKey));
+    const [cashLinkAddress] = CashProgram.findCashLinkAccount(new PublicKey(input.passKey));
     const cashLink = await _getCashLinkAccount(this.connection, cashLinkAddress);
     if (cashLink == null || !cashLink.data) {
       throw new Error(FAILED_TO_FIND_ACCOUNT);
@@ -482,7 +478,7 @@ export class CashLinkClient {
     const mint: PublicKey = new PublicKey(input.mint);
     const passKey = new PublicKey(input.passKey);
     const tokenProgramId = new PublicKey(input.tokenProgramId);
-    const [cashLink, cashLinkBump] = await CashProgram.findCashLinkAccount(passKey);
+    const [cashLink, cashLinkBump] = CashProgram.findCashLinkAccount(passKey);
     const amount = new BN(input.amount);
     const networkFee = new BN(input.networkFee ?? 0);
     const rentFeeToRedeem = new BN(input.rentFeeToRedeem ?? 0);
@@ -718,7 +714,7 @@ export class CashLinkClient {
   }> => {
     const passKey = new PublicKey(input.passKey);
     const tokenProgramId = new PublicKey(input.tokenProgramId);
-    const [cashLinkAddress, cashLinkBump] = await CashProgram.findCashLinkAccount(passKey);
+    const [cashLinkAddress, cashLinkBump] = CashProgram.findCashLinkAccount(passKey);
     const cashLink = await _getCashLinkAccount(this.connection, cashLinkAddress, input.commitment);
     if (cashLink == null) {
       throw new Error(FAILED_TO_FIND_ACCOUNT);
@@ -728,7 +724,7 @@ export class CashLinkClient {
     let fingerprintBump: number | undefined;
     if (input.fingerprint) {
       fingerprint = new PublicKey(input.fingerprint);
-      [fingerprintPda, fingerprintBump] = await CashProgram.findFingerprintAccount(
+      [fingerprintPda, fingerprintBump] = CashProgram.findFingerprintAccount(
         cashLinkAddress,
         fingerprint,
       );

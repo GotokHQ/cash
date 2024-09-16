@@ -101,8 +101,8 @@ export class CashLink extends Account<CashLinkData> {
     }
   }
 
-  static async getPDA(passKey: PublicKey) {
-    const [pubKey] = await CashProgram.findCashLinkAccount(passKey);
+  static getPDA(passKey: PublicKey) {
+    const [pubKey] = CashProgram.findCashLinkAccount(passKey);
     return pubKey;
   }
 
