@@ -16,6 +16,13 @@ export class CashProgram extends Program {
     );
   }
 
+  static userRewardAccount(wallet: PublicKey): [PublicKey, number] {
+    return PublicKey.findProgramAddressSync(
+      [Buffer.from(CashProgram.REFERRAL_REWARD_PREFIX), wallet.toBuffer()],
+      CashProgram.PUBKEY,
+    );
+  }
+
   static findReferralKey(referrer: PublicKey, referee: PublicKey): [PublicKey, number] {
     const referrerBuffer = referrer.toBuffer();
     const refereeBuffer = referee.toBuffer();
