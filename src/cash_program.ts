@@ -8,7 +8,7 @@ export class CashProgram extends Program {
   static readonly REFERRAL_REWARD_PREFIX = 'reward';
   static readonly WALLET_ACCOUNT_PREFIX = 'wallet';
   static readonly REFERRAL_PREFIX = 'referral';
-  static readonly PUBKEY = new PublicKey('cashQKx31fVsquVKXQ9prKqVtSYf8SqcYt9Jyvg966q');
+  static readonly PUBKEY = new PublicKey('cashXAE5UP18RyU7ByFWfxu93kGg69KzoktacNQDukW');
 
   static cashAccount(reference: string): [PublicKey, number] {
     return PublicKey.findProgramAddressSync(
