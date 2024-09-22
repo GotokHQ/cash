@@ -11,98 +11,99 @@ import bs58 from 'bs58';
 import { CashProgram } from '../cash_program';
 import { AccountType } from './account';
 
-export const MAX_CASH_LINK_DATA_LEN = 194;
+export const MAX_CASH_LINK_DATA_LEN = 195;
 
-export enum CashLinkState {
+export enum CashState {
   Initialized = 0,
   Redeemed = 1,
   Redeeming = 2,
   Expired = 3,
 }
 
-export enum CashLinkDistributionType {
+export enum CashDistributionType {
   Fixed = 0,
   Random = 1,
+  Weighted = 2,
 }
 
-export type CashLinkDataArgs = {
+export type CashDataArgs = {
   accountType: AccountType;
   authority: StringPublicKey;
-  state: CashLinkState;
+  state: CashState;
   amount: BN;
   feeBps: number;
-  fixedFee: BN;
+  networkFee: BN;
   baseFeeToRedeem: BN;
   rentFeeToRedeem: BN;
   remainingAmount: BN;
-  distributionType: CashLinkDistributionType;
+  distributionType: CashDistributionType;
   owner: number;
-  expiresAt: BN;
   mint: StringPublicKey;
   totalRedemptions: BN;
   maxNumRedemptions: BN;
   minAmount: BN;
   fingerprintEnabled: boolean;
-  passKey: StringPublicKey;
+  passKey?: StringPublicKey;
+  totalWeightPpm: number;
 };
 
-export class CashLinkData extends Borsh.Data<CashLinkDataArgs> {
-  static readonly SCHEMA = CashLinkData.struct([
+export class CashData extends Borsh.Data<CashDataArgs> {
+  static readonly SCHEMA = CashData.struct([
     ['accountType', 'u8'],
     ['authority', 'pubkeyAsString'],
     ['state', 'u8'],
     ['amount', 'u64'],
     ['feeBps', 'u16'],
-    ['fixedFee', 'u64'],
+    ['networkFee', 'u64'],
     ['baseFeeToRedeem', 'u64'],
     ['rentFeeToRedeem', 'u64'],
     ['remainingAmount', 'u64'],
     ['distributionType', 'u8'],
     ['owner', 'pubkeyAsString'],
-    ['expiresAt', 'u64'],
     ['mint', 'pubkeyAsString'],
     ['totalRedemptions', 'u16'],
     ['maxNumRedemptions', 'u16'],
     ['minAmount', 'u64'],
     ['fingerprintEnabled', 'u8'],
-    ['passKey', 'pubkeyAsString'],
+    ['passKey', { kind: 'option', type: 'pubkeyAsString' }],
+    ['totalWeightPpm', 'u32'],
   ]);
   accountType: AccountType;
   authority: StringPublicKey;
-  state: CashLinkState;
+  state: CashState;
   amount: BN;
   feeBps: number;
-  fixedFee: BN;
+  networkFee: BN;
   baseFeeToRedeem: BN;
   rentFeeToRedeem: BN;
   remainingAmount: BN;
-  distributionType: CashLinkDistributionType;
+  distributionType: CashDistributionType;
   owner: StringPublicKey;
-  expiresAt: BN;
   mint: StringPublicKey;
   totalRedemptions: number;
   maxNumRedemptions: number;
   minAmount: BN;
   fingerprintEnabled: boolean;
-  passKey: StringPublicKey;
+  passKey?: StringPublicKey;
+  totalWeightPpm: number;
 
-  constructor(args: CashLinkDataArgs) {
+  constructor(args: CashDataArgs) {
     super(args);
   }
 }
 
-export class CashLink extends Account<CashLinkData> {
+export class Cash extends Account<CashData> {
   static readonly PREFIX = 'cash';
   constructor(pubkey: AnyPublicKey, info: AccountInfo<Buffer>) {
     super(pubkey, info);
-    this.data = CashLinkData.deserialize(this.info.data);
+    this.data = CashData.deserialize(this.info.data);
     if (!this.assertOwner(CashProgram.PUBKEY)) {
       throw ERROR_INVALID_OWNER();
     }
   }
 
-  static getPDA(passKey: PublicKey) {
-    const [pubKey] = CashProgram.findCashLinkAccount(passKey);
+  static getPDA(reference: string) {
+    const [pubKey] = CashProgram.cashAccount(reference);
     return pubKey;
   }
 
@@ -110,16 +111,16 @@ export class CashLink extends Account<CashLinkData> {
     connection: Connection,
     filters: {
       authority?: AnyPublicKey;
-      state?: CashLinkState;
+      state?: CashState;
     } = {},
     commitment?: Commitment,
   ) {
     const baseFilters = [
-      // Filter for CashLink by account type
+      // Filter for Cash by account type
       {
         memcmp: {
           offset: 0,
-          bytes: bs58.encode(Buffer.from([AccountType.CashLink])),
+          bytes: bs58.encode(Buffer.from([AccountType.Cash])),
         },
       },
       // Filter for assigned to authority
@@ -140,6 +141,6 @@ export class CashLink extends Account<CashLinkData> {
 
     return (
       await CashProgram.getProgramAccounts(connection, { filters: baseFilters, commitment })
-    ).map((account) => CashLink.from(account));
+    ).map((account) => Cash.from(account));
   }
 }

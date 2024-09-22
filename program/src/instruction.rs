@@ -9,24 +9,25 @@ use solana_program::{
 };
 use spl_associated_token_account::get_associated_token_address_with_program_id;
 
-use crate::state::cashlink::DistributionType;
+use crate::state::cash::DistributionType;
 
 /// Initialize a cash_link arguments
 #[repr(C)]
 #[derive(BorshSerialize, BorshDeserialize, PartialEq, Debug, Clone)]
 /// Initialize a cash_link params
-pub struct InitCashLinkArgs {
+pub struct InitCashArgs {
     pub amount: u64,
     pub fee_bps: u16,
     pub network_fee: u64,
     pub base_fee_to_redeem: u64,
     pub rent_fee_to_redeem: u64,
-    pub cash_link_bump: u8,
+    pub cash_bump: u8,
     pub distribution_type: DistributionType,
     pub max_num_redemptions: u16,
     pub min_amount: Option<u64>,
     pub fingerprint_enabled: Option<bool>,
-    pub num_days_to_expire: u8,
+    pub cash_reference: String,
+    pub is_locked: bool,
 }
 
 /// Initialize a redemption arguments
@@ -34,10 +35,13 @@ pub struct InitCashLinkArgs {
 #[derive(BorshSerialize, BorshDeserialize, PartialEq, Debug, Clone)]
 /// Initialize a cash_link params
 pub struct InitCashRedemptionArgs {
-    pub cash_link_bump: u8,
+    pub cash_bump: u8,
+    pub cash_reference: String,
     pub fingerprint_bump: Option<u8>,
     pub referrer_fee_bps:  Option<u16>,
     pub referee_fee_bps:  Option<u16>,
+    pub weight_ppm: Option<u32>,
+    pub rate_usd: Option<String>,
 }
 
 /// Cancel a cash link
@@ -45,7 +49,8 @@ pub struct InitCashRedemptionArgs {
 #[derive(BorshSerialize, BorshDeserialize, PartialEq, Debug, Clone)]
 /// Cancel a cash_link params
 pub struct CancelCashRedemptionArgs {
-    pub cash_link_bump: u8,
+    pub cash_bump: u8,
+    pub cash_reference: String,
 }
 
 #[repr(C)]
@@ -61,16 +66,15 @@ pub enum CashInstruction {
     /// 1. `[signer][writable]`The account of the wallet owner initializing the cashlink
     /// 2. `[signer]`   The fee payer
     /// 3. `[writable]` The cash link account, it will hold all necessary info about the trade.
-    /// 4. `[]` The pass key required to unlock the cash link for redemption
+    /// 4. `[]` The pass key required to unlock the cash link for redemption (Optional)
     /// 5. `[]` The token mint
     /// 6. `[writable]` The associated token for the mint derived from the cash link account
     /// 7. `[writable]` The owner token that must be passed if pay is true and mint is some
     /// 8. `[]` The rent sysvar
     /// 9. `[]` The system program
-    /// 10. `[]` The clock account
-    /// 11. `[]` The token program
-    /// 12. `[]` The associated token program
-    InitCashLink (InitCashLinkArgs),
+    /// 10. `[]` The token program
+    /// 11. `[]` The associated token program
+    InitCashLink (InitCashArgs),
     /// Redeem the cashlink
     ///
     ///
@@ -80,23 +84,22 @@ pub enum CashInstruction {
     /// 1. `[]` The user wallet
     /// 2. `[writable]` The platform fee account for the token they will receive should the trade go through
     /// 3. `[writable]` The cash_link account holding the cash_link info
-    /// 4. `[signer]` The pass key required to unlock the cash link for redemption
+    /// 4. `[signer]` The pass key required to unlock the cash link for redemption (optional)
     /// 5. `[writable]` The payer token account of the payer that initialized the cash_link  
     /// 6. `[writable]` The fee payer account that pays network and rent fees
     /// 7. `[writable]` The fee payer's associated token account that collects the rent or network fees
     /// 8. `[writable]` The vault token account to get tokens. This value is Optional. if the mint is set, then this must be set.
     /// 9. `[writable]` The recipient token account for the token they will receive should the trade go through
     /// 10. `[]` The mint account for the token
-    /// 11. `[]` The clock account
-    /// 12. `[]` The rent account
-    /// 13. `[]` The recent slot hash account
-    /// 14. `[]` The system program
-    /// 15. `[writable][Optional]` The referrer wallet account
-    /// 16. `[writable][Optional]` The referrer token account
-    /// 17. `[writable][Optional]` The fingerprint info
-    /// 18. `[][Optional]` The fingerprint reference
-    /// 19. `[]` The token program
-    /// 20. `[]` The associated program
+    /// 11. `[]` The rent account
+    /// 12. `[]` The recent slot hash account
+    /// 13. `[]` The system program
+    /// 14. `[writable][Optional]` The referrer wallet account
+    /// 15. `[writable][Optional]` The referrer token account
+    /// 16. `[writable][Optional]` The fingerprint info
+    /// 17. `[][Optional]` The fingerprint reference
+    /// 18. `[]` The token program
+    /// 19. `[]` The associated program
     Redeem(InitCashRedemptionArgs),
     /// Cancel the cash_link
     ///
@@ -105,13 +108,11 @@ pub enum CashInstruction {
     ///
     /// 0. `[signer]` The account of the authority
     /// 1. `[writable]` The cash_link account holding the cash_link info   
-    /// 2. `[]` The pass key required to unlock the cash link for redemption   
-    /// 3. `[writable]` The owner associated token account of the owner if it's not a native mint
-    /// 4. `[writable]` The fee payer token account to receive tokens from the vault
-    /// 5. `[writable]` The vault token account to get tokens from and eventually close. This value is Optional. if the mint is set, then this must be set.
-    /// 6. `[]` The clock account 
-    /// 7. `[]` The token program
-    /// 8. `[]` The system program   
+    /// 2. `[writable]` The owner associated token account of the owner if it's not a native mint
+    /// 3. `[writable]` The fee payer token account to receive tokens from the vault
+    /// 4. `[writable]` The vault token account to get tokens from and eventually close. This value is Optional. if the mint is set, then this must be set.
+    /// 5. `[]` The token program
+    /// 6. `[]` The system program   
     Cancel(CancelCashRedemptionArgs),
     /// Close the cash_link
     ///
@@ -134,7 +135,7 @@ pub fn init_cash_link(
     pass_key: &Pubkey,
     mint: &Pubkey,
     token_program_id: &Pubkey,
-    args: InitCashLinkArgs,
+    args: InitCashArgs,
 ) -> Instruction {
     let accounts = vec![
         AccountMeta::new_readonly(*authority, true),

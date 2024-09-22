@@ -1,7 +1,7 @@
 import { Borsh } from '@metaplex-foundation/mpl-core';
 import { PublicKey } from '@solana/web3.js';
 import BN from 'bn.js';
-import { CashLinkDistributionType } from 'src/accounts';
+import { CashDistributionType } from 'src/accounts';
 
 export type InitArgs = {
   amount: BN;
@@ -9,28 +9,30 @@ export type InitArgs = {
   networkFee: BN;
   baseFeeToRedeem: BN;
   rentFeeToRedeem: BN;
-  cashLinkBump: number;
-  distributionType: CashLinkDistributionType;
+  cashBump: number;
+  distributionType: CashDistributionType;
   maxNumRedemptions: number;
   minAmount?: BN;
   fingerprintEnabled?: boolean;
-  numDaysToExpire: number;
+  cashReference: string;
+  isLocked: boolean;
 };
 
-export class InitCashLinkArgs extends Borsh.Data<InitArgs> {
-  static readonly SCHEMA = InitCashLinkArgs.struct([
+export class InitCashArgs extends Borsh.Data<InitArgs> {
+  static readonly SCHEMA = InitCashArgs.struct([
     ['instruction', 'u8'],
     ['amount', 'u64'],
     ['feeBps', 'u16'],
     ['networkFee', 'u64'],
     ['baseFeeToRedeem', 'u64'],
     ['rentFeeToRedeem', 'u64'],
-    ['cashLinkBump', 'u8'],
+    ['cashBump', 'u8'],
     ['distributionType', 'u8'],
     ['maxNumRedemptions', 'u16'],
     ['minAmount', { kind: 'option', type: 'u64' }],
     ['fingerprintEnabled', { kind: 'option', type: 'u8' }],
-    ['numDaysToExpire', 'u8'],
+    ['cashReference', 'string'],
+    ['isLocked', 'u8'],
   ]);
 
   instruction = 0;
@@ -39,32 +41,33 @@ export class InitCashLinkArgs extends Borsh.Data<InitArgs> {
   networkFee: BN;
   baseFeeToRedeem: BN;
   rentFeeToRedeem: BN;
-  cashLinkBump: number;
-  distributionType: CashLinkDistributionType;
+  cashBump: number;
+  distributionType: CashDistributionType;
   maxNumRedemptions: number;
   minAmount?: BN;
   fingerprintEnabled?: boolean;
-  numDaysToExpire: number;
+  cashReference: string;
+  isLocked: boolean;
 }
 
-export type InitCashLinkParams = {
+export type InitCashParams = {
   amount: BN;
   feeBps: number;
   networkFee: BN;
   baseFeeToRedeem: BN;
   rentFeeToRedeem: BN;
-  cashLinkBump: number;
+  cashBump: number;
   authority: PublicKey;
   feePayer: PublicKey;
   ownerTokenAccount: PublicKey;
   owner: PublicKey;
-  cashLink: PublicKey;
-  passKey: PublicKey;
+  cash: PublicKey;
+  passKey?: PublicKey;
   mint: PublicKey;
-  distributionType: CashLinkDistributionType;
+  distributionType: CashDistributionType;
   maxNumRedemptions: number;
   minAmount?: BN;
   fingerprintEnabled?: boolean;
-  numDaysToExpire: number;
   tokenProgramId: PublicKey;
+  cashReference: string;
 };

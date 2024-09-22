@@ -2,19 +2,25 @@ import { Borsh } from '@metaplex-foundation/mpl-core';
 import { PublicKey } from '@solana/web3.js';
 
 export type RedeemArgs = {
-  cashLinkBump: number;
+  cashBump: number;
+  cashReference: string;
   fingerprintBump?: number;
   referrerFeeBps?: number;
   refereeFeeBps?: number;
+  weightPpm?: number;
+  rateUsd?: string;
 };
 
 export class RedeemCashLinkArgs extends Borsh.Data<RedeemArgs> {
   static readonly SCHEMA = RedeemCashLinkArgs.struct([
     ['instruction', 'u8'],
-    ['cashLinkBump', 'u8'],
+    ['cashBump', 'u8'],
+    ['cashReference', 'string'],
     ['fingerprintBump', { kind: 'option', type: 'u8' }],
     ['referrerFeeBps', { kind: 'option', type: 'u16' }],
     ['refereeFeeBps', { kind: 'option', type: 'u16' }],
+    ['weightPpm', { kind: 'option', type: 'u32' }],
+    ['rateUsd', { kind: 'option', type: 'string' }],
   ]);
 
   instruction = 1;
@@ -23,14 +29,15 @@ export class RedeemCashLinkArgs extends Borsh.Data<RedeemArgs> {
 export type RedeemCashLinkParams = {
   wallet: PublicKey;
   authority: PublicKey;
-  cashLink: PublicKey;
+  cash: PublicKey;
+  cashReference: string;
   vaultToken?: PublicKey;
   walletToken: PublicKey;
   ownerToken: PublicKey;
   platformFeeToken: PublicKey;
   feePayer?: PublicKey | null;
   feePayerToken: PublicKey;
-  cashLinkBump: number;
+  cashBump: number;
   passKey: PublicKey;
   fingerprintPda?: PublicKey;
   fingerprint?: PublicKey;
@@ -41,4 +48,6 @@ export type RedeemCashLinkParams = {
   referrerToken?: PublicKey;
   mint: PublicKey;
   tokenProgramId: PublicKey;
+  weightPpm?: number;
+  rateUsd?: string;
 };

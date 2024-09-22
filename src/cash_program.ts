@@ -1,24 +1,32 @@
 import { PublicKey } from '@solana/web3.js';
 import { Program } from '@metaplex-foundation/mpl-core';
-import { CashLink } from './accounts';
+import { Cash } from './accounts';
 
 export class CashProgram extends Program {
   static readonly PREFIX = 'cash';
   static readonly FINGERPRINT_PREFIX = 'fingerprint';
   static readonly REFERRAL_REWARD_PREFIX = 'reward';
+  static readonly WALLET_ACCOUNT_PREFIX = 'wallet';
   static readonly REFERRAL_PREFIX = 'referral';
   static readonly PUBKEY = new PublicKey('cashQKx31fVsquVKXQ9prKqVtSYf8SqcYt9Jyvg966q');
 
-  static findCashLinkAccount(passKey: PublicKey): [PublicKey, number] {
+  static cashAccount(reference: string): [PublicKey, number] {
     return PublicKey.findProgramAddressSync(
-      [Buffer.from(CashLink.PREFIX), passKey.toBuffer()],
+      [Buffer.from(Cash.PREFIX), Buffer.from(reference)],
       CashProgram.PUBKEY,
     );
   }
 
-  static userRewardAccount(wallet: PublicKey): [PublicKey, number] {
+  static rewardAccount(wallet: PublicKey): [PublicKey, number] {
     return PublicKey.findProgramAddressSync(
       [Buffer.from(CashProgram.REFERRAL_REWARD_PREFIX), wallet.toBuffer()],
+      CashProgram.PUBKEY,
+    );
+  }
+
+  static walletAccount(wallet: PublicKey): [PublicKey, number] {
+    return PublicKey.findProgramAddressSync(
+      [Buffer.from(CashProgram.WALLET_ACCOUNT_PREFIX), wallet.toBuffer()],
       CashProgram.PUBKEY,
     );
   }
@@ -36,9 +44,9 @@ export class CashProgram extends Program {
     );
   }
 
-  static findFingerprintAccount(cashLink: PublicKey, fingerprint: PublicKey): [PublicKey, number] {
+  static findFingerprintAccount(cash: PublicKey, fingerprint: PublicKey): [PublicKey, number] {
     return PublicKey.findProgramAddressSync(
-      [Buffer.from(CashProgram.FINGERPRINT_PREFIX), cashLink.toBuffer(), fingerprint.toBuffer()],
+      [Buffer.from(CashProgram.FINGERPRINT_PREFIX), cash.toBuffer(), fingerprint.toBuffer()],
       CashProgram.PUBKEY,
     );
   }

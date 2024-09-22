@@ -11,17 +11,17 @@ use crate::error::CashError;
 
 use super::AccountType;
 
-pub const CASH_LINK_DATA_SIZE: usize = 194;
+pub const CASH_DATA_SIZE: usize = 195;
 
 #[repr(C)]
 #[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq, Clone, Default)]
 #[borsh(use_discriminant=true)]
-pub enum CashLinkState {
+pub enum CashState {
     #[default]
     Initialized = 0,
     Redeemed,
     Redeeming,
-    Expired,
+    Canceled,
 }
 
 #[repr(C)]
@@ -31,14 +31,15 @@ pub enum DistributionType {
     #[default]
     Fixed = 0,
     Random,
+    Weighted,
 }
 
 #[repr(C)]
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, Default)]
-pub struct CashLink {
+pub struct Cash {
     pub account_type: AccountType,
     pub authority: Pubkey,
-    pub state: CashLinkState,
+    pub state: CashState,
     pub amount: u64,
     pub fee_bps: u16,
     pub network_fee: u64,
@@ -47,28 +48,28 @@ pub struct CashLink {
     pub remaining_amount: u64,
     pub distribution_type: DistributionType,//77
     pub owner: Pubkey,
-    pub expires_at: u64,
     pub mint: Pubkey,
     pub total_redemptions: u16,
     pub max_num_redemptions: u16,
     pub min_amount: u64,
     pub fingerprint_enabled: bool,
-    pub pass_key: Pubkey,//118
+    pub pass_key: Option<Pubkey>,//187
+    pub total_weight_ppm: u32,
 }
 
-impl CashLink {
+impl Cash {
     pub const PREFIX: &'static str = "cash";
     pub fn redeemed(&self) -> bool {
-        self.state == CashLinkState::Redeemed
+        self.state == CashState::Redeemed
     }
     pub fn redeeming(&self) -> bool {
-        self.state == CashLinkState::Redeeming
+        self.state == CashState::Redeeming
     }
-    pub fn expired(&self) -> bool {
-        self.state == CashLinkState::Expired
+    pub fn canceled(&self) -> bool {
+        self.state == CashState::Canceled
     }
     pub fn initialized(&self) -> bool {
-        self.state == CashLinkState::Initialized
+        self.state == CashState::Initialized
     }
     pub fn is_fully_redeemed(&self) -> Result<bool, CashError> {
         Ok(self.total_redemptions == self.max_num_redemptions
@@ -89,16 +90,16 @@ impl CashLink {
     }
 }
 
-impl IsInitialized for CashLink {
+impl IsInitialized for Cash {
     fn is_initialized(&self) -> bool {
-        self.initialized() || self.redeeming() || self.redeemed() || self.expired()
+        self.initialized() || self.redeeming() || self.redeemed() || self.canceled()
     }
 }
 
-impl Sealed for CashLink {}
+impl Sealed for Cash {}
 
-impl Pack for CashLink {
-    const LEN: usize = CASH_LINK_DATA_SIZE;
+impl Pack for Cash {
+    const LEN: usize = CASH_DATA_SIZE;
 
     fn pack_into_slice(&self, dst: &mut [u8]) {
         let mut slice = dst;

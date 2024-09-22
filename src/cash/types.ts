@@ -1,9 +1,9 @@
 import { Commitment } from '@solana/web3.js';
-import { CashLinkDistributionType } from 'src/accounts';
-export interface InitializeCashLinkInput {
+import { CashDistributionType } from 'src/accounts';
+export interface InitializeCashInput {
   wallet: string;
   mint?: string;
-  passKey: string;
+  passKey?: string;
   amount: string;
   minAmount?: string;
   feeBps?: number;
@@ -11,13 +11,13 @@ export interface InitializeCashLinkInput {
   totalAmount: string;
   baseFeeToRedeem?: string;
   rentFeeToRedeem?: string;
-  distributionType: CashLinkDistributionType;
+  distributionType: CashDistributionType;
   maxNumRedemptions: number;
   commitment?: Commitment;
   computeUnitPrice?: number;
   computeBudget?: number;
   fingerprintEnabled?: boolean;
-  numDaysToExpire?: number;
+  cashReference: string;
   addressLookupTable?: string;
   asLegacyTransaction: boolean;
   tokenProgramId: string;
@@ -29,9 +29,9 @@ export interface ResultContext {
   asLegacyTransaction: boolean;
 }
 
-export interface CashLinkInput {
+export interface CashInput {
   walletAddress: string;
-  passKey: string;
+  cashReference: string;
   commitment?: Commitment;
   computeUnitPrice?: number;
   computeBudget?: number;
@@ -40,26 +40,15 @@ export interface CashLinkInput {
   tokenProgramId: string;
 }
 
-export interface RedeemCashLinkInput extends CashLinkInput {
+export interface RedeemCashInput extends CashInput {
   fingerprint?: string;
+  passKey?: string;
   addressLookupTable?: string;
   asLegacyTransaction: boolean;
   referrerFeeBps?: number;
   refereeFeeBps?: number;
   referrer?: string;
   tokenProgramId: string;
-}
-
-export interface SettleAndTransferInput {
-  walletAddress: string;
-  transferTokenMintAddress: string;
-  amountToSettle: string;
-  amountToTransfer: string;
-  cashLinkAddress: string;
-  memo?: string;
-  fee?: string;
-}
-
-export interface CancelPaymentOutput {
-  signature: string;
+  cashReference: string;
+  rateUsd: string;
 }

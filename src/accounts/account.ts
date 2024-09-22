@@ -1,5 +1,4 @@
 export enum AccountType {
   Uninitialized = 0,
-  CashLink = 1,
-  Redemption = 2,
+  Cash = 1,
 }

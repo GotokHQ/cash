@@ -1,6 +1,6 @@
 use borsh::{BorshDeserialize, BorshSerialize, BorshSchema};
 
-pub mod cashlink;
+pub mod cash;
 
 pub const FLAG_ACCOUNT_SIZE: usize = 1;
 pub const FINGERPRINT_PREFIX: &'static str = "fingerprint";
@@ -10,7 +10,7 @@ pub enum AccountType {
     /// If the account has not been initialized, the enum will be 0
     Uninitialized,
     /// A cashlink account type
-    CashLink,
+    Cash,
     /// A referral account type
     Referral,
 }

@@ -22,7 +22,7 @@ pub enum CashError {
     #[error("Account already settled")]
     AccountAlreadyRedeemed,
     #[error("Account already canceled")]
-    AccountAlreadyExpired,
+    AccountAlreadyCanceled,
     #[error("Fee overflow")]
     FeeOverflow,
     #[error("Account not redeemed or initialized")]
@@ -30,7 +30,7 @@ pub enum CashError {
     #[error("Account not redeemed or canceled")]
     AccountNotRedeemedOrCanceled,
     #[error("Account not canceled")]
-    AccountNotExpired,
+    AccountNotCanceled,
     #[error("Account not initialized")]
     AccountNotInitialized,
     #[error("Invalid deposit key")]
@@ -101,6 +101,12 @@ pub enum CashError {
     InvalidPassKey,
     #[error("The sum of the referral and referee fee in bps must be less than or equal to 10000")]
     InvalidReferralFees,
+    #[error("Weight not provided")]
+    WeightNotProvided,
+    #[error("Invalid weight")]
+    InvalidWeight,
+    #[error("Total weight exceeded")]
+    TotalWeightExceeded,
 }
 
 impl From<CashError> for ProgramError {

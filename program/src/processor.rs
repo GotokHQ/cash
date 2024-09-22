@@ -3,7 +3,7 @@ use crate::instruction::CashInstruction;
 
 use solana_program::{account_info::AccountInfo, entrypoint::ProgramResult, msg, pubkey::Pubkey};
 
-pub mod cashlink;
+pub mod cash;
 
 
 pub struct Processor;
@@ -20,19 +20,19 @@ impl Processor {
         match instruction {
             CashInstruction::InitCashLink(args) => {
                 msg!("Instruction: InitCashLink");
-                cashlink::process_init_cash_link(accounts, args, program_id)
+                cash::process_init_cash_link(accounts, args, program_id)
             }
             CashInstruction::Redeem(args) => {
-                msg!("Instruction: Redeem CashLink");
-                cashlink::process_redemption(accounts, args, program_id)
+                msg!("Instruction: Redeem Cash");
+                cash::process_redemption(accounts, args, program_id)
             }
             CashInstruction::Cancel(args) => {
-                msg!("Instruction: Cancel CashLink");
-                cashlink::process_cancel(accounts,  program_id, args,)
+                msg!("Instruction: Cancel Cash");
+                cash::process_cancel(accounts,  program_id, args,)
             }
             CashInstruction::Close => {
                 msg!("Instruction: Close");
-                cashlink::process_close(accounts,  program_id)
+                cash::process_close(accounts,  program_id)
             }
         }
     }

@@ -1,1 +1,1 @@
-export * from './cash_link';
+export * from './cash';

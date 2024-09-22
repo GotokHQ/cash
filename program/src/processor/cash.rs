@@ -1,16 +1,19 @@
 use crate::{
     error::CashError::{
-        self, AccountAlreadyExpired, AccountAlreadyRedeemed, AccountNotExpired,
+        self, AccountAlreadyCanceled, AccountAlreadyRedeemed, AccountNotCanceled,
         InsufficientSettlementFunds,
     },
-    instruction::{CancelCashRedemptionArgs, InitCashLinkArgs, InitCashRedemptionArgs},
+    instruction::{CancelCashRedemptionArgs, InitCashArgs, InitCashRedemptionArgs},
     math::SafeMath,
     state::{
-        cashlink::{CashLink, CashLinkState, DistributionType},
+        cash::{Cash, CashState, DistributionType},
         AccountType, FINGERPRINT_PREFIX, FLAG_ACCOUNT_SIZE,
     },
     utils::{
-        assert_account_key, assert_initialized, assert_owned_by, assert_signer, assert_token_owned_by, assert_valid_token_program, calculate_fee, create_associated_token_account_raw, create_new_account_raw, empty_account_balance, exists, get_random_value, spl_token_close, spl_token_transfer
+        assert_account_key, assert_initialized, assert_owned_by, assert_signer,
+        assert_token_owned_by, assert_valid_token_program, calculate_fee,
+        create_associated_token_account_raw, create_new_account_raw, empty_account_balance, exists,
+        get_random_value, spl_token_close, spl_token_transfer,
     },
 };
 
@@ -30,7 +33,7 @@ pub struct Processor;
 
 pub fn process_init_cash_link(
     accounts: &[AccountInfo],
-    args: InitCashLinkArgs,
+    args: InitCashArgs,
     program_id: &Pubkey,
 ) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
@@ -39,30 +42,31 @@ pub fn process_init_cash_link(
     let owner_info = next_account_info(account_info_iter)?;
     let fee_payer_info = next_account_info(account_info_iter)?;
     let cash_link_info = next_account_info(account_info_iter)?;
-    let pass_info = next_account_info(account_info_iter)?;
+    let pass_info = if args.is_locked {
+        Some(next_account_info(account_info_iter)?)
+    } else {
+        None
+    };
     let mint_info = next_account_info(account_info_iter)?;
     let vault_token_info = next_account_info(account_info_iter)?;
     let owner_token_info = next_account_info(account_info_iter)?;
     //let vault_token_info = next_account_info(account_info_iter)?;
     let rent_info = next_account_info(account_info_iter)?;
     let system_account_info = next_account_info(account_info_iter)?;
-    let clock_info = next_account_info(account_info_iter)?;
-
-    let clock = &Clock::from_account_info(clock_info)?;
 
     let token_program_info = next_account_info(account_info_iter)?;
 
     assert_valid_token_program(&token_program_info.key)?;
-    let mut cash_link = create_cash_link(
+    let mut cash = create_cash_link(
         program_id,
         cash_link_info,
         fee_payer_info,
         rent_info,
         system_account_info,
         &[
-            CashLink::PREFIX.as_bytes(),
-            pass_info.key.as_ref(),
-            &[args.cash_link_bump],
+            Cash::PREFIX.as_bytes(),
+            args.cash_reference.as_bytes(),
+            &[args.cash_bump],
         ],
     )?;
     if args.amount == 0 {
@@ -91,7 +95,7 @@ pub fn process_init_cash_link(
             }
             args.amount
         }
-        DistributionType::Random => args.amount,
+        _ => args.amount,
     };
 
     if args.distribution_type == DistributionType::Random {
@@ -104,43 +108,43 @@ pub fn process_init_cash_link(
             }
         }
     }
-    if args.num_days_to_expire == 0 {
-        return Err(CashError::InvalidExpiryInDays.into());
-    }
-    let now = clock.unix_timestamp as u64;
+    // if args.num_days_to_expire == 0 {
+    //     return Err(CashError::InvalidExpiryInDays.into());
+    // }
+    //let now = clock.unix_timestamp as u64;
     let total = total_amount
         .checked_add(total_platform_fee)
         .ok_or::<ProgramError>(CashError::Overflow.into())?
         .checked_add(total_redemption_fee)
         .ok_or::<ProgramError>(CashError::Overflow.into())?;
-    cash_link.account_type = AccountType::CashLink;
-    cash_link.state = CashLinkState::Initialized;
-    cash_link.amount = total_amount;
-    cash_link.fee_bps = args.fee_bps;
-    cash_link.base_fee_to_redeem = args.base_fee_to_redeem;
-    cash_link.rent_fee_to_redeem = args.rent_fee_to_redeem;
-    cash_link.network_fee = args.network_fee;
-    cash_link.remaining_amount = total_amount;
-    cash_link.authority = *authority_info.key;
-    cash_link.pass_key = *pass_info.key;
-    cash_link.owner = *owner_info.key;
-    cash_link.distribution_type = args.distribution_type;
-    cash_link.max_num_redemptions = args.max_num_redemptions;
-    cash_link.fingerprint_enabled = match args.fingerprint_enabled {
-        Some(enabled) => enabled,
-        None => false,
-    };
-    cash_link.expires_at = now + (args.num_days_to_expire as u64 * 86400);
-    cash_link.min_amount = match args.min_amount {
+    cash.account_type = AccountType::Cash;
+    cash.state = CashState::Initialized;
+    cash.amount = total_amount;
+    cash.fee_bps = args.fee_bps;
+    cash.base_fee_to_redeem = args.base_fee_to_redeem;
+    cash.rent_fee_to_redeem = args.rent_fee_to_redeem;
+    cash.network_fee = args.network_fee;
+    cash.remaining_amount = total_amount;
+    cash.authority = *authority_info.key;
+    cash.pass_key = pass_info.map(|pass| *pass.key);
+    cash.owner = *owner_info.key;
+    cash.distribution_type = args.distribution_type;
+    cash.max_num_redemptions = args.max_num_redemptions;
+    cash.fingerprint_enabled = args.fingerprint_enabled.unwrap_or(false);
+    //cash.expires_at = now + (args.num_days_to_expire as u64 * 86400);
+    cash.min_amount = match args.min_amount {
         Some(amount) if amount > total_amount => {
             return Err(CashError::MinAmountMustBeLessThanAmount.into())
         }
         Some(amount) => amount,
         None => 1,
     };
-    cash_link.mint = *mint_info.key;
-    let associated_token_account =
-    get_associated_token_address_with_program_id(&cash_link_info.key, &mint_info.key, &token_program_info.key);
+    cash.mint = *mint_info.key;
+    let associated_token_account = get_associated_token_address_with_program_id(
+        &cash_link_info.key,
+        &mint_info.key,
+        &token_program_info.key,
+    );
     // let vault_token: TokenAccount = assert_initialized(associated_token_account)?;
     // assert_token_owned_by(&vault_token, cash_link_info.key)?;
     assert_account_key(
@@ -160,16 +164,25 @@ pub fn process_init_cash_link(
             cash_link_info,
             mint_info,
             rent_info,
-            &token_program_info.key
+            &token_program_info.key,
         )?;
     }
     assert_owned_by(owner_token_info, &token_program_info.key)?;
     let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
     let mint: Mint = assert_initialized(mint_info)?;
     assert_token_owned_by(&owner_token, owner_info.key)?;
-    spl_token_transfer(owner_token_info, vault_token_info, owner_info, &mint_info, &token_program_info.key, total, mint.decimals, &[])?;
+    spl_token_transfer(
+        owner_token_info,
+        vault_token_info,
+        owner_info,
+        &mint_info,
+        &token_program_info.key,
+        total,
+        mint.decimals,
+        &[],
+    )?;
     //spl_token_transfer(owner_token_info, fee_token_info, owner_info, total_platform_fee, &[])?;
-    CashLink::pack(cash_link, &mut cash_link_info.data.borrow_mut())?;
+    Cash::pack(cash, &mut cash_link_info.data.borrow_mut())?;
     Ok(())
 }
 
@@ -180,12 +193,12 @@ fn create_cash_link<'a>(
     rent_sysvar_info: &AccountInfo<'a>,
     system_program_info: &AccountInfo<'a>,
     signer_seeds: &[&[u8]],
-) -> Result<CashLink, ProgramError> {
+) -> Result<Cash, ProgramError> {
     if cash_link_info.lamports() > 0 && !cash_link_info.data_is_empty() {
         return Err(ProgramError::AccountAlreadyInitialized);
     }
-    // set up cash_link account
-    let unpack = CashLink::unpack(&cash_link_info.data.borrow_mut());
+    // set up cash account
+    let unpack = Cash::unpack(&cash_link_info.data.borrow_mut());
     let proving_process = match unpack {
         Ok(data) => Ok(data),
         Err(_) => {
@@ -195,10 +208,10 @@ fn create_cash_link<'a>(
                 rent_sysvar_info,
                 payer_info,
                 system_program_info,
-                CashLink::LEN,
+                Cash::LEN,
                 signer_seeds,
             )?;
-            Ok(CashLink::unpack_unchecked(
+            Ok(Cash::unpack_unchecked(
                 &cash_link_info.data.borrow_mut(),
             )?)
         }
@@ -219,55 +232,46 @@ pub fn process_cancel(
     assert_signer(authority_info)?;
 
     let cash_link_info = next_account_info(account_info_iter)?;
+    let mut cash = Cash::unpack(&cash_link_info.data.borrow())?;
     assert_owned_by(cash_link_info, program_id)?;
-    let pass_info = next_account_info(account_info_iter)?;
-    let mut cash_link = CashLink::unpack(&cash_link_info.data.borrow())?;
-
     assert_account_key(
         authority_info,
-        &cash_link.authority,
+        &cash.authority,
         Some(CashError::InvalidAuthorityId),
-    )?;
-
-    assert_account_key(
-        pass_info,
-        &cash_link.pass_key,
-        Some(CashError::InvalidPassKey),
     )?;
     let owner_token_info = next_account_info(account_info_iter)?;
     let fee_payer_info = next_account_info(account_info_iter)?;
     let vault_token_info = next_account_info(account_info_iter)?;
     let mint_info = next_account_info(account_info_iter)?;
 
-    let clock_info = next_account_info(account_info_iter)?;
-    let clock = &Clock::from_account_info(clock_info)?;
-
-
     let token_program_info = next_account_info(account_info_iter)?;
     assert_valid_token_program(&token_program_info.key)?;
 
-    if cash_link.expired() {
-        return Err(AccountAlreadyExpired.into());
+    if cash.canceled() {
+        return Err(AccountAlreadyCanceled.into());
     }
-    if cash_link.redeemed() {
+    if cash.redeemed() {
         return Err(AccountAlreadyRedeemed.into());
     }
 
-    if (clock.unix_timestamp as u64) <= cash_link.expires_at {
-        return Err(CashError::CashlinkNotExpired.into());
-    }
+    // if (clock.unix_timestamp as u64) <= cash.expires_at {
+    //     return Err(CashError::CashlinkNotExpired.into());
+    // }
 
     let signer_seeds = [
-        CashLink::PREFIX.as_bytes(),
-        pass_info.key.as_ref(),
-        &[args.cash_link_bump],
+        Cash::PREFIX.as_bytes(),
+        args.cash_reference.as_bytes(),
+        &[args.cash_bump],
     ];
 
     let vault_token: TokenAccount = assert_initialized(vault_token_info)?;
     let mint: Mint = assert_initialized(mint_info)?;
     // assert_account_key(vault_token.mint, mint, Some(CashError::InvalidMint))?;
-    let associated_token_account =
-    get_associated_token_address_with_program_id(&cash_link_info.key, &cash_link.mint, &token_program_info.key);
+    let associated_token_account = get_associated_token_address_with_program_id(
+        &cash_link_info.key,
+        &cash.mint,
+        &token_program_info.key,
+    );
     assert_account_key(
         vault_token_info,
         &associated_token_account,
@@ -275,7 +279,7 @@ pub fn process_cancel(
     )?;
     if vault_token.amount > 0 {
         let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
-        assert_token_owned_by(&owner_token, &cash_link.owner)?;
+        assert_token_owned_by(&owner_token, &cash.owner)?;
         spl_token_transfer(
             vault_token_info,
             owner_token_info,
@@ -302,9 +306,9 @@ pub fn process_cancel(
             &[&signer_seeds],
         )?;
     }
-    msg!("Mark the cash_link account as expired...");
-    cash_link.state = CashLinkState::Expired;
-    CashLink::pack(cash_link, &mut cash_link_info.data.borrow_mut())?;
+    msg!("Mark the cash account as canceled...");
+    cash.state = CashState::Canceled;
+    Cash::pack(cash, &mut cash_link_info.data.borrow_mut())?;
     Ok(())
 }
 
@@ -323,26 +327,27 @@ pub fn process_redemption(
     let wallet_info = next_account_info(account_info_iter)?;
     let fee_token_info = next_account_info(account_info_iter)?;
     let cash_link_info = next_account_info(account_info_iter)?;
-    let pass_info = next_account_info(account_info_iter)?;
-
     assert_owned_by(cash_link_info, program_id)?;
-    let mut cash_link = CashLink::unpack(&cash_link_info.data.borrow())?;
+    let mut cash = Cash::unpack(&cash_link_info.data.borrow())?;
     assert_account_key(
         authority_info,
-        &cash_link.authority,
+        &cash.authority,
         Some(CashError::InvalidAuthorityId),
     )?;
-    assert_account_key(
-        pass_info,
-        &cash_link.pass_key,
-        Some(CashError::InvalidPassKey),
-    )?;
-    assert_signer(pass_info)?;
+    let pass_info = cash.pass_key
+    .map(|_| next_account_info(account_info_iter))
+    .transpose()?;
 
-    if cash_link.expired() {
-        return Err(AccountAlreadyExpired.into());
+    if let Some((pass_info, pass_key)) = pass_info.zip(cash.pass_key.as_ref()) {
+        assert_account_key(pass_info, pass_key, Some(CashError::InvalidPassKey))?;
+        assert_signer(pass_info)?;
+    } else if pass_info.is_some() || cash.pass_key.is_some() {
+        return Err(CashError::InvalidPassKey.into());
     }
-    if cash_link.redeemed() {
+    if cash.canceled() {
+        return Err(AccountAlreadyCanceled.into());
+    }
+    if cash.redeemed() {
         return Err(AccountAlreadyRedeemed.into());
     }
     let owner_token_info = next_account_info(account_info_iter)?; //owner_token_info
@@ -357,9 +362,6 @@ pub fn process_redemption(
     let recent_slothashes_info = next_account_info(account_info_iter)?;
     let system_account_info = next_account_info(account_info_iter)?;
     let token_program_info = next_account_info(account_info_iter)?;
-    if clock.unix_timestamp as u64 > cash_link.expires_at {
-        return Err(CashError::CashlinkExpired.into());
-    }
     assert_account_key(
         recent_slothashes_info,
         &slot_hashes::id(),
@@ -369,69 +371,118 @@ pub fn process_redemption(
     assert_valid_token_program(&token_program_info.key)?;
 
     let signer_seeds = [
-        CashLink::PREFIX.as_bytes(),
-        pass_info.key.as_ref(),
-        &[args.cash_link_bump],
+        Cash::PREFIX.as_bytes(),
+        args.cash_reference.as_ref(),
+        &[args.cash_bump],
     ];
 
-    if cash_link.total_redemptions >= cash_link.max_num_redemptions {
+    if cash.total_redemptions >= cash.max_num_redemptions {
         return Err(CashError::MaxRedemptionsReached.into());
     }
-    if cash_link.remaining_amount == 0 {
+    if cash.remaining_amount == 0 {
         return Err(CashError::NoRemainingAmount.into());
     }
 
-    let amount_to_redeem = match cash_link.distribution_type {
-        DistributionType::Fixed => cash_link
+    let amount_to_redeem = match cash.distribution_type {
+        DistributionType::Fixed => cash
             .amount
-            .checked_div(cash_link.max_num_redemptions as u64)
+            .checked_div(cash.max_num_redemptions as u64)
             .ok_or(CashError::Overflow)?,
         DistributionType::Random => {
-            if cash_link.max_num_redemptions == 1
-                || cash_link.total_redemptions == (cash_link.max_num_redemptions - 1)
+            if cash.max_num_redemptions == 1
+                || cash.total_redemptions == (cash.max_num_redemptions - 1)
             {
-                cash_link.remaining_amount
+                cash.remaining_amount
             } else {
                 // get slot hash
-                let max_possible = cash_link
-                    .remaining_amount
-                    .checked_div(cash_link.max_num_redemptions as u64)
-                    .and_then(|amount| amount.checked_mul(2))
-                    .ok_or(CashError::Overflow)?;
+                // let max_possible = cash
+                //     .remaining_amount
+                //     .checked_div(cash.max_num_redemptions as u64)
+                //     .and_then(|amount| amount.checked_mul(2))
+                //     .ok_or(CashError::Overflow)?;
 
-                let rand =
-                    get_random_value(recent_slothashes_info, clock)? as f64 / u64::MAX as f64;
-                let money;
+                // let rand =
+                //     get_random_value(recent_slothashes_info, clock)? as f64 / u64::MAX as f64;
+                // let money;
 
-                if max_possible > cash_link.min_amount {
-                    let range_amount = max_possible - cash_link.min_amount;
-                    money = cash_link.min_amount + (rand * range_amount as f64) as u64;
+                // if max_possible > cash.min_amount {
+                //     let range_amount = max_possible - cash.min_amount;
+                //     money = cash.min_amount + (rand * range_amount as f64) as u64;
+                // } else {
+                //     money = cash.min_amount;
+                // }
+                // money
+                let remaining_redemptions =
+                    cash.max_num_redemptions - cash.total_redemptions;
+                let average_possible = cash.remaining_amount / remaining_redemptions as u64;
+                let max_possible = average_possible * 2;
+
+                let min_possible = cash.min_amount.min(cash.remaining_amount);
+                let max_possible = max_possible.min(cash.remaining_amount);
+
+                if max_possible > min_possible {
+                    let rand = get_random_value(recent_slothashes_info, clock)?;
+                    let range = max_possible - min_possible + 1;
+                    let random_amount = min_possible + (rand % range);
+                    random_amount
                 } else {
-                    money = cash_link.min_amount;
+                    min_possible
                 }
-                money
             }
         }
+        DistributionType::Weighted => {
+            let weight_ppm = args.weight_ppm.ok_or(CashError::WeightNotProvided)?;
+        
+            // Validate that weight_ppm is within acceptable range (0 to 1,000,000)
+            if weight_ppm == 0 || weight_ppm > 1_000_000 {
+                return Err(CashError::InvalidWeight.into());
+            }
+        
+            // Calculate new total weight
+            let new_total_weight_ppm = cash.total_weight_ppm
+                .checked_add(weight_ppm)
+                .ok_or(CashError::Overflow)?;
+        
+            // Ensure that total weight does not exceed 1,000,000 PPM (100%)
+            if new_total_weight_ppm > 1_000_000 {
+                return Err(CashError::TotalWeightExceeded.into());
+            }
+        
+            // Calculate amount to redeem based on the total amount
+            let amount_to_redeem = cash.amount
+                .checked_mul(weight_ppm as u64)
+                .ok_or(CashError::Overflow)?
+                .checked_div(1_000_000)
+                .ok_or(CashError::Overflow)?;
+        
+            // Ensure amount_to_redeem does not exceed remaining_amount
+            let amount_to_redeem = amount_to_redeem.min(cash.remaining_amount);
+        
+            // Update cumulative weight
+            cash.total_weight_ppm = new_total_weight_ppm;
+        
+            amount_to_redeem
+        },
     };
 
-    let fee_to_redeem = cash_link.max_fee_to_redeem()?;
+    let fee_to_redeem = cash.max_fee_to_redeem()?;
 
-    cash_link.remaining_amount = cash_link
+    cash.remaining_amount = cash
         .remaining_amount
         .checked_sub(amount_to_redeem)
         .ok_or(CashError::Overflow)?;
 
-    cash_link.total_redemptions = cash_link.total_redemptions.error_increment()?;
+    cash.total_redemptions = cash.total_redemptions.error_increment()?;
 
-    let platform_fee_per_redeem: u64 = calculate_fee(cash_link.amount, cash_link.fee_bps as u64)?
-        .checked_div(cash_link.max_num_redemptions as u64)
+    let platform_fee_per_redeem: u64 = calculate_fee(cash.amount, cash.fee_bps as u64)?
+        .checked_div(cash.max_num_redemptions as u64)
         .ok_or(CashError::Overflow)?;
 
-    let mut total_fee_to_redeem = if cash_link.total_redemptions == 1 {
+    let mut total_fee_to_redeem = if cash.total_redemptions == 1 {
         platform_fee_per_redeem
             .checked_add(fee_to_redeem)
             .ok_or::<ProgramError>(CashError::Overflow.into())?
-            .checked_add(cash_link.network_fee)
+            .checked_add(cash.network_fee)
             .ok_or::<ProgramError>(CashError::Overflow.into())?
     } else {
         platform_fee_per_redeem
@@ -443,8 +494,11 @@ pub fn process_redemption(
         .checked_add(total_fee_to_redeem)
         .ok_or::<ProgramError>(CashError::Overflow.into())?;
     assert_owned_by(vault_token_info, &token_program_info.key)?;
-    let associated_token_account =
-        get_associated_token_address_with_program_id(&cash_link_info.key, &cash_link.mint, &token_program_info.key);
+    let associated_token_account = get_associated_token_address_with_program_id(
+        &cash_link_info.key,
+        &cash.mint,
+        &token_program_info.key,
+    );
     assert_account_key(
         vault_token_info,
         &associated_token_account,
@@ -463,7 +517,7 @@ pub fn process_redemption(
         assert_owned_by(recipient_token_info, &token_program_info.key)?;
         //subtract rent_fee
         total_fee_to_redeem = total_fee_to_redeem
-            .checked_sub(cash_link.rent_fee_to_redeem)
+            .checked_sub(cash.rent_fee_to_redeem)
             .ok_or::<ProgramError>(CashError::Overflow.into())?;
         total = amount_to_redeem
             .checked_add(total_fee_to_redeem)
@@ -506,7 +560,7 @@ pub fn process_redemption(
                     referral_wallet_info,
                     mint_info,
                     rent_info,
-                    &token_program_info.key
+                    &token_program_info.key,
                 )?;
             }
             let referee_fee_bps = match args.referee_fee_bps {
@@ -600,9 +654,9 @@ pub fn process_redemption(
         .amount
         .checked_sub(total)
         .ok_or::<ProgramError>(CashError::Overflow.into())?;
-    if cash_link.is_fully_redeemed()? {
+    if cash.is_fully_redeemed()? {
         let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
-        assert_token_owned_by(&owner_token, &cash_link.owner)?;
+        assert_token_owned_by(&owner_token, &cash.owner)?;
         if remaining > 0 {
             spl_token_transfer(
                 vault_token_info,
@@ -623,12 +677,11 @@ pub fn process_redemption(
             &[&signer_seeds],
         )?;
     }
-    if cash_link.fingerprint_enabled {
+    if cash.fingerprint_enabled {
         if let Some(bump) = args.fingerprint_bump {
             let fingerprint_account_info = next_account_info(account_info_iter)?;
             let fingerprint_ref_info = next_account_info(account_info_iter)?;
-            if fingerprint_account_info.lamports() > 0
-                && !fingerprint_account_info.data_is_empty()
+            if fingerprint_account_info.lamports() > 0 && !fingerprint_account_info.data_is_empty()
             {
                 return Err(ProgramError::AccountAlreadyInitialized);
             }
@@ -650,12 +703,12 @@ pub fn process_redemption(
             return Err(CashError::FingerprintBumpNotFound.into());
         }
     }
-    cash_link.state = if cash_link.is_fully_redeemed()? {
-        CashLinkState::Redeemed
+    cash.state = if cash.is_fully_redeemed()? {
+        CashState::Redeemed
     } else {
-        CashLinkState::Redeeming
+        CashState::Redeeming
     };
-    CashLink::pack(cash_link, &mut cash_link_info.data.borrow_mut())?;
+    Cash::pack(cash, &mut cash_link_info.data.borrow_mut())?;
     Ok(())
 }
 
@@ -668,19 +721,19 @@ pub fn process_close(accounts: &[AccountInfo], program_id: &Pubkey) -> ProgramRe
     let destination_info = next_account_info(account_info_iter)?;
     assert_owned_by(cash_link_info, program_id)?;
 
-    let cash_link = CashLink::unpack(&cash_link_info.data.borrow())?;
+    let cash = Cash::unpack(&cash_link_info.data.borrow())?;
     assert_account_key(
         authority_info,
-        &cash_link.authority,
+        &cash.authority,
         Some(CashError::InvalidAuthorityId),
     )?;
-    if !cash_link.expired() {
-        return Err(AccountNotExpired.into());
+    if !cash.canceled() {
+        return Err(AccountNotCanceled.into());
     }
-    if cash_link.total_redemptions > 0 {
+    if cash.total_redemptions > 0 {
         return Err(AccountAlreadyRedeemed.into());
     }
-    msg!("Closing the cash_link account...");
+    msg!("Closing the cash account...");
     empty_account_balance(cash_link_info, destination_info)?;
     Ok(())
 }

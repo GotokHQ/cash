@@ -1,7 +1,7 @@
 {
     "name": "@gotok/cash",
-    "version": "0.0.1",
-    "description": "Cash Link JavaScript API.",
+    "version": "2.0.0",
+    "description": "Cash JavaScript API.",
     "main": "dist/src/index.js",
     "types": "dist/src/index.d.ts",
     "scripts": {
@@ -28,7 +28,7 @@
     ],
     "homepage": "https://gotok.app",
     "repository": "https://github.com/GotokHQ/card.git",
-    "author": "CashLink Maintainers <contact@gotok.app>",
+    "author": "Cash Maintainers <contact@gotok.app>",
     "license": "MIT",
     "dependencies": {
         "@metaplex-foundation/mpl-core": "^0.0.2",
