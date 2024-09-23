@@ -93,7 +93,7 @@ export class CashClient {
 
   cancel = async (input: CashInput): Promise<ResultContext> => {
     const [cashAddress, bump] = CashProgram.cashAccount(input.cashReference);
-    const cash = await _getCashLinkAccount(this.connection, cashAddress);
+    const cash = await _getCashAccount(this.connection, cashAddress);
     if (cash == null) {
       throw new Error(FAILED_TO_FIND_ACCOUNT);
     }
@@ -153,7 +153,7 @@ export class CashClient {
 
   cancelAndClose = async (input: CashInput): Promise<ResultContext> => {
     const [cashAddress, bump] = CashProgram.cashAccount(input.cashReference);
-    const cash = await _getCashLinkAccount(this.connection, cashAddress);
+    const cash = await _getCashAccount(this.connection, cashAddress);
     if (cash == null) {
       throw new Error(FAILED_TO_FIND_ACCOUNT);
     }
@@ -312,7 +312,7 @@ export class CashClient {
 
   close = async (input: CashInput): Promise<ResultContext> => {
     const [cashAddress] = CashProgram.cashAccount(input.cashReference);
-    const cash = await _getCashLinkAccount(this.connection, cashAddress);
+    const cash = await _getCashAccount(this.connection, cashAddress);
     if (cash == null || !cash.data) {
       throw new Error(FAILED_TO_FIND_ACCOUNT);
     }
@@ -690,7 +690,7 @@ export class CashClient {
     const passKey = input.passKey ? new PublicKey(input.passKey) : undefined;
     const tokenProgramId = new PublicKey(input.tokenProgramId);
     const [cashLinkAddress, cashBump] = CashProgram.cashAccount(input.cashReference);
-    const cash = await _getCashLinkAccount(this.connection, cashLinkAddress, input.commitment);
+    const cash = await _getCashAccount(this.connection, cashLinkAddress, input.commitment);
     if (cash == null) {
       throw new Error(FAILED_TO_FIND_ACCOUNT);
     }
@@ -881,7 +881,7 @@ export class CashClient {
 
   getCash = async (address: PublicKey, commitment?: Commitment): Promise<Cash | null> => {
     try {
-      return await _getCashLinkAccount(this.connection, address, commitment);
+      return await _getCashAccount(this.connection, address, commitment);
     } catch (error) {
       if (error.message === FAILED_TO_FIND_ACCOUNT) {
         return null;
@@ -963,7 +963,7 @@ export class CashClient {
   };
 }
 
-const _getCashLinkAccount = async (
+const _getCashAccount = async (
   connection: Connection,
   cashLinkAddress: PublicKey,
   commitment?: Commitment,
