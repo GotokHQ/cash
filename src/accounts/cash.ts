@@ -24,6 +24,7 @@ export enum CashDistributionType {
   Fixed = 0,
   Random = 1,
   Weighted = 2,
+  Equal = 3,
 }
 
 export type CashDataArgs = {
