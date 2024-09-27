@@ -12,7 +12,7 @@ pub mod entrypoint;
 use solana_program::{declare_id, pubkey::Pubkey};
 use state::{cash::Cash, FINGERPRINT_PREFIX };
 
-declare_id!("cashQKx31fVsquVKXQ9prKqVtSYf8SqcYt9Jyvg966q");
+declare_id!("cashXAE5UP18RyU7ByFWfxu93kGg69KzoktacNQDukW");
 
 
 /// Generates cash link program address

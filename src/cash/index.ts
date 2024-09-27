@@ -41,10 +41,10 @@ export const FAILED_TO_FIND_ACCOUNT = 'Failed to find account';
 export const INVALID_ACCOUNT_OWNER = 'Invalid account owner';
 export const INVALID_AUTHORITY = 'Invalid _authority';
 export const INVALID_PAYER_ADDRESS = 'Invalid payer address';
-export const ACCOUNT_ALREADY_EXPIRED = 'Account already canceled';
+export const ACCOUNT_ALREADY_CANCELED = 'Account already canceled';
 export const ACCOUNT_ALREADY_SETTLED = 'Account already settled';
 export const ACCOUNT_NOT_INITIALIZED_OR_SETTLED = 'Account not initialized or settled';
-export const ACCOUNT_NOT_EXPIRED = 'Account not canceled';
+export const ACCOUNT_NOT_CANCELED = 'Account not canceled';
 export const ACCOUNT_HAS_REDEMPTIONS = 'Account has redemptions';
 export const INVALID_SIGNATURE = 'Invalid signature';
 export const AMOUNT_MISMATCH = 'Amount mismatch';
@@ -227,8 +227,8 @@ export class CashClient {
     instructions: TransactionInstruction[];
     signers: Keypair[];
   }> => {
-    if (cash.data?.state === CashState.Expired) {
-      throw new Error(ACCOUNT_ALREADY_EXPIRED);
+    if (cash.data?.state === CashState.Canceled) {
+      throw new Error(ACCOUNT_ALREADY_CANCELED);
     }
     if (cash.data?.state === CashState.Redeemed) {
       throw new Error(ACCOUNT_ALREADY_SETTLED);
@@ -316,8 +316,8 @@ export class CashClient {
     if (cash == null || !cash.data) {
       throw new Error(FAILED_TO_FIND_ACCOUNT);
     }
-    if (cash.data.state !== CashState.Expired) {
-      throw new Error(ACCOUNT_NOT_EXPIRED);
+    if (cash.data.state !== CashState.Canceled) {
+      throw new Error(ACCOUNT_NOT_CANCELED);
     }
     if (cash.data.totalRedemptions !== 0) {
       throw new Error(ACCOUNT_HAS_REDEMPTIONS);

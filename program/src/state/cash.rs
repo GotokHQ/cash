@@ -32,6 +32,7 @@ pub enum DistributionType {
     Fixed = 0,
     Random,
     Weighted,
+    Equal,
 }
 
 #[repr(C)]

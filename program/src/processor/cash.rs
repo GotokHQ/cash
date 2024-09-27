@@ -463,6 +463,14 @@ pub fn process_redemption(
         
             amount_to_redeem
         },
+        DistributionType::Equal => {
+            // Calculate the equal amount per redemption
+            let amount_to_redeem = cash
+                .amount
+                .checked_div(cash.max_num_redemptions as u64)
+                .ok_or(CashError::Overflow)?;
+            amount_to_redeem
+        },
     };
 
     let fee_to_redeem = cash.max_fee_to_redeem()?;

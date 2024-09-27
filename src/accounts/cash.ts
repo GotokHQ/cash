@@ -17,7 +17,7 @@ export enum CashState {
   Initialized = 0,
   Redeemed = 1,
   Redeeming = 2,
-  Expired = 3,
+  Canceled = 3,
 }
 
 export enum CashDistributionType {
