@@ -8,6 +8,7 @@ export class CashProgram extends Program {
   static readonly REWARD_PREFIX = 'reward';
   static readonly WALLET_PREFIX = 'wallet';
   static readonly REFERRAL_PREFIX = 'referral';
+  static readonly TICKET_PREFIX = 'ticket';
   static readonly PUBKEY = new PublicKey('cashXAE5UP18RyU7ByFWfxu93kGg69KzoktacNQDukW');
 
   static cashAccount(reference: string): [PublicKey, number] {
@@ -27,6 +28,13 @@ export class CashProgram extends Program {
   static walletAccount(wallet: PublicKey): [PublicKey, number] {
     return PublicKey.findProgramAddressSync(
       [Buffer.from(CashProgram.WALLET_PREFIX), wallet.toBuffer()],
+      CashProgram.PUBKEY,
+    );
+  }
+
+  static ticketAccount(cash: PublicKey, wallet: PublicKey): [PublicKey, number] {
+    return PublicKey.findProgramAddressSync(
+      [Buffer.from(CashProgram.TICKET_PREFIX), cash.toBuffer(), wallet.toBuffer()],
       CashProgram.PUBKEY,
     );
   }
