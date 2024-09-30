@@ -359,7 +359,6 @@ pub fn process_redemption(
     let clock = &Clock::from_account_info(clock_info)?;
     let rent_info = next_account_info(account_info_iter)?;
     let recent_slothashes_info = next_account_info(account_info_iter)?;
-    let system_account_info = next_account_info(account_info_iter)?;
     let token_program_info = next_account_info(account_info_iter)?;
     assert_account_key(
         recent_slothashes_info,

@@ -92,12 +92,10 @@ pub enum CashInstruction {
     /// 10. `[]` The mint account for the token
     /// 11. `[]` The rent account
     /// 12. `[]` The recent slot hash account
-    /// 13. `[]` The system program
+    /// 13. `[]` The token program
     /// 14. `[writable][Optional]` The referrer wallet account
     /// 15. `[writable][Optional]` The referrer token account
-    /// 16. `[][Optional]` The fingerprint reference
-    /// 17. `[]` The token program
-    /// 18. `[]` The associated program
+    /// 16. `[]` The associated program
     Redeem(InitCashRedemptionArgs),
     /// Cancel the cash_link
     ///
@@ -225,7 +223,6 @@ pub fn redeem_cash_link(
         AccountMeta::new_readonly(sysvar::clock::id(), false),
         AccountMeta::new_readonly(sysvar::rent::id(), false),
         AccountMeta::new_readonly(sysvar::slot_hashes::id(), false),
-        AccountMeta::new_readonly(system_program::id(), false),
         AccountMeta::new_readonly(*token_program_id, false),
     ];
     if let Some(referral) = referral_wallet {

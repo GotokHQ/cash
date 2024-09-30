@@ -11,7 +11,7 @@ import bs58 from 'bs58';
 import { CashProgram } from '../cash_program';
 import { AccountType } from './account';
 
-export const MAX_CASH_LINK_DATA_LEN = 195;
+export const MAX_CASH_LINK_DATA_LEN = 194;
 
 export enum CashState {
   Initialized = 0,
