@@ -712,12 +712,32 @@ export class CashClient {
       referrer = new PublicKey(input.referrer);
       referrerToken = spl.getAssociatedTokenAddressSync(mint, referrer, true, tokenProgramId);
     }
-    const walletTokenAccount = spl.getAssociatedTokenAddressSync(
-      mint,
-      walletAddress,
-      true,
-      tokenProgramId,
-    );
+
+    const isNativeToken = mint.equals(spl.NATIVE_MINT) || mint.equals(spl.NATIVE_MINT_2022);
+    const unwrapTokenAccount = isNativeToken ? Keypair.generate() : null;
+
+    const instructions = [
+      ...(isNativeToken
+        ? [
+            SystemProgram.createAccount({
+              fromPubkey: this.feePayer,
+              newAccountPubkey: unwrapTokenAccount.publicKey,
+              lamports: kTokenProgramRent,
+              space: spl.ACCOUNT_SIZE,
+              programId: tokenProgramId,
+            }),
+            spl.createInitializeAccount3Instruction(
+              unwrapTokenAccount.publicKey,
+              mint,
+              walletAddress,
+              tokenProgramId,
+            ),
+          ]
+        : []),
+    ];
+    const walletTokenAccount = isNativeToken
+      ? unwrapTokenAccount.publicKey
+      : spl.getAssociatedTokenAddressSync(mint, walletAddress, true, tokenProgramId);
     const ownerTokenAccount = await this.getOrCreateAssociatedAccount(
       mint,
       owner,
@@ -756,9 +776,24 @@ export class CashClient {
       referrerFeeBps: input.referrerFeeBps,
       cashReference: input.cashReference,
     });
-    const instructions = [];
     instructions.push(redeemInstruction);
-    const signers = [];
+    if (isNativeToken) {
+      instructions.push(
+        spl.createCloseAccountInstruction(
+          unwrapTokenAccount.publicKey,
+          walletAddress,
+          walletAddress,
+          [],
+          tokenProgramId,
+        ),
+        SystemProgram.transfer({
+          fromPubkey: walletAddress,
+          toPubkey: this.feePayer,
+          lamports: kTokenProgramRent,
+        }),
+      );
+    }
+    const signers = isNativeToken ? [unwrapTokenAccount] : [];
     return {
       instructions,
       signers,

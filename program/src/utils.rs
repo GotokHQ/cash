@@ -191,6 +191,18 @@ pub fn spl_token_transfer<'a>(
     )
 }
 
+/// Native Sync.
+pub fn sync_native<'a>(
+    account: &AccountInfo<'a>,
+    token_id: &Pubkey,
+) -> Result<(), ProgramError> {
+    invoke(
+        // for native SOL transfer user_wallet key == user_token_account key
+        &spl_token_2022::instruction::sync_native(token_id, &account.key)?,
+        &[account.clone()],
+    )
+}
+
 /// Native instruction.
 pub fn native_transfer<'a>(
     source: &AccountInfo<'a>,
@@ -205,6 +217,7 @@ pub fn native_transfer<'a>(
         signers_seeds,
     )
 }
+
 
 /// SPL transfer instruction.
 pub fn spl_token_close<'a>(

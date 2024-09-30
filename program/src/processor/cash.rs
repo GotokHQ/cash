@@ -7,13 +7,13 @@ use crate::{
     math::SafeMath,
     state::{
         cash::{Cash, CashState, DistributionType},
-        AccountType
+        AccountType,
     },
     utils::{
         assert_account_key, assert_initialized, assert_owned_by, assert_signer,
-        assert_token_owned_by, assert_valid_token_program, calculate_fee,
+        assert_token_owned_by, assert_valid_token_program, calculate_fee, cmp_pubkeys,
         create_associated_token_account_raw, create_new_account_raw, empty_account_balance, exists,
-        get_random_value, spl_token_close, spl_token_transfer,
+        get_random_value, native_transfer, spl_token_close, spl_token_transfer, sync_native,
     },
 };
 
@@ -169,17 +169,24 @@ pub fn process_init_cash_link(
     assert_owned_by(owner_token_info, &token_program_info.key)?;
     let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
     let mint: Mint = assert_initialized(mint_info)?;
-    assert_token_owned_by(&owner_token, owner_info.key)?;
-    spl_token_transfer(
-        owner_token_info,
-        vault_token_info,
-        owner_info,
-        &mint_info,
-        &token_program_info.key,
-        total,
-        mint.decimals,
-        &[],
-    )?;
+    if cmp_pubkeys(&owner_info.key, &spl_token::native_mint::id())
+        || cmp_pubkeys(&owner_info.key, &spl_token_2022::native_mint::id())
+    {
+        native_transfer(owner_info, vault_token_info, total, &[])?;
+        sync_native(vault_token_info, &token_program_info.key)?;
+    } else {
+        assert_token_owned_by(&owner_token, owner_info.key)?;
+        spl_token_transfer(
+            owner_token_info,
+            vault_token_info,
+            owner_info,
+            &mint_info,
+            &token_program_info.key,
+            total,
+            mint.decimals,
+            &[],
+        )?;
+    }
     //spl_token_transfer(owner_token_info, fee_token_info, owner_info, total_platform_fee, &[])?;
     Cash::pack(cash, &mut cash_link_info.data.borrow_mut())?;
     Ok(())
@@ -210,9 +217,7 @@ fn create_cash_link<'a>(
                 Cash::LEN,
                 signer_seeds,
             )?;
-            Ok(Cash::unpack_unchecked(
-                &cash_link_info.data.borrow_mut(),
-            )?)
+            Ok(Cash::unpack_unchecked(&cash_link_info.data.borrow_mut())?)
         }
     };
 
@@ -277,25 +282,38 @@ pub fn process_cancel(
         Some(CashError::InvalidVaultTokenOwner),
     )?;
     if vault_token.amount > 0 {
-        let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
-        assert_token_owned_by(&owner_token, &cash.owner)?;
-        spl_token_transfer(
-            vault_token_info,
-            owner_token_info,
-            cash_link_info,
-            mint_info,
-            &token_program_info.key,
-            vault_token.amount,
-            mint.decimals,
-            &[&signer_seeds],
-        )?;
-        spl_token_close(
-            vault_token_info,
-            fee_payer_info,
-            cash_link_info,
-            &token_program_info.key,
-            &[&signer_seeds],
-        )?;
+        if cmp_pubkeys(&owner_token_info.key, &spl_token::native_mint::id())
+            || cmp_pubkeys(&owner_token_info.key, &spl_token_2022::native_mint::id())
+        {
+            spl_token_close(
+                vault_token_info,
+                fee_payer_info,
+                cash_link_info,
+                &token_program_info.key,
+                &[&signer_seeds],
+            )?;
+            native_transfer(fee_payer_info, owner_token_info, vault_token.amount, &[])?;
+        } else {
+            let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
+            assert_token_owned_by(&owner_token, &cash.owner)?;
+            spl_token_transfer(
+                vault_token_info,
+                owner_token_info,
+                cash_link_info,
+                mint_info,
+                &token_program_info.key,
+                vault_token.amount,
+                mint.decimals,
+                &[&signer_seeds],
+            )?;
+            spl_token_close(
+                vault_token_info,
+                fee_payer_info,
+                cash_link_info,
+                &token_program_info.key,
+                &[&signer_seeds],
+            )?;
+        }
     } else {
         spl_token_close(
             vault_token_info,
@@ -333,9 +351,10 @@ pub fn process_redemption(
         &cash.authority,
         Some(CashError::InvalidAuthorityId),
     )?;
-    let pass_info = cash.pass_key
-    .map(|_| next_account_info(account_info_iter))
-    .transpose()?;
+    let pass_info = cash
+        .pass_key
+        .map(|_| next_account_info(account_info_iter))
+        .transpose()?;
 
     if let Some((pass_info, pass_key)) = pass_info.zip(cash.pass_key.as_ref()) {
         assert_account_key(pass_info, pass_key, Some(CashError::InvalidPassKey))?;
@@ -410,8 +429,7 @@ pub fn process_redemption(
                 //     money = cash.min_amount;
                 // }
                 // money
-                let remaining_redemptions =
-                    cash.max_num_redemptions - cash.total_redemptions;
+                let remaining_redemptions = cash.max_num_redemptions - cash.total_redemptions;
                 let average_possible = cash.remaining_amount / remaining_redemptions as u64;
                 let max_possible = average_possible * 2;
 
@@ -430,37 +448,39 @@ pub fn process_redemption(
         }
         DistributionType::Weighted => {
             let weight_ppm = args.weight_ppm.ok_or(CashError::WeightNotProvided)?;
-        
+
             // Validate that weight_ppm is within acceptable range (0 to 1,000,000)
             if weight_ppm == 0 || weight_ppm > 1_000_000 {
                 return Err(CashError::InvalidWeight.into());
             }
-        
+
             // Calculate new total weight
-            let new_total_weight_ppm = cash.total_weight_ppm
+            let new_total_weight_ppm = cash
+                .total_weight_ppm
                 .checked_add(weight_ppm)
                 .ok_or(CashError::Overflow)?;
-        
+
             // Ensure that total weight does not exceed 1,000,000 PPM (100%)
             if new_total_weight_ppm > 1_000_000 {
                 return Err(CashError::TotalWeightExceeded.into());
             }
-        
+
             // Calculate amount to redeem based on the total amount
-            let amount_to_redeem = cash.amount
+            let amount_to_redeem = cash
+                .amount
                 .checked_mul(weight_ppm as u64)
                 .ok_or(CashError::Overflow)?
                 .checked_div(1_000_000)
                 .ok_or(CashError::Overflow)?;
-        
+
             // Ensure amount_to_redeem does not exceed remaining_amount
             let amount_to_redeem = amount_to_redeem.min(cash.remaining_amount);
-        
+
             // Update cumulative weight
             cash.total_weight_ppm = new_total_weight_ppm;
-        
+
             amount_to_redeem
-        },
+        }
         DistributionType::Equal => {
             // Calculate the equal amount per redemption
             let amount_to_redeem = cash
@@ -468,7 +488,7 @@ pub fn process_redemption(
                 .checked_div(cash.max_num_redemptions as u64)
                 .ok_or(CashError::Overflow)?;
             amount_to_redeem
-        },
+        }
     };
 
     let fee_to_redeem = cash.max_fee_to_redeem()?;
@@ -661,27 +681,42 @@ pub fn process_redemption(
         .checked_sub(total)
         .ok_or::<ProgramError>(CashError::Overflow.into())?;
     if cash.is_fully_redeemed()? {
-        let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
-        assert_token_owned_by(&owner_token, &cash.owner)?;
-        if remaining > 0 {
-            spl_token_transfer(
+        if cmp_pubkeys(&owner_token_info.key, &spl_token::native_mint::id())
+            || cmp_pubkeys(&owner_token_info.key, &spl_token_2022::native_mint::id())
+        {
+            spl_token_close(
                 vault_token_info,
-                owner_token_info,
+                fee_payer_info,
                 cash_link_info,
-                mint_info,
                 &token_program_info.key,
-                remaining,
-                mint.decimals,
+                &[&signer_seeds],
+            )?;
+            if remaining > 0 {
+                native_transfer(fee_payer_info, owner_token_info, remaining, &[])?;
+            }
+        } else {
+            let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
+            assert_token_owned_by(&owner_token, &cash.owner)?;
+            if remaining > 0 {
+                spl_token_transfer(
+                    vault_token_info,
+                    owner_token_info,
+                    cash_link_info,
+                    mint_info,
+                    &token_program_info.key,
+                    remaining,
+                    mint.decimals,
+                    &[&signer_seeds],
+                )?;
+            }
+            spl_token_close(
+                vault_token_info,
+                fee_payer_info,
+                cash_link_info,
+                &token_program_info.key,
                 &[&signer_seeds],
             )?;
         }
-        spl_token_close(
-            vault_token_info,
-            fee_payer_info,
-            cash_link_info,
-            &token_program_info.key,
-            &[&signer_seeds],
-        )?;
     }
     cash.state = if cash.is_fully_redeemed()? {
         CashState::Redeemed
