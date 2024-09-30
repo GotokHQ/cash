@@ -7,7 +7,7 @@ use crate::{
     math::SafeMath,
     state::{
         cash::{Cash, CashState, DistributionType},
-        AccountType, FINGERPRINT_PREFIX, FLAG_ACCOUNT_SIZE,
+        AccountType
     },
     utils::{
         assert_account_key, assert_initialized, assert_owned_by, assert_signer,
@@ -130,7 +130,6 @@ pub fn process_init_cash_link(
     cash.owner = *owner_info.key;
     cash.distribution_type = args.distribution_type;
     cash.max_num_redemptions = args.max_num_redemptions;
-    cash.fingerprint_enabled = args.fingerprint_enabled.unwrap_or(false);
     //cash.expires_at = now + (args.num_days_to_expire as u64 * 86400);
     cash.min_amount = match args.min_amount {
         Some(amount) if amount > total_amount => {
@@ -684,32 +683,6 @@ pub fn process_redemption(
             &token_program_info.key,
             &[&signer_seeds],
         )?;
-    }
-    if cash.fingerprint_enabled {
-        if let Some(bump) = args.fingerprint_bump {
-            let fingerprint_account_info = next_account_info(account_info_iter)?;
-            let fingerprint_ref_info = next_account_info(account_info_iter)?;
-            if fingerprint_account_info.lamports() > 0 && !fingerprint_account_info.data_is_empty()
-            {
-                return Err(ProgramError::AccountAlreadyInitialized);
-            }
-            create_new_account_raw(
-                program_id,
-                fingerprint_account_info,
-                rent_info,
-                fee_payer_info,
-                system_account_info,
-                FLAG_ACCOUNT_SIZE,
-                &[
-                    FINGERPRINT_PREFIX.as_bytes(),
-                    cash_link_info.key.as_ref(),
-                    fingerprint_ref_info.key.as_ref(),
-                    &[bump],
-                ],
-            )?;
-        } else {
-            return Err(CashError::FingerprintBumpNotFound.into());
-        }
     }
     cash.state = if cash.is_fully_redeemed()? {
         CashState::Redeemed

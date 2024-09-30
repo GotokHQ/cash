@@ -25,7 +25,6 @@ pub struct InitCashArgs {
     pub distribution_type: DistributionType,
     pub max_num_redemptions: u16,
     pub min_amount: Option<u64>,
-    pub fingerprint_enabled: Option<bool>,
     pub cash_reference: String,
     pub is_locked: bool,
 }
@@ -96,10 +95,9 @@ pub enum CashInstruction {
     /// 13. `[]` The system program
     /// 14. `[writable][Optional]` The referrer wallet account
     /// 15. `[writable][Optional]` The referrer token account
-    /// 16. `[writable][Optional]` The fingerprint info
-    /// 17. `[][Optional]` The fingerprint reference
-    /// 18. `[]` The token program
-    /// 19. `[]` The associated program
+    /// 16. `[][Optional]` The fingerprint reference
+    /// 17. `[]` The token program
+    /// 18. `[]` The associated program
     Redeem(InitCashRedemptionArgs),
     /// Cancel the cash_link
     ///
@@ -208,8 +206,6 @@ pub fn redeem_cash_link(
     fee_payer_token: &Pubkey,
     referral_wallet: Option<&Pubkey>,
     referral_token: Option<&Pubkey>,
-    fingerprint: Option<&Pubkey>,
-    fingerprint_ref: Option<&Pubkey>,
     mint: &Pubkey,
     token_program_id: &Pubkey,
     args: InitCashRedemptionArgs
@@ -237,12 +233,6 @@ pub fn redeem_cash_link(
     }
     if let Some(referral_token_account) = referral_token {
         accounts.push(AccountMeta::new(*referral_token_account, false));
-    }
-    if let Some(fingerprint_id) = fingerprint {
-        accounts.push(AccountMeta::new(*fingerprint_id, false));
-    }
-    if let Some(fingerprint_id) = fingerprint_ref {
-        accounts.push(AccountMeta::new_readonly(*fingerprint_id, false));
     }
     accounts.push(AccountMeta::new_readonly(spl_associated_token_account::id(), false));
 

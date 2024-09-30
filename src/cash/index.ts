@@ -694,19 +694,6 @@ export class CashClient {
     if (cash == null) {
       throw new Error(FAILED_TO_FIND_ACCOUNT);
     }
-    let fingerprint: PublicKey | undefined;
-    let fingerprintPda: PublicKey | undefined;
-    let fingerprintBump: number | undefined;
-    if (input.fingerprint) {
-      fingerprint = new PublicKey(input.fingerprint);
-      [fingerprintPda, fingerprintBump] = CashProgram.findFingerprintAccount(
-        cashLinkAddress,
-        fingerprint,
-      );
-    }
-    if (cash.data.fingerprintEnabled && !fingerprint) {
-      throw new Error(FINGERPRINT_NOT_FOUND);
-    }
     if (input.referrerFeeBps && !input.referrer) {
       throw new Error(REFERRER_WALLET);
     }
@@ -762,9 +749,6 @@ export class CashClient {
       authority: this.authority,
       cash: cash.pubkey,
       feePayer: this.feePayer,
-      fingerprint,
-      fingerprintBump,
-      fingerprintPda,
       referrer,
       referrerToken,
       tokenProgramId,
@@ -796,12 +780,8 @@ export class CashClient {
       mint,
       referrer,
       referrerToken,
-      fingerprintPda,
-      fingerprint,
       tokenProgramId,
       cashBump,
-      fingerprintBump,
-      referrerFeeBps,
       refereeFeeBps,
       cashReference,
       weightPpm,
@@ -831,15 +811,11 @@ export class CashClient {
             { pubkey: referrerToken, isSigner: false, isWritable: true },
           ]
         : []),
-      ...(fingerprintPda ? [{ pubkey: fingerprintPda, isSigner: false, isWritable: true }] : []),
-      ...(fingerprint ? [{ pubkey: fingerprint, isSigner: false, isWritable: false }] : []),
       { pubkey: spl.ASSOCIATED_TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
     ];
 
     const data = RedeemCashLinkArgs.serialize({
       cashBump,
-      fingerprintBump,
-      referrerFeeBps,
       refereeFeeBps,
       cashReference,
       weightPpm,

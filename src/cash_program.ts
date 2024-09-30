@@ -4,7 +4,7 @@ import { Cash } from './accounts';
 
 export class CashProgram extends Program {
   static readonly PREFIX = 'cash';
-  static readonly FINGERPRINT_PREFIX = 'fingerprint';
+  static readonly REDEMPTION_PREFIX = 'redemption';
   static readonly REWARD_PREFIX = 'reward';
   static readonly WALLET_PREFIX = 'wallet';
   static readonly REFERRAL_PREFIX = 'referral';
@@ -52,9 +52,9 @@ export class CashProgram extends Program {
     );
   }
 
-  static findFingerprintAccount(cash: PublicKey, fingerprint: PublicKey): [PublicKey, number] {
+  static redemptionAccount(cash: PublicKey, wallet: PublicKey): [PublicKey, number] {
     return PublicKey.findProgramAddressSync(
-      [Buffer.from(CashProgram.FINGERPRINT_PREFIX), cash.toBuffer(), fingerprint.toBuffer()],
+      [Buffer.from(CashProgram.REDEMPTION_PREFIX), cash.toBuffer(), wallet.toBuffer()],
       CashProgram.PUBKEY,
     );
   }

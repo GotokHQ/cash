@@ -10,7 +10,7 @@ pub mod math;
 pub mod entrypoint;
 
 use solana_program::{declare_id, pubkey::Pubkey};
-use state::{cash::Cash, FINGERPRINT_PREFIX };
+use state::cash::Cash;
 
 declare_id!("cashXAE5UP18RyU7ByFWfxu93kGg69KzoktacNQDukW");
 
@@ -21,18 +21,6 @@ pub fn find_cash_link_program_address(program_id: &Pubkey, pass_key: Pubkey) -> 
         &[
             Cash::PREFIX.as_bytes(),
             pass_key.as_ref()
-        ],
-        program_id,
-    )
-}
-
-
-pub fn find_fingerprint_program_address(program_id: &Pubkey, cash_link: &Pubkey, fingerprint: String) -> (Pubkey, u8) {
-    Pubkey::find_program_address(
-        &[
-            FINGERPRINT_PREFIX.as_bytes(),
-            cash_link.as_ref(),
-            fingerprint.as_bytes()
         ],
         program_id,
     )

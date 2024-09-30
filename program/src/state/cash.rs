@@ -11,7 +11,7 @@ use crate::error::CashError;
 
 use super::AccountType;
 
-pub const CASH_DATA_SIZE: usize = 195;
+pub const CASH_DATA_SIZE: usize = 194;
 
 #[repr(C)]
 #[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq, Clone, Default)]
@@ -53,7 +53,6 @@ pub struct Cash {
     pub total_redemptions: u16,
     pub max_num_redemptions: u16,
     pub min_amount: u64,
-    pub fingerprint_enabled: bool,
     pub pass_key: Option<Pubkey>,//187
     pub total_weight_ppm: u32,
 }
