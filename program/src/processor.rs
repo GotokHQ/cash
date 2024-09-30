@@ -18,9 +18,9 @@ impl Processor {
         msg!("Successfully deserialized cash instruction");
 
         match instruction {
-            CashInstruction::InitCashLink(args) => {
-                msg!("Instruction: InitCashLink");
-                cash::process_init_cash_link(accounts, args, program_id)
+            CashInstruction::InitCash(args) => {
+                msg!("Instruction: InitCash");
+                cash::process_init(accounts, args, program_id)
             }
             CashInstruction::Redeem(args) => {
                 msg!("Instruction: Redeem Cash");

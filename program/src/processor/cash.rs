@@ -31,7 +31,7 @@ use spl_token_2022::state::{Account as TokenAccount, Mint};
 
 pub struct Processor;
 
-pub fn process_init_cash_link(
+pub fn process_init(
     accounts: &[AccountInfo],
     args: InitCashArgs,
     program_id: &Pubkey,
