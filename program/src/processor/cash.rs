@@ -36,6 +36,7 @@ pub fn process_init(
     args: InitCashArgs,
     program_id: &Pubkey,
 ) -> ProgramResult {
+    msg!("Start reading account");
     let account_info_iter = &mut accounts.iter();
     let authority_info = next_account_info(account_info_iter)?;
     assert_signer(authority_info)?;
@@ -54,8 +55,9 @@ pub fn process_init(
     let rent_info = next_account_info(account_info_iter)?;
     let system_account_info = next_account_info(account_info_iter)?;
 
+    msg!("About to read token program account");
     let token_program_info = next_account_info(account_info_iter)?;
-
+    msg!("Done reading token program account");
     assert_valid_token_program(&token_program_info.key)?;
     let mut cash = create_cash_link(
         program_id,
@@ -97,7 +99,7 @@ pub fn process_init(
         }
         _ => args.amount,
     };
-
+    msg!("Success Initialized");
     if args.distribution_type == DistributionType::Random {
         if args.min_amount.is_none() {
             return Err(CashError::MinAmountNotSet.into());
@@ -144,6 +146,7 @@ pub fn process_init(
         &mint_info.key,
         &token_program_info.key,
     );
+    msg!("Done setting cash link item");
     // let vault_token: TokenAccount = assert_initialized(associated_token_account)?;
     // assert_token_owned_by(&vault_token, cash_link_info.key)?;
     assert_account_key(
@@ -166,6 +169,7 @@ pub fn process_init(
             &token_program_info.key,
         )?;
     }
+    msg!("Done created token account");
     assert_owned_by(owner_token_info, &token_program_info.key)?;
     let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
     let mint: Mint = assert_initialized(mint_info)?;

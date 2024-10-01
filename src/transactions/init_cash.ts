@@ -13,7 +13,6 @@ export type InitArgs = {
   distributionType: CashDistributionType;
   maxNumRedemptions: number;
   minAmount?: BN;
-  fingerprintEnabled?: boolean;
   cashReference: string;
   isLocked: boolean;
 };
@@ -30,7 +29,6 @@ export class InitCashArgs extends Borsh.Data<InitArgs> {
     ['distributionType', 'u8'],
     ['maxNumRedemptions', 'u16'],
     ['minAmount', { kind: 'option', type: 'u64' }],
-    ['fingerprintEnabled', { kind: 'option', type: 'u8' }],
     ['cashReference', 'string'],
     ['isLocked', 'u8'],
   ]);
@@ -45,7 +43,6 @@ export class InitCashArgs extends Borsh.Data<InitArgs> {
   distributionType: CashDistributionType;
   maxNumRedemptions: number;
   minAmount?: BN;
-  fingerprintEnabled?: boolean;
   cashReference: string;
   isLocked: boolean;
 }

@@ -518,7 +518,6 @@ export class CashClient {
       distributionType: params.distributionType,
       maxNumRedemptions: params.maxNumRedemptions,
       minAmount: params.minAmount,
-      fingerprintEnabled: params.fingerprintEnabled,
       isLocked: !!params.passKey,
       cashReference: params.cashReference,
     });
