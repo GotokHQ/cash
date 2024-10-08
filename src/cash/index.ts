@@ -774,6 +774,7 @@ export class CashClient {
       refereeFeeBps: input.refereeFeeBps,
       referrerFeeBps: input.referrerFeeBps,
       cashReference: input.cashReference,
+      weightPpm: input.weightPpm
     });
     instructions.push(redeemInstruction);
     if (isNativeToken) {

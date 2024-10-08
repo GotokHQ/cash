@@ -51,4 +51,5 @@ export interface RedeemCashInput extends CashInput {
   tokenProgramId: string;
   cashReference: string;
   rateUsd: string;
+  weightPpm?: number;
 }
