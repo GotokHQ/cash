@@ -511,6 +511,8 @@ export class CashClient {
   };
 
   initInstruction = (params: InitCashParams): TransactionInstruction => {
+    const isNativeToken =
+      params.mint.equals(spl.NATIVE_MINT) || params.mint.equals(spl.NATIVE_MINT_2022);
     const data = InitCashArgs.serialize({
       amount: params.amount,
       feeBps: params.feeBps,
@@ -533,7 +535,7 @@ export class CashClient {
       {
         pubkey: params.owner,
         isSigner: true,
-        isWritable: !params.mint,
+        isWritable: isNativeToken,
       },
       {
         pubkey: this.feePayer,
