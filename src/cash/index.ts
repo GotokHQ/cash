@@ -236,7 +236,10 @@ export class CashClient {
     const owner = new PublicKey(cash.data.owner);
     const mint = new PublicKey(cash.data.mint);
     const programId = new PublicKey(input.tokenProgramId);
-    const ownerTokenAccount = spl.getAssociatedTokenAddressSync(mint, owner, true, programId);
+    const isNativeToken = mint.equals(spl.NATIVE_MINT) || mint.equals(spl.NATIVE_MINT_2022);
+    const ownerTokenAccount = isNativeToken
+      ? owner
+      : spl.getAssociatedTokenAddressSync(mint, owner, true, programId);
     const instructions = [];
     const cancelInstruction = await this.cancelInstruction({
       authority: this.authority,
@@ -737,12 +740,9 @@ export class CashClient {
     const walletTokenAccount = isNativeToken
       ? unwrapTokenAccount.publicKey
       : spl.getAssociatedTokenAddressSync(mint, walletAddress, true, tokenProgramId);
-    const ownerTokenAccount = await this.getOrCreateAssociatedAccount(
-      mint,
-      owner,
-      tokenProgramId,
-      input.commitment,
-    );
+    const ownerTokenAccount = isNativeToken
+      ? owner
+      : await this.getOrCreateAssociatedAccount(mint, owner, tokenProgramId, input.commitment);
     const feeTokenAccount = await this.getOrCreateAssociatedAccount(
       mint,
       this.feeWallet,

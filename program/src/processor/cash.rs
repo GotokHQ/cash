@@ -164,8 +164,8 @@ pub fn process_init(
     assert_owned_by(owner_token_info, &token_program_info.key)?;
     let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
     let mint: Mint = assert_initialized(mint_info)?;
-    if cmp_pubkeys(&owner_info.key, &spl_token::native_mint::id())
-        || cmp_pubkeys(&owner_info.key, &spl_token_2022::native_mint::id())
+    if cmp_pubkeys(&mint_info.key, &spl_token::native_mint::id())
+        || cmp_pubkeys(&mint_info.key, &spl_token_2022::native_mint::id())
     {
         native_transfer(owner_info, vault_token_info, total, &[])?;
         sync_native(vault_token_info, &token_program_info.key)?;
@@ -277,9 +277,14 @@ pub fn process_cancel(
         Some(CashError::InvalidVaultTokenOwner),
     )?;
     if vault_token.amount > 0 {
-        if cmp_pubkeys(&owner_token_info.key, &spl_token::native_mint::id())
-            || cmp_pubkeys(&owner_token_info.key, &spl_token_2022::native_mint::id())
+        if cmp_pubkeys(&mint_info.key, &spl_token::native_mint::id())
+            || cmp_pubkeys(&mint_info.key, &spl_token_2022::native_mint::id())
         {
+            assert_account_key(
+                owner_token_info,
+                &cash_link_info.owner,
+                Some(CashError::InvalidOwner),
+            )?;
             spl_token_close(
                 vault_token_info,
                 fee_payer_info,
@@ -676,9 +681,14 @@ pub fn process_redemption(
         .checked_sub(total)
         .ok_or::<ProgramError>(CashError::Overflow.into())?;
     if cash.is_fully_redeemed()? {
-        if cmp_pubkeys(&owner_token_info.key, &spl_token::native_mint::id())
-            || cmp_pubkeys(&owner_token_info.key, &spl_token_2022::native_mint::id())
+        if cmp_pubkeys(&mint_info.key, &spl_token::native_mint::id())
+            || cmp_pubkeys(&mint_info.key, &spl_token_2022::native_mint::id())
         {
+            assert_account_key(
+                owner_token_info,
+                &cash_link_info.owner,
+                Some(CashError::InvalidOwner),
+            )?;
             spl_token_close(
                 vault_token_info,
                 fee_payer_info,
