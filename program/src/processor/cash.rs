@@ -725,6 +725,9 @@ pub fn process_redemption(
             )?;
         }
     }
+    if redemption_info.lamports() > 0 && !redemption_info.data_is_empty() {
+        return Err(ProgramError::AccountAlreadyInitialized);
+    }
     create_new_account_raw(
         program_id,
         redemption_info,
