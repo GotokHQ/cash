@@ -8,6 +8,7 @@ export type RedeemArgs = {
   refereeFeeBps?: number;
   weightPpm?: number;
   rateUsd?: string;
+  redemptionBump: number;
 };
 
 export class RedeemCashLinkArgs extends Borsh.Data<RedeemArgs> {
@@ -19,6 +20,7 @@ export class RedeemCashLinkArgs extends Borsh.Data<RedeemArgs> {
     ['refereeFeeBps', { kind: 'option', type: 'u16' }],
     ['weightPpm', { kind: 'option', type: 'u32' }],
     ['rateUsd', { kind: 'option', type: 'string' }],
+    ['redemptionBump', 'u8'],
   ]);
 
   instruction = 1;
@@ -45,4 +47,6 @@ export type RedeemCashLinkParams = {
   tokenProgramId: PublicKey;
   weightPpm?: number;
   rateUsd?: string;
+  redemptionBump: number;
+  redemptionAddress: PublicKey;
 };

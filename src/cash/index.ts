@@ -693,23 +693,22 @@ export class CashClient {
   }> => {
     const passKey = input.passKey ? new PublicKey(input.passKey) : undefined;
     const tokenProgramId = new PublicKey(input.tokenProgramId);
-    const [cashLinkAddress, cashBump] = CashProgram.cashAccount(input.cashReference);
-    const cash = await _getCashAccount(this.connection, cashLinkAddress, input.commitment);
+    const walletAddress = new PublicKey(input.walletAddress);
+    const [cashAddress, cashBump] = CashProgram.cashAccount(input.cashReference);
+    const [redemptionAddress, redemptionBump] = CashProgram.redemptionAccount(
+      cashAddress,
+      walletAddress,
+    );
+    const cash = await _getCashAccount(this.connection, cashAddress, input.commitment);
     if (cash == null) {
       throw new Error(FAILED_TO_FIND_ACCOUNT);
     }
     if (input.referrerFeeBps && !input.referrer) {
       throw new Error(REFERRER_WALLET);
     }
-    const walletAddress = new PublicKey(input.walletAddress);
     const owner = new PublicKey(cash.data.owner);
     const mint = new PublicKey(cash.data.mint);
-    const vaultToken = spl.getAssociatedTokenAddressSync(
-      mint,
-      cashLinkAddress,
-      true,
-      tokenProgramId,
-    );
+    const vaultToken = spl.getAssociatedTokenAddressSync(mint, cashAddress, true, tokenProgramId);
     let referrer: PublicKey | undefined;
     let referrerToken: PublicKey | undefined;
     if (input.referrerFeeBps) {
@@ -761,6 +760,8 @@ export class CashClient {
       mint,
       cashBump,
       passKey,
+      redemptionAddress,
+      redemptionBump,
       wallet: walletAddress,
       walletToken: walletTokenAccount,
       platformFeeToken: feeTokenAccount,
@@ -823,6 +824,8 @@ export class CashClient {
       cashReference,
       weightPpm,
       rateUsd,
+      redemptionBump,
+      redemptionAddress,
     } = params;
 
     const keys = [
@@ -837,10 +840,12 @@ export class CashClient {
       { pubkey: vaultToken, isSigner: false, isWritable: true },
       { pubkey: walletToken, isSigner: false, isWritable: true },
       { pubkey: mint, isSigner: false, isWritable: false },
+      { pubkey: redemptionAddress, isSigner: false, isWritable: false },
       { pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false },
       { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
       { pubkey: SYSVAR_SLOT_HASHES_PUBKEY, isSigner: false, isWritable: false },
       { pubkey: tokenProgramId, isSigner: false, isWritable: false },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       ...(referrer
         ? [
             { pubkey: referrer, isSigner: false, isWritable: true },
@@ -856,6 +861,7 @@ export class CashClient {
       cashReference,
       weightPpm,
       rateUsd,
+      redemptionBump,
     });
 
     return new TransactionInstruction({
@@ -977,15 +983,15 @@ export class CashClient {
 
 const _getCashAccount = async (
   connection: Connection,
-  cashLinkAddress: PublicKey,
+  cashAddress: PublicKey,
   commitment?: Commitment,
 ): Promise<Cash | null> => {
   try {
-    const accountInfo = await connection.getAccountInfo(cashLinkAddress, commitment);
+    const accountInfo = await connection.getAccountInfo(cashAddress, commitment);
     if (accountInfo === null) {
       return null;
     }
-    const cash = Cash.from(new Account(cashLinkAddress, accountInfo));
+    const cash = Cash.from(new Account(cashAddress, accountInfo));
     return cash;
   } catch (error) {
     return null;

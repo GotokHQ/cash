@@ -7,7 +7,7 @@ use crate::{
     math::SafeMath,
     state::{
         cash::{Cash, CashState, DistributionType},
-        AccountType,
+        AccountType, FLAG_ACCOUNT_SIZE, REDEMPTION_PREFIX,
     },
     utils::{
         assert_account_key, assert_initialized, assert_owned_by, assert_signer,
@@ -41,7 +41,7 @@ pub fn process_init(
     assert_signer(authority_info)?;
     let owner_info = next_account_info(account_info_iter)?;
     let fee_payer_info = next_account_info(account_info_iter)?;
-    let cash_link_info = next_account_info(account_info_iter)?;
+    let cash_info = next_account_info(account_info_iter)?;
     let pass_info = if args.is_locked {
         Some(next_account_info(account_info_iter)?)
     } else {
@@ -57,7 +57,7 @@ pub fn process_init(
     assert_valid_token_program(&token_program_info.key)?;
     let mut cash = create_cash_link(
         program_id,
-        cash_link_info,
+        cash_info,
         fee_payer_info,
         rent_info,
         system_account_info,
@@ -137,7 +137,7 @@ pub fn process_init(
     };
     cash.mint = *mint_info.key;
     let associated_token_account = get_associated_token_address_with_program_id(
-        &cash_link_info.key,
+        &cash_info.key,
         &mint_info.key,
         &token_program_info.key,
     );
@@ -149,13 +149,13 @@ pub fn process_init(
     if exists(vault_token_info)? {
         let vault_token: TokenAccount = assert_initialized(vault_token_info)?;
         assert_owned_by(vault_token_info, &token_program_info.key)?;
-        assert_token_owned_by(&vault_token, cash_link_info.key)?;
+        assert_token_owned_by(&vault_token, cash_info.key)?;
         assert_account_key(mint_info, &vault_token.mint, Some(CashError::InvalidMint))?;
     } else {
         create_associated_token_account_raw(
             fee_payer_info,
             vault_token_info,
-            cash_link_info,
+            cash_info,
             mint_info,
             rent_info,
             &token_program_info.key,
@@ -183,36 +183,36 @@ pub fn process_init(
         )?;
     }
     //spl_token_transfer(owner_token_info, fee_token_info, owner_info, total_platform_fee, &[])?;
-    Cash::pack(cash, &mut cash_link_info.data.borrow_mut())?;
+    Cash::pack(cash, &mut cash_info.data.borrow_mut())?;
     Ok(())
 }
 
 fn create_cash_link<'a>(
     program_id: &Pubkey,
-    cash_link_info: &AccountInfo<'a>,
+    cash_info: &AccountInfo<'a>,
     payer_info: &AccountInfo<'a>,
     rent_sysvar_info: &AccountInfo<'a>,
     system_program_info: &AccountInfo<'a>,
     signer_seeds: &[&[u8]],
 ) -> Result<Cash, ProgramError> {
-    if cash_link_info.lamports() > 0 && !cash_link_info.data_is_empty() {
+    if cash_info.lamports() > 0 && !cash_info.data_is_empty() {
         return Err(ProgramError::AccountAlreadyInitialized);
     }
     // set up cash account
-    let unpack = Cash::unpack(&cash_link_info.data.borrow_mut());
+    let unpack = Cash::unpack(&cash_info.data.borrow_mut());
     let proving_process = match unpack {
         Ok(data) => Ok(data),
         Err(_) => {
             create_new_account_raw(
                 program_id,
-                cash_link_info,
+                cash_info,
                 rent_sysvar_info,
                 payer_info,
                 system_program_info,
                 Cash::LEN,
                 signer_seeds,
             )?;
-            Ok(Cash::unpack_unchecked(&cash_link_info.data.borrow_mut())?)
+            Ok(Cash::unpack_unchecked(&cash_info.data.borrow_mut())?)
         }
     };
 
@@ -230,9 +230,9 @@ pub fn process_cancel(
 
     assert_signer(authority_info)?;
 
-    let cash_link_info = next_account_info(account_info_iter)?;
-    let mut cash = Cash::unpack(&cash_link_info.data.borrow())?;
-    assert_owned_by(cash_link_info, program_id)?;
+    let cash_info = next_account_info(account_info_iter)?;
+    let mut cash = Cash::unpack(&cash_info.data.borrow())?;
+    assert_owned_by(cash_info, program_id)?;
     assert_account_key(
         authority_info,
         &cash.authority,
@@ -267,7 +267,7 @@ pub fn process_cancel(
     let mint: Mint = assert_initialized(mint_info)?;
     // assert_account_key(vault_token.mint, mint, Some(CashError::InvalidMint))?;
     let associated_token_account = get_associated_token_address_with_program_id(
-        &cash_link_info.key,
+        &cash_info.key,
         &cash.mint,
         &token_program_info.key,
     );
@@ -282,13 +282,13 @@ pub fn process_cancel(
         {
             assert_account_key(
                 owner_token_info,
-                &cash_link_info.owner,
+                &cash_info.owner,
                 Some(CashError::InvalidOwner),
             )?;
             spl_token_close(
                 vault_token_info,
                 fee_payer_info,
-                cash_link_info,
+                cash_info,
                 &token_program_info.key,
                 &[&signer_seeds],
             )?;
@@ -299,7 +299,7 @@ pub fn process_cancel(
             spl_token_transfer(
                 vault_token_info,
                 owner_token_info,
-                cash_link_info,
+                cash_info,
                 mint_info,
                 &token_program_info.key,
                 vault_token.amount,
@@ -309,7 +309,7 @@ pub fn process_cancel(
             spl_token_close(
                 vault_token_info,
                 fee_payer_info,
-                cash_link_info,
+                cash_info,
                 &token_program_info.key,
                 &[&signer_seeds],
             )?;
@@ -318,14 +318,14 @@ pub fn process_cancel(
         spl_token_close(
             vault_token_info,
             fee_payer_info,
-            cash_link_info,
+            cash_info,
             &token_program_info.key,
             &[&signer_seeds],
         )?;
     }
     msg!("Mark the cash account as canceled...");
     cash.state = CashState::Canceled;
-    Cash::pack(cash, &mut cash_link_info.data.borrow_mut())?;
+    Cash::pack(cash, &mut cash_info.data.borrow_mut())?;
     Ok(())
 }
 
@@ -343,9 +343,9 @@ pub fn process_redemption(
 
     let wallet_info = next_account_info(account_info_iter)?;
     let fee_token_info = next_account_info(account_info_iter)?;
-    let cash_link_info = next_account_info(account_info_iter)?;
-    assert_owned_by(cash_link_info, program_id)?;
-    let mut cash = Cash::unpack(&cash_link_info.data.borrow())?;
+    let cash_info = next_account_info(account_info_iter)?;
+    assert_owned_by(cash_info, program_id)?;
+    let mut cash = Cash::unpack(&cash_info.data.borrow())?;
     assert_account_key(
         authority_info,
         &cash.authority,
@@ -374,11 +374,13 @@ pub fn process_redemption(
     let vault_token_info = next_account_info(account_info_iter)?;
     let recipient_token_info = next_account_info(account_info_iter)?;
     let mint_info = next_account_info(account_info_iter)?;
+    let redemption_info = next_account_info(account_info_iter)?;
     let clock_info = next_account_info(account_info_iter)?;
     let clock = &Clock::from_account_info(clock_info)?;
     let rent_info = next_account_info(account_info_iter)?;
     let recent_slothashes_info = next_account_info(account_info_iter)?;
     let token_program_info = next_account_info(account_info_iter)?;
+    let system_program_info = next_account_info(account_info_iter)?;
     assert_account_key(
         recent_slothashes_info,
         &slot_hashes::id(),
@@ -521,7 +523,7 @@ pub fn process_redemption(
         .ok_or::<ProgramError>(CashError::Overflow.into())?;
     assert_owned_by(vault_token_info, &token_program_info.key)?;
     let associated_token_account = get_associated_token_address_with_program_id(
-        &cash_link_info.key,
+        &cash_info.key,
         &cash.mint,
         &token_program_info.key,
     );
@@ -564,7 +566,7 @@ pub fn process_redemption(
     spl_token_transfer(
         vault_token_info,
         recipient_token_info,
-        cash_link_info,
+        cash_info,
         mint_info,
         &token_program_info.key,
         amount_to_redeem,
@@ -616,7 +618,7 @@ pub fn process_redemption(
                 spl_token_transfer(
                     vault_token_info,
                     fee_token_info,
-                    cash_link_info,
+                    cash_info,
                     mint_info,
                     &token_program_info.key,
                     platform_fee,
@@ -628,7 +630,7 @@ pub fn process_redemption(
                 spl_token_transfer(
                     vault_token_info,
                     referral_account_info,
-                    cash_link_info,
+                    cash_info,
                     mint_info,
                     &token_program_info.key,
                     referrer_fee,
@@ -640,7 +642,7 @@ pub fn process_redemption(
                 spl_token_transfer(
                     vault_token_info,
                     owner_token_info,
-                    cash_link_info,
+                    cash_info,
                     mint_info,
                     &token_program_info.key,
                     referee_fee,
@@ -652,7 +654,7 @@ pub fn process_redemption(
             spl_token_transfer(
                 vault_token_info,
                 fee_token_info,
-                cash_link_info,
+                cash_info,
                 mint_info,
                 &token_program_info.key,
                 platform_fee_per_redeem,
@@ -668,7 +670,7 @@ pub fn process_redemption(
         spl_token_transfer(
             vault_token_info,
             fee_payer_token_info,
-            cash_link_info,
+            cash_info,
             mint_info,
             &token_program_info.key,
             total_network_fee,
@@ -686,13 +688,13 @@ pub fn process_redemption(
         {
             assert_account_key(
                 owner_token_info,
-                &cash_link_info.owner,
+                &cash_info.owner,
                 Some(CashError::InvalidOwner),
             )?;
             spl_token_close(
                 vault_token_info,
                 fee_payer_info,
-                cash_link_info,
+                cash_info,
                 &token_program_info.key,
                 &[&signer_seeds],
             )?;
@@ -706,7 +708,7 @@ pub fn process_redemption(
                 spl_token_transfer(
                     vault_token_info,
                     owner_token_info,
-                    cash_link_info,
+                    cash_info,
                     mint_info,
                     &token_program_info.key,
                     remaining,
@@ -717,18 +719,32 @@ pub fn process_redemption(
             spl_token_close(
                 vault_token_info,
                 fee_payer_info,
-                cash_link_info,
+                cash_info,
                 &token_program_info.key,
                 &[&signer_seeds],
             )?;
         }
     }
+    create_new_account_raw(
+        program_id,
+        redemption_info,
+        rent_info,
+        fee_payer_info,
+        system_program_info,
+        FLAG_ACCOUNT_SIZE,
+        &[
+            REDEMPTION_PREFIX.as_bytes(),
+            cash_info.key.as_ref(),
+            wallet_info.key.as_ref(),
+            &[args.redemption_bump],
+        ],
+    )?;
     cash.state = if cash.is_fully_redeemed()? {
         CashState::Redeemed
     } else {
         CashState::Redeeming
     };
-    Cash::pack(cash, &mut cash_link_info.data.borrow_mut())?;
+    Cash::pack(cash, &mut cash_info.data.borrow_mut())?;
     Ok(())
 }
 
@@ -737,11 +753,11 @@ pub fn process_close(accounts: &[AccountInfo], program_id: &Pubkey) -> ProgramRe
     let account_info_iter = &mut accounts.iter();
     let authority_info = next_account_info(account_info_iter)?;
     assert_signer(authority_info)?;
-    let cash_link_info = next_account_info(account_info_iter)?;
+    let cash_info = next_account_info(account_info_iter)?;
     let destination_info = next_account_info(account_info_iter)?;
-    assert_owned_by(cash_link_info, program_id)?;
+    assert_owned_by(cash_info, program_id)?;
 
-    let cash = Cash::unpack(&cash_link_info.data.borrow())?;
+    let cash = Cash::unpack(&cash_info.data.borrow())?;
     assert_account_key(
         authority_info,
         &cash.authority,
@@ -754,6 +770,6 @@ pub fn process_close(accounts: &[AccountInfo], program_id: &Pubkey) -> ProgramRe
         return Err(AccountAlreadyRedeemed.into());
     }
     msg!("Closing the cash account...");
-    empty_account_balance(cash_link_info, destination_info)?;
+    empty_account_balance(cash_info, destination_info)?;
     Ok(())
 }

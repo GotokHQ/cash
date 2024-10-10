@@ -36,11 +36,11 @@ pub struct InitCashArgs {
 pub struct InitCashRedemptionArgs {
     pub cash_bump: u8,
     pub cash_reference: String,
-    pub fingerprint_bump: Option<u8>,
     pub referrer_fee_bps:  Option<u16>,
     pub referee_fee_bps:  Option<u16>,
     pub weight_ppm: Option<u32>,
     pub rate_usd: Option<String>,
+    pub redemption_bump: u8,
 }
 
 /// Cancel a cash link
@@ -90,12 +90,14 @@ pub enum CashInstruction {
     /// 8. `[writable]` The vault token account to get tokens. This value is Optional. if the mint is set, then this must be set.
     /// 9. `[writable]` The recipient token account for the token they will receive should the trade go through
     /// 10. `[]` The mint account for the token
-    /// 11. `[]` The rent account
-    /// 12. `[]` The recent slot hash account
-    /// 13. `[]` The token program
-    /// 14. `[writable][Optional]` The referrer wallet account
-    /// 15. `[writable][Optional]` The referrer token account
-    /// 16. `[]` The associated program
+    /// 11. `[writable]` The redemption account pda
+    /// 12. `[]` The rent account
+    /// 13. `[]` The recent slot hash account
+    /// 14. `[]` The token program
+    /// 15. `[]` The system program
+    /// 16. `[writable][Optional]` The referrer wallet account
+    /// 17. `[writable][Optional]` The referrer token account
+    /// 18. `[]` The associated program
     Redeem(InitCashRedemptionArgs),
     /// Cancel the cash
     ///
