@@ -840,7 +840,7 @@ export class CashClient {
       { pubkey: vaultToken, isSigner: false, isWritable: true },
       { pubkey: walletToken, isSigner: false, isWritable: true },
       { pubkey: mint, isSigner: false, isWritable: false },
-      { pubkey: redemptionAddress, isSigner: false, isWritable: false },
+      { pubkey: redemptionAddress, isSigner: false, isWritable: true },
       { pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false },
       { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
       { pubkey: SYSVAR_SLOT_HASHES_PUBKEY, isSigner: false, isWritable: false },
