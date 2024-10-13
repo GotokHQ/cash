@@ -298,13 +298,11 @@ pub fn process_cancel(
         if cmp_pubkeys(&mint_info.key, &spl_token::native_mint::id())
             || cmp_pubkeys(&mint_info.key, &spl_token_2022::native_mint::id())
         {
-            msg!("Start validating owner");
             assert_account_key(
                 owner_info,
-                &cash_info.owner,
+                &cash.owner,
                 Some(CashError::InvalidOwner),
             )?;
-            msg!("End validating owner");
             spl_token_close(
                 vault_token_info,
                 fee_payer_info,
@@ -313,13 +311,12 @@ pub fn process_cancel(
                 &[&signer_seeds],
             )?;
             native_transfer(fee_payer_info, owner_info, vault_token.amount, &[])?;
-            msg!("Done native transfer");
         } else {
             let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
             assert_token_owned_by(&owner_token, &cash.owner)?;
             assert_account_key(
                 owner_info,
-                &cash_info.owner,
+                &cash.owner,
                 Some(CashError::InvalidOwner),
             )?;
             spl_token_transfer(
@@ -768,7 +765,7 @@ pub fn process_redemption(
         {
             assert_account_key(
                 owner_token_info,
-                &cash_info.owner,
+                &cash.owner,
                 Some(CashError::InvalidOwner),
             )?;
             spl_token_close(
