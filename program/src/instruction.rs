@@ -81,23 +81,26 @@ pub enum CashInstruction {
     ///
     /// 0. `[signer]` The account of the authority
     /// 1. `[]` The user wallet
-    /// 2. `[writable]` The platform fee account for the token they will receive should the trade go through
-    /// 3. `[writable]` The cash account holding the cash info
-    /// 4. `[signer]` The pass key required to unlock the cash link for redemption (optional)
-    /// 5. `[writable]` The payer token account of the payer that initialized the cash  
-    /// 6. `[writable]` The fee payer account that pays network and rent fees
-    /// 7. `[writable]` The fee payer's associated token account that collects the rent or network fees
-    /// 8. `[writable]` The vault token account to get tokens. This value is Optional. if the mint is set, then this must be set.
-    /// 9. `[writable]` The recipient token account for the token they will receive should the trade go through
-    /// 10. `[]` The mint account for the token
-    /// 11. `[writable]` The redemption account pda
-    /// 12. `[]` The rent account
-    /// 13. `[]` The recent slot hash account
-    /// 14. `[]` The token program
-    /// 15. `[]` The system program
-    /// 16. `[writable][Optional]` The referrer wallet account
-    /// 17. `[writable][Optional]` The referrer token account
-    /// 18. `[]` The associated program
+    /// 2. `[writable]` The platform fee wallet for the token they will receive should the trade go through
+    /// 3. `[writable]` The platform fee token account for the token they will receive should the trade go through
+    /// 4. `[writable]` The cash account holding the cash info
+    /// 5. `[writable][optional]` The pass key account required to sign this transaction
+    /// 6. `[writable]` The owner wallet that created the cash vault
+    /// 7. `[writable]` The owner token account belonging to the owner wallet that created the cash vault
+    /// 8. `[writable]` The payer token account of the payer that initialized the cash  
+    /// 9. `[writable]` The fee payer wallet that pays network and rent fees
+    /// 10. `[writable]` The fee payer's associated token account that collects the rent or network fees
+    /// 11. `[writable]` The vault token account to get tokens. This value is Optional. if the mint is set, then this must be set.
+    /// 12. `[writable]` The recipient token account for the token they will receive belonging to the user wallet
+    /// 13. `[]` The mint account for the token
+    /// 14. `[writable]` The redemption account pda
+    /// 15. `[]` The rent account
+    /// 16. `[]` The recent slot hash account
+    /// 17. `[]` The token program
+    /// 18. `[]` The system program
+    /// 19. `[writable][Optional]` The referrer wallet account
+    /// 20. `[writable][Optional]` The referrer token account
+    /// 21. `[]` The associated program
     Redeem(InitCashRedemptionArgs),
     /// Cancel the cash
     ///
@@ -197,10 +200,12 @@ pub fn redeem_cash(
     authority: &Pubkey,
     wallet: &Pubkey,
     wallet_token: &Pubkey,
-    collection_fee_token: &Pubkey,
+    platform_wallet: &Pubkey,
+    platform_fee_token: &Pubkey,
     vault_token: &Pubkey,
     cash: &Pubkey,
     pass_key: Option<&Pubkey>, // pass_key is now optional
+    owner_wallet: &Pubkey,
     owner_token: &Pubkey,
     fee_payer: &Pubkey,
     fee_payer_token: &Pubkey,
@@ -213,8 +218,10 @@ pub fn redeem_cash(
     let mut accounts = vec![
         AccountMeta::new_readonly(*authority, true),
         AccountMeta::new_readonly(*wallet, true),
-        AccountMeta::new(*collection_fee_token, false),
+        AccountMeta::new(*platform_wallet, false),
+        AccountMeta::new(*platform_fee_token, false),
         AccountMeta::new(*cash, false),
+        AccountMeta::new(*owner_wallet, false),
         AccountMeta::new(*owner_token, false),
         AccountMeta::new(*fee_payer, true),
         AccountMeta::new(*fee_payer_token, false),
@@ -229,7 +236,7 @@ pub fn redeem_cash(
 
     // Add pass_key if it's Some, otherwise continue with next accounts
     if let Some(pass_key_account) = pass_key {
-        accounts.insert(4, AccountMeta::new_readonly(*pass_key_account, false)); // Insert pass_key after cash
+        accounts.insert(5, AccountMeta::new_readonly(*pass_key_account, false)); // Insert pass_key after cash
     }
 
     // Add referral wallet if provided
@@ -241,7 +248,7 @@ pub fn redeem_cash(
     if let Some(referral_token_account) = referral_token {
         accounts.push(AccountMeta::new(*referral_token_account, false));
     }
-
+    
     // Include associated token program ID
     accounts.push(AccountMeta::new_readonly(spl_associated_token_account::id(), false));
 

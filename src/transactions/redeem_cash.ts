@@ -33,7 +33,9 @@ export type RedeemCashLinkParams = {
   cashReference: string;
   vaultToken?: PublicKey;
   walletToken: PublicKey;
+  ownerWallet: PublicKey;
   ownerToken: PublicKey;
+  platformWallet: PublicKey;
   platformFeeToken: PublicKey;
   feePayer?: PublicKey | null;
   feePayerToken: PublicKey;

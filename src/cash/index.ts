@@ -720,41 +720,43 @@ export class CashClient {
     const unwrapTokenAccount = isNativeToken ? Keypair.generate() : null;
 
     const instructions = [
-      ...(isNativeToken
-        ? [
-            SystemProgram.createAccount({
-              fromPubkey: this.feePayer,
-              newAccountPubkey: unwrapTokenAccount.publicKey,
-              lamports: kTokenProgramRent,
-              space: spl.ACCOUNT_SIZE,
-              programId: tokenProgramId,
-            }),
-            spl.createInitializeAccount3Instruction(
-              unwrapTokenAccount.publicKey,
-              mint,
-              walletAddress,
-              tokenProgramId,
-            ),
-          ]
-        : []),
+      // ...(isNativeToken
+      //   ? [
+      //       SystemProgram.createAccount({
+      //         fromPubkey: this.feePayer,
+      //         newAccountPubkey: unwrapTokenAccount.publicKey,
+      //         lamports: kTokenProgramRent,
+      //         space: spl.ACCOUNT_SIZE,
+      //         programId: tokenProgramId,
+      //       }),
+      //       spl.createInitializeAccount3Instruction(
+      //         unwrapTokenAccount.publicKey,
+      //         mint,
+      //         walletAddress,
+      //         tokenProgramId,
+      //       ),
+      //     ]
+      //   : []),
     ];
-    const walletTokenAccount = isNativeToken
-      ? unwrapTokenAccount.publicKey
-      : spl.getAssociatedTokenAddressSync(mint, walletAddress, true, tokenProgramId);
-    const ownerTokenAccount = isNativeToken
-      ? owner
-      : await this.getOrCreateAssociatedAccount(mint, owner, tokenProgramId, input.commitment);
-    const feeTokenAccount = await this.getOrCreateAssociatedAccount(
+    //const tempToken = isNativeToken ? unwrapTokenAccount.publicKey : null;
+    const walletTokenAccount = spl.getAssociatedTokenAddressSync(
+      mint,
+      walletAddress,
+      true,
+      tokenProgramId,
+    );
+    const ownerTokenAccount = spl.getAssociatedTokenAddressSync(mint, owner, true, tokenProgramId);
+    const platformTokenAccount = spl.getAssociatedTokenAddressSync(
       mint,
       this.feeWallet,
+      true,
       tokenProgramId,
-      input.commitment,
     );
-    const feePayerTokenAccount = await this.getOrCreateAssociatedAccount(
+    const feePayerTokenAccount = spl.getAssociatedTokenAddressSync(
       mint,
       this.feePayer,
+      true,
       tokenProgramId,
-      input.commitment,
     );
     const redeemInstruction = await this.redeemInstruction({
       mint,
@@ -764,7 +766,9 @@ export class CashClient {
       redemptionBump,
       wallet: walletAddress,
       walletToken: walletTokenAccount,
-      platformFeeToken: feeTokenAccount,
+      platformWallet: this.feeWallet,
+      platformFeeToken: platformTokenAccount,
+      ownerWallet: owner,
       ownerToken: ownerTokenAccount,
       feePayerToken: feePayerTokenAccount,
       vaultToken,
@@ -780,22 +784,22 @@ export class CashClient {
       weightPpm: input.weightPpm,
     });
     instructions.push(redeemInstruction);
-    if (isNativeToken) {
-      instructions.push(
-        spl.createCloseAccountInstruction(
-          unwrapTokenAccount.publicKey,
-          walletAddress,
-          walletAddress,
-          [],
-          tokenProgramId,
-        ),
-        SystemProgram.transfer({
-          fromPubkey: walletAddress,
-          toPubkey: this.feePayer,
-          lamports: kTokenProgramRent,
-        }),
-      );
-    }
+    // if (isNativeToken) {
+    //   instructions.push(
+    //     spl.createCloseAccountInstruction(
+    //       unwrapTokenAccount.publicKey,
+    //       walletAddress,
+    //       walletAddress,
+    //       [],
+    //       tokenProgramId,
+    //     ),
+    //     SystemProgram.transfer({
+    //       fromPubkey: walletAddress,
+    //       toPubkey: this.feePayer,
+    //       lamports: kTokenProgramRent,
+    //     }),
+    //   );
+    // }
     const signers = isNativeToken ? [unwrapTokenAccount] : [];
     return {
       instructions,
@@ -826,14 +830,18 @@ export class CashClient {
       rateUsd,
       redemptionBump,
       redemptionAddress,
+      platformWallet,
+      ownerWallet,
     } = params;
 
     const keys = [
       { pubkey: authority, isSigner: true, isWritable: false },
       { pubkey: wallet, isSigner: false, isWritable: true },
+      { pubkey: platformWallet, isSigner: false, isWritable: true },
       { pubkey: platformFeeToken, isSigner: false, isWritable: true },
       { pubkey: cash, isSigner: false, isWritable: true },
       ...(passKey ? [{ pubkey: passKey, isSigner: true, isWritable: false }] : []),
+      { pubkey: ownerWallet, isSigner: false, isWritable: true },
       { pubkey: ownerToken, isSigner: false, isWritable: true },
       { pubkey: feePayer, isSigner: true, isWritable: true },
       { pubkey: feePayerToken, isSigner: false, isWritable: true },

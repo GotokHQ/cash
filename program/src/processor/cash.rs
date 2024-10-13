@@ -13,7 +13,8 @@ use crate::{
         assert_account_key, assert_initialized, assert_owned_by, assert_signer,
         assert_token_owned_by, assert_valid_token_program, calculate_fee, cmp_pubkeys,
         create_associated_token_account_raw, create_new_account_raw, empty_account_balance, exists,
-        get_random_value, native_transfer, spl_token_close, spl_token_transfer, sync_native,
+        get_random_value, native_transfer, spl_token_close, spl_token_transfer,
+        sync_native,
     },
 };
 
@@ -73,11 +74,11 @@ pub fn process_init(
     if args.max_num_redemptions == 0 {
         return Err(CashError::InvalidNumberOfRedemptions.into());
     }
-    let fee_from_bps = calculate_fee(args.amount, args.fee_bps as u64)?;
+    let total_platform_fee = calculate_fee(args.amount, args.fee_bps as u64)?;
 
-    let total_platform_fee = fee_from_bps
-        .checked_add(args.network_fee)
-        .ok_or::<ProgramError>(CashError::Overflow.into())?;
+    // let total_platform_fee = fee_from_bps
+    //     .checked_add(args.network_fee)
+    //     .ok_or::<ProgramError>(CashError::Overflow.into())?;
 
     let total_redemption_fee = args
         .base_fee_to_redeem
@@ -164,11 +165,15 @@ pub fn process_init(
     assert_owned_by(owner_token_info, &token_program_info.key)?;
     let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
     let mint: Mint = assert_initialized(mint_info)?;
+    let total_network_fee = args.network_fee;
     if cmp_pubkeys(&mint_info.key, &spl_token::native_mint::id())
         || cmp_pubkeys(&mint_info.key, &spl_token_2022::native_mint::id())
     {
         native_transfer(owner_info, vault_token_info, total, &[])?;
         sync_native(vault_token_info, &token_program_info.key)?;
+        if total_network_fee > 0 {
+            native_transfer(owner_info, fee_payer_info, total_network_fee, &[])?;
+        }
     } else {
         assert_token_owned_by(&owner_token, owner_info.key)?;
         spl_token_transfer(
@@ -181,6 +186,18 @@ pub fn process_init(
             mint.decimals,
             &[],
         )?;
+        if total_network_fee > 0 {
+            spl_token_transfer(
+                owner_token_info,
+                fee_payer_info,
+                owner_info,
+                mint_info,
+                &token_program_info.key,
+                total_network_fee,
+                mint.decimals,
+                &[],
+            )?;
+        }
     }
     //spl_token_transfer(owner_token_info, fee_token_info, owner_info, total_platform_fee, &[])?;
     Cash::pack(cash, &mut cash_info.data.borrow_mut())?;
@@ -342,7 +359,8 @@ pub fn process_redemption(
     assert_signer(authority_info)?;
 
     let wallet_info = next_account_info(account_info_iter)?;
-    let fee_token_info = next_account_info(account_info_iter)?;
+    let platform_wallet_info = next_account_info(account_info_iter)?;
+    let platform_token_info = next_account_info(account_info_iter)?;
     let cash_info = next_account_info(account_info_iter)?;
     assert_owned_by(cash_info, program_id)?;
     let mut cash = Cash::unpack(&cash_info.data.borrow())?;
@@ -368,6 +386,7 @@ pub fn process_redemption(
     if cash.redeemed() {
         return Err(AccountAlreadyRedeemed.into());
     }
+    let owner_wallet_info = next_account_info(account_info_iter)?;
     let owner_token_info = next_account_info(account_info_iter)?; //owner_token_info
     let fee_payer_info = next_account_info(account_info_iter)?;
     let fee_payer_token_info = next_account_info(account_info_iter)?;
@@ -413,24 +432,6 @@ pub fn process_redemption(
             {
                 cash.remaining_amount
             } else {
-                // get slot hash
-                // let max_possible = cash
-                //     .remaining_amount
-                //     .checked_div(cash.max_num_redemptions as u64)
-                //     .and_then(|amount| amount.checked_mul(2))
-                //     .ok_or(CashError::Overflow)?;
-
-                // let rand =
-                //     get_random_value(recent_slothashes_info, clock)? as f64 / u64::MAX as f64;
-                // let money;
-
-                // if max_possible > cash.min_amount {
-                //     let range_amount = max_possible - cash.min_amount;
-                //     money = cash.min_amount + (rand * range_amount as f64) as u64;
-                // } else {
-                //     money = cash.min_amount;
-                // }
-                // money
                 let remaining_redemptions = cash.max_num_redemptions - cash.total_redemptions;
                 let average_possible = cash.remaining_amount / remaining_redemptions as u64;
                 let max_possible = average_possible * 2;
@@ -534,11 +535,15 @@ pub fn process_redemption(
     )?;
     let vault_token: TokenAccount = assert_initialized(vault_token_info)?;
     let mint: Mint = assert_initialized(mint_info)?;
-    let fee_payer_token: TokenAccount = assert_initialized(fee_payer_token_info)?;
-    assert_token_owned_by(&fee_payer_token, &fee_payer_info.key)?;
-    assert_owned_by(fee_payer_token_info, &token_program_info.key)?;
-    let _: TokenAccount = assert_initialized(fee_token_info)?;
-    assert_owned_by(fee_token_info, &token_program_info.key)?;
+
+    let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
+    assert_token_owned_by(&owner_token, &owner_wallet_info.key)?;
+    assert_account_key(
+        owner_wallet_info,
+        &cash.owner,
+        Some(CashError::InvalidOwner),
+    )?;
+
     if exists(recipient_token_info)? {
         let recipient_token: TokenAccount = assert_initialized(recipient_token_info)?;
         assert_token_owned_by(&recipient_token, &wallet_info.key)?;
@@ -560,19 +565,107 @@ pub fn process_redemption(
             &token_program_info.key,
         )?;
     }
+
+    if exists(platform_token_info)? {
+        let platform_token: TokenAccount = assert_initialized(platform_token_info)?;
+        assert_token_owned_by(&platform_token, &platform_wallet_info.key)?;
+        assert_owned_by(platform_token_info, &token_program_info.key)?;
+    } else {
+        create_associated_token_account_raw(
+            fee_payer_info,
+            platform_token_info,
+            platform_wallet_info,
+            mint_info,
+            rent_info,
+            &token_program_info.key,
+        )?;
+    }
+
+    if exists(fee_payer_token_info)? {
+        let fee_payer_token: TokenAccount = assert_initialized(fee_payer_token_info)?;
+        assert_token_owned_by(&fee_payer_token, &fee_payer_info.key)?;
+        assert_owned_by(fee_payer_token_info, &token_program_info.key)?;
+    } else {
+        create_associated_token_account_raw(
+            fee_payer_info,
+            fee_payer_token_info,
+            fee_payer_info,
+            mint_info,
+            rent_info,
+            &token_program_info.key,
+        )?;
+    }
+
     if vault_token.amount < total {
         return Err(InsufficientSettlementFunds.into());
     }
-    spl_token_transfer(
-        vault_token_info,
-        recipient_token_info,
-        cash_info,
-        mint_info,
-        &token_program_info.key,
-        amount_to_redeem,
-        mint.decimals,
-        &[&signer_seeds],
-    )?;
+
+    // let referral_wallet_info_opt = if args.referrer_fee_bps.is_some() {
+    //     Some(next_account_info(account_info_iter)?)
+    // } else {
+    //     None
+    // };
+    // let referral_account_info_opt = if args.referrer_fee_bps.is_some() {
+    //     Some(next_account_info(account_info_iter)?)
+    // } else {
+    //     None
+    // };
+
+    let is_native = cmp_pubkeys(&mint_info.key, &spl_token::native_mint::id())
+        || cmp_pubkeys(&mint_info.key, &spl_token_2022::native_mint::id());
+
+    if is_native {
+        // let temp_token_info = next_account_info(account_info_iter)?;
+        // create_new_account_raw(
+        //     &token_program_info.key,
+        //     temp_token_info,
+        //     rent_info,
+        //     fee_payer_info,
+        //     system_program_info,
+        //     spl_token_2022::state::Account::LEN,
+        //     &[],
+        // )?;
+        // spl_token_init(
+        //     &token_program_info.key,
+        //     temp_token_info,
+        //     mint_info,
+        //     fee_payer_info,
+        //     &[],
+        // )?;
+        spl_token_transfer(
+            vault_token_info,
+            fee_payer_token_info,
+            cash_info,
+            mint_info,
+            &token_program_info.key,
+            amount_to_redeem
+                .checked_add(platform_fee_per_redeem)
+                .ok_or::<ProgramError>(CashError::Overflow.into())?,
+            mint.decimals,
+            &[&signer_seeds],
+        )?;
+        spl_token_close(
+            fee_payer_token_info,
+            fee_payer_info,
+            fee_payer_info,
+            &token_program_info.key,
+            &[&signer_seeds],
+        )?;
+    }
+    if is_native {
+        native_transfer(fee_payer_info, wallet_info, amount_to_redeem, &[])?;
+    } else {
+        spl_token_transfer(
+            vault_token_info,
+            recipient_token_info,
+            cash_info,
+            mint_info,
+            &token_program_info.key,
+            amount_to_redeem,
+            mint.decimals,
+            &[&signer_seeds],
+        )?;
+    }
     if platform_fee_per_redeem > 0 {
         if let Some(referrer_fee_bps) = args.referrer_fee_bps {
             let referral_wallet_info = next_account_info(account_info_iter)?;
@@ -615,68 +708,74 @@ pub fn process_redemption(
                 .ok_or(CashError::Overflow)?;
 
             if platform_fee > 0 {
-                spl_token_transfer(
-                    vault_token_info,
-                    fee_token_info,
-                    cash_info,
-                    mint_info,
-                    &token_program_info.key,
-                    platform_fee,
-                    mint.decimals,
-                    &[&signer_seeds],
-                )?;
+                if is_native {
+                    native_transfer(fee_payer_info, platform_wallet_info, platform_fee, &[])?;
+                } else {
+                    spl_token_transfer(
+                        vault_token_info,
+                        platform_token_info,
+                        cash_info,
+                        mint_info,
+                        &token_program_info.key,
+                        platform_fee,
+                        mint.decimals,
+                        &[&signer_seeds],
+                    )?;
+                }
             }
             if referrer_fee > 0 {
-                spl_token_transfer(
-                    vault_token_info,
-                    referral_account_info,
-                    cash_info,
-                    mint_info,
-                    &token_program_info.key,
-                    referrer_fee,
-                    mint.decimals,
-                    &[&signer_seeds],
-                )?;
+                if is_native {
+                    native_transfer(fee_payer_info, referral_wallet_info, referrer_fee, &[])?;
+                } else {
+                    spl_token_transfer(
+                        vault_token_info,
+                        referral_account_info,
+                        cash_info,
+                        mint_info,
+                        &token_program_info.key,
+                        referrer_fee,
+                        mint.decimals,
+                        &[&signer_seeds],
+                    )?;
+                }
             }
             if referee_fee > 0 {
+                if is_native {
+                    native_transfer(fee_payer_info, owner_wallet_info, referee_fee, &[])?;
+                } else {
+                    spl_token_transfer(
+                        vault_token_info,
+                        owner_token_info,
+                        cash_info,
+                        mint_info,
+                        &token_program_info.key,
+                        referee_fee,
+                        mint.decimals,
+                        &[&signer_seeds],
+                    )?;
+                }
+            }
+        } else {
+            if is_native {
+                native_transfer(
+                    fee_payer_info,
+                    platform_wallet_info,
+                    platform_fee_per_redeem,
+                    &[],
+                )?;
+            } else {
                 spl_token_transfer(
                     vault_token_info,
-                    owner_token_info,
+                    platform_token_info,
                     cash_info,
                     mint_info,
                     &token_program_info.key,
-                    referee_fee,
+                    platform_fee_per_redeem,
                     mint.decimals,
                     &[&signer_seeds],
                 )?;
             }
-        } else {
-            spl_token_transfer(
-                vault_token_info,
-                fee_token_info,
-                cash_info,
-                mint_info,
-                &token_program_info.key,
-                platform_fee_per_redeem,
-                mint.decimals,
-                &[&signer_seeds],
-            )?;
         }
-    }
-    let total_network_fee = total_fee_to_redeem
-        .checked_sub(platform_fee_per_redeem)
-        .ok_or::<ProgramError>(CashError::Overflow.into())?;
-    if total_network_fee > 0 {
-        spl_token_transfer(
-            vault_token_info,
-            fee_payer_token_info,
-            cash_info,
-            mint_info,
-            &token_program_info.key,
-            total_network_fee,
-            mint.decimals,
-            &[&signer_seeds],
-        )?;
     }
     let remaining = vault_token
         .amount
