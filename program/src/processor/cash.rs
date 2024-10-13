@@ -298,7 +298,6 @@ pub fn process_cancel(
         if cmp_pubkeys(&mint_info.key, &spl_token::native_mint::id())
             || cmp_pubkeys(&mint_info.key, &spl_token_2022::native_mint::id())
         {
-
             msg!("Start validating owner");
             assert_account_key(
                 owner_info,
