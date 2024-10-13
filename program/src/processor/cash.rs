@@ -255,6 +255,7 @@ pub fn process_cancel(
         &cash.authority,
         Some(CashError::InvalidAuthorityId),
     )?;
+    let owner_info = next_account_info(account_info_iter)?;
     let owner_token_info = next_account_info(account_info_iter)?;
     let fee_payer_info = next_account_info(account_info_iter)?;
     let vault_token_info = next_account_info(account_info_iter)?;
@@ -297,11 +298,14 @@ pub fn process_cancel(
         if cmp_pubkeys(&mint_info.key, &spl_token::native_mint::id())
             || cmp_pubkeys(&mint_info.key, &spl_token_2022::native_mint::id())
         {
+
+            msg!("Start validating owner");
             assert_account_key(
-                owner_token_info,
+                owner_info,
                 &cash_info.owner,
                 Some(CashError::InvalidOwner),
             )?;
+            msg!("End validating owner");
             spl_token_close(
                 vault_token_info,
                 fee_payer_info,
@@ -309,10 +313,16 @@ pub fn process_cancel(
                 &token_program_info.key,
                 &[&signer_seeds],
             )?;
-            native_transfer(fee_payer_info, owner_token_info, vault_token.amount, &[])?;
+            native_transfer(fee_payer_info, owner_info, vault_token.amount, &[])?;
+            msg!("Done native transfer");
         } else {
             let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
             assert_token_owned_by(&owner_token, &cash.owner)?;
+            assert_account_key(
+                owner_info,
+                &cash_info.owner,
+                Some(CashError::InvalidOwner),
+            )?;
             spl_token_transfer(
                 vault_token_info,
                 owner_token_info,
@@ -584,25 +594,13 @@ pub fn process_redemption(
         )?;
         native_transfer(fee_payer_info, wallet_info, amount_to_redeem, &[])?;
     } else {
-        if exists(owner_token_info)? {
-            let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
-            assert_token_owned_by(&owner_token, &owner_wallet_info.key)?;
-            assert_account_key(
-                owner_wallet_info,
-                &cash.owner,
-                Some(CashError::InvalidOwner),
-            )?;
-        } else {
-            create_associated_token_account_raw(
-                fee_payer_info,
-                owner_token_info,
-                owner_wallet_info,
-                mint_info,
-                rent_info,
-                &token_program_info.key,
-            )?;
-        }
-
+        let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
+        assert_token_owned_by(&owner_token, &owner_wallet_info.key)?;
+        assert_account_key(
+            owner_wallet_info,
+            &cash.owner,
+            Some(CashError::InvalidOwner),
+        )?;
         if exists(recipient_token_info)? {
             let recipient_token: TokenAccount = assert_initialized(recipient_token_info)?;
             assert_token_owned_by(&recipient_token, &wallet_info.key)?;

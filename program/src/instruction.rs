@@ -109,11 +109,12 @@ pub enum CashInstruction {
     ///
     /// 0. `[signer]` The account of the authority
     /// 1. `[writable]` The cash account holding the cash info   
-    /// 2. `[writable]` The owner associated token account of the owner if it's not a native mint
-    /// 3. `[writable]` The fee payer token account to receive tokens from the vault
-    /// 4. `[writable]` The vault token account to get tokens from and eventually close. This value is Optional. if the mint is set, then this must be set.
-    /// 5. `[]` The token program
-    /// 6. `[]` The system program   
+    /// 2. `[writable]` The owner wallet
+    /// 3. `[writable]` The owner associated token account of the owner if it's not a native mint
+    /// 4. `[writable]` The fee payer token account to receive tokens from the vault
+    /// 5. `[writable]` The vault token account to get tokens from and eventually close. This value is Optional. if the mint is set, then this must be set.
+    /// 6. `[]` The token program
+    /// 7. `[]` The system program   
     Cancel(CancelCashRedemptionArgs),
     /// Close the cash
     ///
@@ -166,7 +167,7 @@ pub fn cancel_cash(
     program_id: &Pubkey,
     authority: &Pubkey,
     cash: &Pubkey,
-    pass_key: &Pubkey,
+    owner: &Pubkey,
     owner_token: &Pubkey,
     vault_token: &Pubkey,
     mint: &Pubkey,
@@ -177,7 +178,7 @@ pub fn cancel_cash(
     let accounts = vec![
         AccountMeta::new_readonly(*authority, true),
         AccountMeta::new(*cash, false),
-        AccountMeta::new_readonly(*pass_key, false),
+        AccountMeta::new(*owner, false),
         AccountMeta::new(*owner_token, false),
         AccountMeta::new(*fee_payer, false),
         AccountMeta::new(*vault_token, false),

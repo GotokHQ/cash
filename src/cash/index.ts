@@ -236,14 +236,12 @@ export class CashClient {
     const owner = new PublicKey(cash.data.owner);
     const mint = new PublicKey(cash.data.mint);
     const programId = new PublicKey(input.tokenProgramId);
-    const isNativeToken = mint.equals(spl.NATIVE_MINT) || mint.equals(spl.NATIVE_MINT_2022);
-    const ownerTokenAccount = isNativeToken
-      ? owner
-      : spl.getAssociatedTokenAddressSync(mint, owner, true, programId);
+    const ownerTokenAccount = spl.getAssociatedTokenAddressSync(mint, owner, true, programId);
     const instructions = [];
     const cancelInstruction = await this.cancelInstruction({
       authority: this.authority,
       cash: cash.pubkey,
+      owner,
       ownerToken: ownerTokenAccount,
       vaultToken: spl.getAssociatedTokenAddressSync(mint, cash.pubkey, true, programId),
       feePayer: this.feePayer,
@@ -263,6 +261,7 @@ export class CashClient {
     const keys = [
       { pubkey: params.authority, isSigner: true, isWritable: false },
       { pubkey: params.cash, isSigner: false, isWritable: true },
+      { pubkey: params.owner, isSigner: false, isWritable: true },
       { pubkey: params.ownerToken, isSigner: false, isWritable: true },
       { pubkey: params.feePayer, isSigner: false, isWritable: true },
       {
