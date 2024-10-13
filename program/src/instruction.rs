@@ -64,15 +64,16 @@ pub enum CashInstruction {
     /// 0. `[signer]`   The cash authority responsible for approving / refunding payments due to some external conditions
     /// 1. `[signer][writable]`The account of the wallet owner initializing the cash
     /// 2. `[signer]`   The fee payer
-    /// 3. `[writable]` The cash link account, it will hold all necessary info about the trade.
-    /// 4. `[]` The pass key required to unlock the cash link for redemption (Optional)
-    /// 5. `[]` The token mint
-    /// 6. `[writable]` The associated token for the mint derived from the cash link account
-    /// 7. `[writable]` The owner token that must be passed if pay is true and mint is some
-    /// 8. `[]` The rent sysvar
-    /// 9. `[]` The system program
-    /// 10. `[]` The token program
-    /// 11. `[]` The associated token program
+    /// 3. `[writable]`   The fee payer token account
+    /// 4. `[writable]` The cash link account, it will hold all necessary info about the trade.
+    /// 5. `[]` The pass key required to unlock the cash link for redemption (Optional)
+    /// 6. `[]` The token mint
+    /// 7. `[writable]` The associated token for the mint derived from the cash link account
+    /// 8. `[writable]` The owner token that must be passed if pay is true and mint is some
+    /// 9. `[]` The rent sysvar
+    /// 10. `[]` The system program
+    /// 11. `[]` The token program
+    /// 12. `[]` The associated token program
     InitCash (InitCashArgs),
     /// Redeem the cash
     ///
@@ -133,6 +134,7 @@ pub fn init_cash(
     authority: &Pubkey,
     owner: &Pubkey,
     fee_payer: &Pubkey,
+    fee_payer_token: &Pubkey,
     cash_link_pda: &Pubkey,
     pass_key: &Pubkey,
     mint: &Pubkey,
@@ -143,6 +145,7 @@ pub fn init_cash(
         AccountMeta::new_readonly(*authority, true),
         AccountMeta::new_readonly(*owner, true),
         AccountMeta::new(*fee_payer, true),
+        AccountMeta::new(*fee_payer_token, false),
         AccountMeta::new(*cash_link_pda, false),
         AccountMeta::new_readonly(*pass_key, false),
         AccountMeta::new_readonly(*mint, false),

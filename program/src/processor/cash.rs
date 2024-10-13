@@ -42,6 +42,7 @@ pub fn process_init(
     assert_signer(authority_info)?;
     let owner_info = next_account_info(account_info_iter)?;
     let fee_payer_info = next_account_info(account_info_iter)?;
+    let fee_payer_token_info = next_account_info(account_info_iter)?;
     let cash_info = next_account_info(account_info_iter)?;
     let pass_info = if args.is_locked {
         Some(next_account_info(account_info_iter)?)
@@ -187,9 +188,12 @@ pub fn process_init(
             &[],
         )?;
         if total_network_fee > 0 {
+            assert_owned_by(fee_payer_token_info, &token_program_info.key)?;
+            let fee_token: TokenAccount = assert_initialized(fee_payer_token_info)?;
+            assert_token_owned_by(&fee_token, fee_payer_info.key)?;
             spl_token_transfer(
                 owner_token_info,
-                fee_payer_info,
+                fee_payer_token_info,
                 owner_info,
                 mint_info,
                 &token_program_info.key,

@@ -56,6 +56,7 @@ export type InitCashParams = {
   cashBump: number;
   authority: PublicKey;
   feePayer: PublicKey;
+  feeTokenAccount: PublicKey;
   ownerTokenAccount: PublicKey;
   owner: PublicKey;
   cash: PublicKey;

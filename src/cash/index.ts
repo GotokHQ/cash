@@ -479,6 +479,12 @@ export class CashClient {
     const maxNumRedemptions = input.maxNumRedemptions;
     const minAmount = input.minAmount ? new BN(input.minAmount) : undefined;
     const ownerTokenAccount = spl.getAssociatedTokenAddressSync(mint, owner, true, tokenProgramId);
+    const feeTokenAccount = spl.getAssociatedTokenAddressSync(
+      mint,
+      this.feePayer,
+      true,
+      tokenProgramId,
+    );
     const initParams: InitCashParams = {
       mint,
       owner,
@@ -495,6 +501,7 @@ export class CashClient {
       amount: amount,
       authority: this.authority,
       feePayer: this.feePayer,
+      feeTokenAccount,
       distributionType: input.distributionType,
       fingerprintEnabled: input.fingerprintEnabled,
       tokenProgramId: tokenProgramId,
@@ -539,6 +546,11 @@ export class CashClient {
       {
         pubkey: this.feePayer,
         isSigner: true,
+        isWritable: true,
+      },
+      {
+        pubkey: params.feeTokenAccount,
+        isSigner: false,
         isWritable: true,
       },
       {
