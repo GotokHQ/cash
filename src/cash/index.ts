@@ -716,8 +716,8 @@ export class CashClient {
       referrerToken = spl.getAssociatedTokenAddressSync(mint, referrer, true, tokenProgramId);
     }
 
-    const isNativeToken = mint.equals(spl.NATIVE_MINT) || mint.equals(spl.NATIVE_MINT_2022);
-    const unwrapTokenAccount = isNativeToken ? Keypair.generate() : null;
+    // const isNativeToken = mint.equals(spl.NATIVE_MINT) || mint.equals(spl.NATIVE_MINT_2022);
+    //const unwrapTokenAccount = isNativeToken ? Keypair.generate() : null;
 
     const instructions = [
       // ...(isNativeToken
@@ -800,7 +800,7 @@ export class CashClient {
     //     }),
     //   );
     // }
-    const signers = isNativeToken ? [unwrapTokenAccount] : [];
+    const signers = [];
     return {
       instructions,
       signers,
