@@ -350,7 +350,6 @@ pub fn process_cancel(
             &[&signer_seeds],
         )?;
     }
-    msg!("Mark the cash account as canceled...");
     cash.state = CashState::Canceled;
     Cash::pack(cash, &mut cash_info.data.borrow_mut())?;
     Ok(())
@@ -461,7 +460,6 @@ pub fn process_redemption(
         }
         DistributionType::Weighted => {
             let weight_ppm = args.weight_ppm.ok_or(CashError::WeightNotProvided)?;
-
             // Validate that weight_ppm is within acceptable range (0 to 1,000,000)
             if weight_ppm == 0 || weight_ppm > 1_000_000 {
                 return Err(CashError::InvalidWeight.into());
@@ -520,8 +518,6 @@ pub fn process_redemption(
     let mut total_fee_to_redeem = if cash.total_redemptions == 1 {
         platform_fee_per_redeem
             .checked_add(fee_to_redeem)
-            .ok_or::<ProgramError>(CashError::Overflow.into())?
-            .checked_add(cash.network_fee)
             .ok_or::<ProgramError>(CashError::Overflow.into())?
     } else {
         platform_fee_per_redeem
@@ -851,7 +847,6 @@ pub fn process_close(accounts: &[AccountInfo], program_id: &Pubkey) -> ProgramRe
     if cash.total_redemptions > 0 {
         return Err(AccountAlreadyRedeemed.into());
     }
-    msg!("Closing the cash account...");
     empty_account_balance(cash_info, destination_info)?;
     Ok(())
 }
