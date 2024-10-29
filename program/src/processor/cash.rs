@@ -163,8 +163,6 @@ pub fn process_init(
             &token_program_info.key,
         )?;
     }
-    assert_owned_by(owner_token_info, &token_program_info.key)?;
-    let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
     let mint: Mint = assert_initialized(mint_info)?;
     let total_network_fee = args.network_fee;
     if cmp_pubkeys(&mint_info.key, &spl_token::native_mint::id())
@@ -176,6 +174,8 @@ pub fn process_init(
             native_transfer(owner_info, fee_payer_info, total_network_fee, &[])?;
         }
     } else {
+        assert_owned_by(owner_token_info, &token_program_info.key)?;
+        let owner_token: TokenAccount = assert_initialized(owner_token_info)?;
         assert_token_owned_by(&owner_token, owner_info.key)?;
         spl_token_transfer(
             owner_token_info,
@@ -502,7 +502,7 @@ pub fn process_redemption(
         }
     };
 
-    let fee_to_redeem = cash.max_fee_to_redeem()?;
+    let mut fee_to_redeem = cash.max_fee_to_redeem()?;
 
     cash.remaining_amount = cash
         .remaining_amount
@@ -576,7 +576,7 @@ pub fn process_redemption(
             mint_info,
             &token_program_info.key,
             amount_to_redeem
-                .checked_add(platform_fee_per_redeem)
+                .checked_add(total_fee_to_redeem)
                 .ok_or::<ProgramError>(CashError::Overflow.into())?,
             mint.decimals,
             &[&signer_seeds],
@@ -605,6 +605,9 @@ pub fn process_redemption(
             total_fee_to_redeem = total_fee_to_redeem
                 .checked_sub(cash.rent_fee_to_redeem)
                 .ok_or::<ProgramError>(CashError::Overflow.into())?;
+            fee_to_redeem = fee_to_redeem
+            .checked_sub(cash.rent_fee_to_redeem)
+            .ok_or::<ProgramError>(CashError::Overflow.into())?;
             total = amount_to_redeem
                 .checked_add(total_fee_to_redeem)
                 .ok_or::<ProgramError>(CashError::Overflow.into())?;
@@ -633,7 +636,20 @@ pub fn process_redemption(
                 &token_program_info.key,
             )?;
         }
-
+        if exists(fee_payer_token_info)? {
+            let fee_payer_token: TokenAccount = assert_initialized(fee_payer_token_info)?;
+            assert_token_owned_by(&fee_payer_token, &fee_payer_info.key)?;
+            assert_owned_by(fee_payer_token_info, &token_program_info.key)?;
+        } else {
+            create_associated_token_account_raw(
+                fee_payer_info,
+                fee_payer_token_info,
+                fee_payer_info,
+                mint_info,
+                rent_info,
+                &token_program_info.key,
+            )?;
+        }
         spl_token_transfer(
             vault_token_info,
             recipient_token_info,
@@ -641,6 +657,18 @@ pub fn process_redemption(
             mint_info,
             &token_program_info.key,
             amount_to_redeem,
+            mint.decimals,
+            &[&signer_seeds],
+        )?;
+    }
+    if fee_to_redeem > 0 && !is_native{
+        spl_token_transfer(
+            vault_token_info,
+            fee_payer_token_info,
+            cash_info,
+            mint_info,
+            &token_program_info.key,
+            fee_to_redeem,
             mint.decimals,
             &[&signer_seeds],
         )?;
@@ -763,11 +791,6 @@ pub fn process_redemption(
     if cash.is_fully_redeemed()? {
         if is_native
         {
-            assert_account_key(
-                owner_token_info,
-                &cash.owner,
-                Some(CashError::InvalidOwner),
-            )?;
             spl_token_close(
                 vault_token_info,
                 fee_payer_info,
